@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verifica tu correo - Glucosapp</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+  <div style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 20px; text-align: center;">
+      <h1 style="margin: 0; color: #ffffff; font-size: 28px;">¡Bienvenido a Glucosapp!</h1>
+    </div>
+    
+    <!-- Content -->
+    <div style="padding: 40px 30px;">
+      <h2 style="margin: 0 0 20px; color: #333333; font-size: 24px;">Verifica tu correo electrónico</h2>
+      
+      <p style="margin: 0 0 20px; color: #666666; font-size: 16px; line-height: 1.6;">
+        Gracias por registrarte en Glucosapp. Para completar tu registro y comenzar a usar la aplicación, 
+        necesitamos verificar tu dirección de correo electrónico.
+      </p>
+      
+      <p style="margin: 0 0 30px; color: #666666; font-size: 16px; line-height: 1.6;">
+        Haz clic en el botón de abajo para verificar tu correo:
+      </p>
+      
+      <!-- Button -->
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="{{verificationUrl}}" 
+           style="display: inline-block; padding: 14px 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: bold; box-shadow: 0 4px 6px rgba(102, 126, 234, 0.4);">
+          Verificar correo electrónico
+        </a>
+      </div>
+      
+      <!-- Alternative link -->
+      <div style="margin: 30px 0; padding: 20px; background-color: #f8f9fa; border-radius: 6px;">
+        <p style="margin: 0 0 10px; color: #666666; font-size: 14px;">
+          Si el botón no funciona, copia y pega este enlace en tu navegador:
+        </p>
+        <p style="margin: 0; word-break: break-all; color: #667eea; font-size: 14px;">
+          {{verificationUrl}}
+        </p>
+      </div>
+      
+      <!-- Warning -->
+      <div style="margin: 30px 0; padding: 15px; background-color: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+        <p style="margin: 0; color: #856404; font-size: 14px;">
+          ⚠️ Este enlace expirará en 24 horas por seguridad.
+        </p>
+      </div>
+      
+      <p style="margin: 20px 0 0; color: #999999; font-size: 14px; line-height: 1.6;">
+        Si no creaste una cuenta en Glucosapp, puedes ignorar este correo de forma segura.
+      </p>
+    </div>
+    
+    <!-- Footer -->
+    <div style="background-color: #f8f9fa; padding: 20px 30px; text-align: center; border-top: 1px solid #e9ecef;">
+      <p style="margin: 0; color: #999999; font-size: 12px;">
+        © 2025 Glucosapp. Todos los derechos reservados.
+      </p>
+      <p style="margin: 10px 0 0; color: #999999; font-size: 12px;">
+        Este es un correo automático, por favor no respondas.
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+
