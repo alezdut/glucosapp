@@ -1,0 +1,10 @@
+node_modules
+dist
+.build
+.next
+.expo
+coverage
+.env
+.env.*
+.prisma
+.DS_Store

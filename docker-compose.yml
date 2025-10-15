@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: glucosapp
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  api:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/glucosapp?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+  web:
+    image: node:20-alpine
+    working_dir: /repo
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://api:3000
+    command: sh -lc "corepack enable && corepack prepare pnpm@9.12.2 --activate && pnpm install && pnpm -C apps/web dev -p 3001"
+    ports:
+      - "3003:3001"
+    volumes:
+      - .:/repo
+    depends_on:
+      - api

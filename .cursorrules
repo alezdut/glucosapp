@@ -1,0 +1,106 @@
+Glucosapp Cursor Rules
+
+Context
+- Monorepo managed with pnpm workspaces and Turborepo.
+- Apps
+  - apps/backend: NestJS + Prisma + Swagger (URI versioning v1)
+  - apps/web: Next.js (App Router) + @tanstack/react-query
+  - apps/mobile: Expo + React Native + @tanstack/react-query
+- Shared packages
+  - packages/config: tsconfig base, eslint, prettier
+  - packages/env: Zod-based env loader
+  - packages/types: shared types (User, GlucoseEntry)
+  - packages/api-client: makeApiClient(baseUrl) built on openapi-fetch
+
+Tooling and Versions
+- Node 20.19.5 via nvm; pnpm 9.12.2 via corepack (packageManager pinned).
+- Turborepo tasks: dev (persistent), build, lint, typecheck.
+- Husky + lint-staged (prettier) + commitlint (conventional commits).
+- CI (GitHub Actions): setup node 20, corepack, pnpm install, build, lint, typecheck.
+
+High-level Principles
+1) Simplicity first; minimal code changes; avoid touching unrelated code.
+2) Readability over cleverness; prefer early returns; avoid deep nesting.
+3) Correctness and type-safety; strict TypeScript in shared code.
+4) Maintainability and testability; isolate concerns; keep functions small.
+5) Functional and mostly immutable style unless verbose.
+
+Code Style
+- Use descriptive names; no 1–2 character identifiers.
+- Functions are verbs; variables are nouns; avoid abbreviations.
+- Add short function-level comments only when non-obvious; explain “why”, not “how”.
+- Prefer constants over functions when feasible; extract config to shared packages/config.
+- Do not add drive-by refactors; keep edits scoped to the task.
+- Prefer guard clauses; handle error/edge cases first.
+
+Backend (NestJS) Conventions
+- API versioning: URI-based v1 via app.enableVersioning; do NOT also set a matching global prefix.
+- Global pipes: ValidationPipe with whitelist, forbidNonWhitelisted, transform.
+- Swagger is mounted at /docs with DocumentBuilder in main.ts.
+- Enable CORS; restrict origins from env when hardening.
+- PrismaService must NOT auto-connect on module init (health should work without DB).
+- Use DTOs with class-validator for inputs; map domain types explicitly.
+- Keep controllers thin; extract business logic to providers/services.
+- Env via ConfigModule (global) and packages/env when convenient.
+
+Web (Next.js) Conventions
+- App Router with top-level QueryClientProvider in src/app/providers.tsx.
+- Use @glucosapp/api-client: makeApiClient(`${NEXT_PUBLIC_API_BASE_URL}/v1`).
+- Use React Query for data fetching; set queryKey explicitly; prefer staleTime/cacheTime as appropriate.
+- Dev port is 3001; .env.local must define NEXT_PUBLIC_API_BASE_URL (default http://localhost:3000).
+
+Mobile (Expo) Conventions
+- Use React Query and @glucosapp/api-client with `${EXPO_PUBLIC_API_BASE_URL}/v1`.
+- For real devices, use machine LAN IP instead of localhost.
+- Dev server prefers port 8082 to avoid 8081 conflicts.
+
+Shared Packages
+- @glucosapp/config exports tsconfig base, eslint config, prettier config.
+- @glucosapp/env exposes EnvSchema, loadEnv(), env; validate env at boundaries.
+- @glucosapp/types holds cross-cutting types; keep lean and stable.
+- @glucosapp/api-client returns { client } from openapi-fetch; keep paths simple and typed progressively.
+
+Dependencies Policy
+- Prefer workspace packages over duplicating logic.
+- Keep dependencies minimal; avoid heavy libs for simple tasks.
+- Pin major tooling versions consistent with repo (Node 20, pnpm 9.12.2).
+
+Testing & Quality
+- Add unit tests for services and utilities (Jest recommended).
+- For web/mobile UI, prefer Testing Library patterns.
+- Lint and typecheck must pass locally before pushing (CI enforces).
+
+Git & Commits
+- Conventional commits (feat, fix, chore, docs, refactor, test, ci, build).
+- Small, focused PRs; include motivation and screenshots/logs when helpful.
+
+CI/CD & Docker
+- CI runs install, build, lint, typecheck; keep pipelines fast and cache-friendly.
+- docker-compose provides db (postgres:16) and api; api depends_on db healthy.
+- Backend Dockerfile uses multi-stage build on node:20-alpine.
+
+Security & Config
+- Never commit secrets; use env vars and .env files excluded by .gitignore.
+- Validate and parse env with Zod (packages/env) where appropriate.
+- Sanitize external inputs; whitelist CORS origins from env.
+
+Performance
+- Use React Query caching and invalidation patterns instead of manual caches.
+- Avoid unnecessary re-renders; memoize where beneficial and simple.
+
+Operational Notes
+- Ports: backend 3000, web 3001, expo 8082. Free with: lsof -ti:<port> | xargs kill -9
+- Prisma local dev: prisma generate; prisma migrate dev (requires Postgres).
+
+When Editing with Cursor
+- Make the smallest viable change; do not refactor unrelated code.
+- Match existing file formatting and indentation; do not reformat other sections.
+- Add imports/deps only when required by the change.
+- After edits that add TypeScript, ensure typecheck stays green.
+- If a toolchain change is required, update CI and docs accordingly.
+
+Acceptance for Feature PRs
+- Local dev runs: pnpm dev and individual app scripts.
+- Lint/typecheck pass locally; CI green.
+- For API changes: /docs updated and health remains stable.
+

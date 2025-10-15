@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "Glucosapp Mobile",
+    "slug": "glucosapp-mobile",
+    "version": "1.0.0",
+    "sdkVersion": "54.0.0",
+    "extra": {},
+    "scheme": "glucosapp",
+    "platforms": ["ios", "android", "web"],
+    "orientation": "portrait",
+    "newArchEnabled": true,
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Glucosapp to access your camera to scan food items."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow Glucosapp to save scanned images to your photo library.",
+          "savePhotosPermission": "Allow Glucosapp to save scanned images to your photo library.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ]
+    ],
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "experiments": {
+      "typedRoutes": false
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "ios": {
+      "bundleIdentifier": "com.anonymous.glucosapp-mobile"
+    }
+  }
+}
