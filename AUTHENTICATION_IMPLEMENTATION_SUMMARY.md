@@ -235,7 +235,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ### 2. Iniciar Base de Datos
 
 ```bash
-cd /Users/alejandrozdut/Documents/glucosapp
+# Desde la raíz del repositorio
 docker-compose up -d db
 ```
 
