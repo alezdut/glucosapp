@@ -7,7 +7,7 @@ export default function Home() {
   const { data, isLoading } = useQuery({
     queryKey: ["health"],
     queryFn: async () => {
-      const res = await client.GET("/health", {} as Record<string, never>);
+      const res = await client.GET("/health");
       return res?.data ?? { ok: true };
     },
   });

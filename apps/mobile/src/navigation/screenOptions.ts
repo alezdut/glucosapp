@@ -1,4 +1,3 @@
-import { Platform } from "react-native";
 import { getPlatformTheme } from "../theme";
 
 export const getTabBarScreenOptions = () => {

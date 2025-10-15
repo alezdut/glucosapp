@@ -38,7 +38,7 @@ export default function TabNavigator() {
         name="Scan"
         component={ScanScreen}
         options={{
-          tabBarIcon: ({ color, size }) => (
+          tabBarIcon: ({ size }) => (
             <Camera size={size + 8} color={platformConfig.tabBarIconActive} />
           ),
           ...getScanTabOptions(),

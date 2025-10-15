@@ -8,8 +8,7 @@ import {
   Dimensions,
   ActivityIndicator,
 } from "react-native";
-import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
-import * as ImagePicker from "expo-image-picker";
+import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as MediaLibrary from "expo-media-library";
 import { analyzeImage, AnalyzeResponse } from "@glucosapp/api-client";
@@ -50,7 +49,7 @@ export default function ScanScreen() {
       });
 
       if (photo?.uri) {
-        await handleAnalyzeImage(photo.uri, photo.width, photo.height);
+        await handleAnalyzeImage(photo.uri);
       }
     } catch (error) {
       console.error("Error taking picture:", error);
@@ -58,7 +57,7 @@ export default function ScanScreen() {
     }
   };
 
-  const handleAnalyzeImage = async (imageUri: string, width?: number, height?: number) => {
+  const handleAnalyzeImage = async (imageUri: string) => {
     setIsAnalyzing(true);
     setAnalysisResult(null);
 

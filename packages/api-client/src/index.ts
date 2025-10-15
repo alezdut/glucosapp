@@ -1,12 +1,44 @@
-import createClient from "openapi-fetch";
-
 export type ApiClient = ReturnType<typeof makeApiClient>;
 
 /**
- * Creates an OpenAPI client for the given baseUrl.
+ * Creates an API client for the given baseUrl.
  */
 export function makeApiClient(baseUrl: string) {
-  const client = createClient({ baseUrl });
+  const client = {
+    async GET<T = any>(path: string, init?: RequestInit): Promise<{ data?: T; error?: any }> {
+      try {
+        const response = await fetch(`${baseUrl}${path}`, { ...init, method: "GET" });
+        if (!response.ok) {
+          return { error: { status: response.status, message: response.statusText } };
+        }
+        const data = await response.json();
+        return { data };
+      } catch (error) {
+        return { error };
+      }
+    },
+    async POST<T = any>(
+      path: string,
+      body?: any,
+      init?: RequestInit,
+    ): Promise<{ data?: T; error?: any }> {
+      try {
+        const response = await fetch(`${baseUrl}${path}`, {
+          ...init,
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...init?.headers },
+          body: body ? JSON.stringify(body) : undefined,
+        });
+        if (!response.ok) {
+          return { error: { status: response.status, message: response.statusText } };
+        }
+        const data = await response.json();
+        return { data };
+      } catch (error) {
+        return { error };
+      }
+    },
+  };
   return { client };
 }
 
