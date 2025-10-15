@@ -14,6 +14,10 @@ COPY apps/backend/package.json apps/backend/tsconfig.json ./apps/backend/
 COPY apps/backend/prisma ./apps/backend/prisma
 # Install all workspace dependencies
 RUN pnpm install --frozen-lockfile
+# Generate Prisma client (needed at runtime)
+WORKDIR /app/apps/backend
+RUN pnpm prisma:generate
+WORKDIR /app
 
 FROM deps AS build
 # Copy shared packages (config, types, env)
@@ -27,9 +31,9 @@ WORKDIR /app
 RUN pnpm --filter @glucosapp/types build && pnpm --filter @glucosapp/env build
 # Copy backend source (including email templates)
 COPY apps/backend/src ./apps/backend/src
-# Build backend
+# Build backend (Prisma client already generated in deps stage)
 WORKDIR /app/apps/backend
-RUN pnpm prisma:generate && pnpm build
+RUN pnpm build
 # Copy email templates to dist folder
 RUN mkdir -p dist/modules/auth/templates && \
     cp -r src/modules/auth/templates/*.html dist/modules/auth/templates/

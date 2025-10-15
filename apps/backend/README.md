@@ -233,7 +233,7 @@ lsof -ti:3000 | xargs kill -9
 
 - Verify `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set
 - Check redirect URI in Google Console matches `GOOGLE_CALLBACK_URL`
-- Ensure Google+ API is enabled in Google Cloud Console
+- Ensure OAuth 2.0 client credentials are properly configured in Google Cloud Console with required scopes (profile, email) and authorized redirect URI matching `GOOGLE_CALLBACK_URL`
 
 ## Testing with Swagger
 

@@ -376,7 +376,7 @@ Todo está documentado en Swagger (http://localhost:3000/docs).
 
 ## ✨ Siguientes Mejoras Sugeridas
 
-- [ ] Password reset (recuperación de contraseña)
+- [x] Password reset (recuperación de contraseña)
 - [ ] Rate limiting en endpoints de auth
 - [ ] 2FA (autenticación de dos factores)
 - [ ] Session management (ver sesiones activas)

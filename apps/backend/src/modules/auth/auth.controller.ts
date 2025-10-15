@@ -181,14 +181,32 @@ export class AuthController {
   @Get("google/callback")
   @UseGuards(GoogleAuthGuard)
   @ApiOperation({ summary: "Google OAuth callback" })
-  @ApiResponse({ status: 302, description: "Redirect to frontend with tokens" })
+  @ApiResponse({ status: 302, description: "Redirect to frontend with secure cookies" })
   async googleAuthCallback(@Req() req: Request, @Res() res: Response): Promise<void> {
     const user = req.user as UserResponseDto;
     const authResponse = await this.authService.login(user);
 
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3001";
-    const redirectUrl = `${frontendUrl}/auth/callback?accessToken=${authResponse.accessToken}&refreshToken=${authResponse.refreshToken}`;
+    const isProduction = process.env.NODE_ENV === "production";
 
-    res.redirect(redirectUrl);
+    // Set secure HTTP-only cookies for tokens
+    res.cookie("accessToken", authResponse.accessToken, {
+      httpOnly: true,
+      secure: isProduction, // HTTPS only in production
+      sameSite: "lax",
+      maxAge: 15 * 60 * 1000, // 15 minutes
+      path: "/",
+    });
+
+    res.cookie("refreshToken", authResponse.refreshToken, {
+      httpOnly: true,
+      secure: isProduction, // HTTPS only in production
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: "/",
+    });
+
+    // Redirect without tokens in URL
+    res.redirect(`${frontendUrl}/auth/callback`);
   }
 }

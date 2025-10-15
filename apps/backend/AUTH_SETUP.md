@@ -66,11 +66,15 @@ Run this twice to generate both `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET`.
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project or select existing one
-3. Enable Google+ API
+3. Navigate to "APIs & Services" > "Credentials"
 4. Create OAuth 2.0 credentials:
+   - Click "Create Credentials" > "OAuth client ID"
    - Application type: Web application
-   - Authorized redirect URIs: `http://localhost:3000/v1/auth/google/callback`
+   - Add authorized redirect URIs: `http://localhost:3000/v1/auth/google/callback`
+   - Configure OAuth consent screen if prompted (scopes: profile, email)
 5. Copy Client ID and Client Secret to your `.env` file
+
+**Note:** The OAuth 2.0 client uses Google's OpenID Connect userinfo endpoint (accessed via passport-google-oauth20) to retrieve user profile and email. No additional API enablement is required beyond the OAuth 2.0 setup.
 
 ### Setting up Email (Optional)
 
@@ -202,7 +206,7 @@ Content-Type: application/json
 GET /v1/auth/google
 ```
 
-Redirects to Google OAuth consent screen. After authorization, redirects to frontend with tokens.
+Redirects to Google OAuth consent screen. After authorization, redirects to frontend with tokens set as secure HTTP-only cookies.
 
 ### Protected Endpoints
 
@@ -300,6 +304,32 @@ const meResponse = await client.GET("/auth/me", {
 ### Mobile (Expo)
 
 Same as web, but use `EXPO_PUBLIC_API_BASE_URL` and AsyncStorage instead of localStorage.
+
+### Google OAuth Cookie Handling
+
+After successful Google OAuth authentication, tokens are set as secure HTTP-only cookies:
+
+**Backend sets cookies:**
+
+- `accessToken` - httpOnly, secure (production), sameSite: lax, maxAge: 15 minutes
+- `refreshToken` - httpOnly, secure (production), sameSite: lax, maxAge: 7 days
+
+**Frontend callback page (`/auth/callback`):**
+
+```typescript
+// The tokens are automatically available in cookies
+// No need to extract from URL or localStorage
+
+// For API calls, cookies will be sent automatically if using credentials: 'include'
+const meResponse = await fetch("/v1/auth/me", {
+  credentials: "include", // Important: includes cookies
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+```
+
+**Note:** For cross-origin requests, ensure your frontend includes `credentials: 'include'` in fetch requests, and the backend CORS configuration allows credentials from your frontend origin.
 
 ## Troubleshooting
 
