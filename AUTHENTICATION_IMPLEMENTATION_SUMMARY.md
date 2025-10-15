@@ -60,10 +60,12 @@ Se ha implementado exitosamente un sistema de autenticación completo en el back
 apps/backend/src/modules/auth/
 ├── dto/
 │   ├── auth-response.dto.ts       ✨ Nuevo
+│   ├── forgot-password.dto.ts     ✨ Nuevo
 │   ├── login.dto.ts               ✨ Nuevo
-│   ├── register.dto.ts            ✨ Nuevo
 │   ├── refresh-token.dto.ts       ✨ Nuevo
+│   ├── register.dto.ts            ✨ Nuevo
 │   ├── resend-verification.dto.ts ✨ Nuevo
+│   ├── reset-password.dto.ts      ✨ Nuevo
 │   └── verify-email.dto.ts        ✨ Nuevo
 ├── guards/
 │   ├── google-auth.guard.ts       ✨ Nuevo
@@ -79,6 +81,9 @@ apps/backend/src/modules/auth/
 │   ├── jwt.strategy.ts            ✨ Nuevo
 │   ├── local.strategy.ts          ✨ Nuevo
 │   └── refresh-token.strategy.ts  ✨ Nuevo
+├── templates/
+│   ├── reset-password.html        ✨ Nuevo
+│   └── verification-email.html    ✨ Nuevo
 ├── auth.controller.ts             ✨ Nuevo
 ├── auth.module.ts                 ✨ Nuevo
 └── README.md                      ✨ Nuevo
