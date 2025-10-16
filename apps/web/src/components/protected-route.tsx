@@ -1,4 +1,5 @@
 "use client";
+import { Box, CircularProgress } from "@mui/material";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
@@ -22,9 +23,9 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (isLoading) {
     return (
-      <div style={{ padding: 24, textAlign: "center" }}>
-        <p>Cargando...</p>
-      </div>
+      <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
+        <CircularProgress />
+      </Box>
     );
   }
 
