@@ -13,6 +13,10 @@ export function makeApiClient(baseUrl: string) {
           const message = errorData.message || response.statusText;
           return { error: { status: response.status, message } };
         }
+        // Handle 204 No Content - no body to parse
+        if (response.status === 204) {
+          return { data: undefined as T };
+        }
         const data = await response.json();
         return { data };
       } catch (error) {
@@ -35,6 +39,10 @@ export function makeApiClient(baseUrl: string) {
           const errorData = await response.json().catch(() => ({}));
           const message = errorData.message || response.statusText;
           return { error: { status: response.status, message } };
+        }
+        // Handle 204 No Content - no body to parse
+        if (response.status === 204) {
+          return { data: undefined as T };
         }
         const data = await response.json();
         return { data };

@@ -25,8 +25,9 @@ reviews:
   #   - feature/*
 
 # Configure what to review
-knowledge_base: true
-learnings: true
+knowledge_base:
+  enabled: true
+  learnings: true
 auto_title_placeholder: "<!-- CODERABBIT TITLE -->"
 
 # Path-based instructions for reviewers

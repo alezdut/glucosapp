@@ -1,5 +1,5 @@
 "use client";
-import { useState, FormEvent } from "react";
+import { useState, FormEvent, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -49,6 +49,18 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const { register } = useAuth();
   const router = useRouter();
+  const timeoutRef = useRef<number | null>(null);
+
+  /**
+   * Cleanup timeout on unmount
+   */
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current !== null) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   /**
    * Handles password change and updates strength indicator
@@ -94,8 +106,12 @@ export default function RegisterPage() {
     try {
       await register(email, password, firstName, lastName);
       setSuccess(true);
+      // Clear any existing timeout before scheduling a new one
+      if (timeoutRef.current !== null) {
+        clearTimeout(timeoutRef.current);
+      }
       // Redirect to login after 3 seconds
-      setTimeout(() => router.push("/login"), 3000);
+      timeoutRef.current = window.setTimeout(() => router.push("/login"), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al registrarse");
     } finally {

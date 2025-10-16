@@ -16,6 +16,7 @@ function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const hasVerified = useRef(false);
+  const timeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     // Prevent double execution in React StrictMode
@@ -36,13 +37,24 @@ function VerifyEmailContent() {
       .then((response) => {
         setStatus("success");
         setMessage(response.message);
+        // Clear any existing timeout before scheduling a new one
+        if (timeoutRef.current !== null) {
+          clearTimeout(timeoutRef.current);
+        }
         // Redirect to login after 3 seconds
-        setTimeout(() => router.push("/login"), 3000);
+        timeoutRef.current = window.setTimeout(() => router.push("/login"), 3000);
       })
       .catch((error) => {
         setStatus("error");
         setMessage(error.message || "Error al verificar email");
       });
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (timeoutRef.current !== null) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
   }, [searchParams, router]);
 
   const handleResendVerification = async (e: React.FormEvent) => {

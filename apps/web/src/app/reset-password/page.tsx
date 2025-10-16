@@ -1,5 +1,5 @@
 "use client";
-import { useState, FormEvent, Suspense } from "react";
+import { useState, FormEvent, Suspense, useRef, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -29,8 +29,20 @@ function ResetPasswordContent() {
   const [isLoading, setIsLoading] = useState(false);
   const searchParams = useSearchParams();
   const router = useRouter();
+  const timeoutRef = useRef<number | null>(null);
 
   const token = searchParams.get("token");
+
+  /**
+   * Cleanup timeout on unmount
+   */
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current !== null) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -57,8 +69,12 @@ function ResetPasswordContent() {
     try {
       await resetPassword(token, newPassword);
       setSuccess(true);
+      // Clear any existing timeout before scheduling a new one
+      if (timeoutRef.current !== null) {
+        clearTimeout(timeoutRef.current);
+      }
       // Redirect to login after 3 seconds
-      setTimeout(() => router.push("/login"), 3000);
+      timeoutRef.current = window.setTimeout(() => router.push("/login"), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al restablecer contraseña");
     } finally {

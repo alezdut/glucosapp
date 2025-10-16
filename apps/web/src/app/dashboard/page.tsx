@@ -34,9 +34,7 @@ export default function DashboardPage() {
                   <strong style={{ display: "block", marginBottom: 4, color: "#555" }}>
                     Nombre:
                   </strong>
-                  <span>
-                    {user.firstName} {user.lastName}
-                  </span>
+                  <span>{[user.firstName, user.lastName].filter(Boolean).join(" ")}</span>
                 </div>
               )}
 

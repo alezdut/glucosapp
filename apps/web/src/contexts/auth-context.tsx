@@ -109,14 +109,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
    * Fetch current user from API
    */
   const fetchCurrentUser = async () => {
-    const { accessToken } = getTokens();
+    let { accessToken } = getTokens();
     if (!accessToken) {
       setIsLoading(false);
       return;
     }
 
     try {
+      // Refresh token if needed and re-read to get fresh token
       await refreshTokenIfNeeded();
+      // Re-read tokens in case they were refreshed
+      const tokens = getTokens();
+      accessToken = tokens.accessToken;
+
+      if (!accessToken) {
+        setIsLoading(false);
+        return;
+      }
+
       const currentUser = await authApi.getCurrentUser(accessToken);
       setUser(currentUser);
     } catch (error) {
