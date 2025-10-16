@@ -1,0 +1,79 @@
+# CodeRabbit Configuration
+# Documentation: https://docs.coderabbit.ai/guides/configure-coderabbit
+
+# Language used for reviews (ISO 639 code)
+language: es
+
+# Configure which branches should trigger reviews
+reviews:
+  # Review PRs targeting these branches
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  high_level_summary_placeholder: "<!-- CODERABBIT COMMENT -->"
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  auto_review:
+    enabled: true
+    # Only review PRs targeting develop branch
+    base_branches:
+      - develop
+  # Optional: also enable for feature branches
+  # base_branches:
+  #   - develop
+  #   - feature/*
+
+# Configure what to review
+knowledge_base: true
+learnings: true
+auto_title_placeholder: "<!-- CODERABBIT TITLE -->"
+
+# Path-based instructions for reviewers
+path_instructions:
+  - path: "apps/backend/**"
+    instructions: |
+      - Review NestJS best practices
+      - Check Prisma queries for performance
+      - Verify DTOs and validation
+      - Ensure proper error handling
+  - path: "apps/web/**"
+    instructions: |
+      - Review Next.js App Router patterns
+      - Check React Query usage
+      - Verify TypeScript types
+      - Review accessibility
+  - path: "apps/mobile/**"
+    instructions: |
+      - Review React Native best practices
+      - Check Expo compatibility
+      - Verify responsive design
+  - path: "packages/**"
+    instructions: |
+      - Review shared package design
+      - Ensure backward compatibility
+      - Check TypeScript exports
+  - path: "**/*.test.ts"
+    instructions: |
+      - Review test coverage
+      - Check edge cases
+      - Verify mock usage
+
+# Files to ignore
+ignore:
+  - "**/*.lock"
+  - "**/*.log"
+  - "**/dist/**"
+  - "**/build/**"
+  - "**/node_modules/**"
+  - "**/.next/**"
+  - "**/coverage/**"
+  - "**/*.config.js"
+  - "**/*.config.ts"
+  - "**/tsconfig.json"
+  - "**/*.md"
+
+# Chat configuration
+chat:
+  auto_reply: true
+
