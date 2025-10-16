@@ -11,7 +11,10 @@ export class UserResponseDto {
   email!: string;
 
   @ApiProperty({ required: false })
-  name?: string;
+  firstName?: string;
+
+  @ApiProperty({ required: false })
+  lastName?: string;
 
   @ApiProperty()
   emailVerified!: boolean;

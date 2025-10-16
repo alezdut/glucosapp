@@ -46,7 +46,8 @@ export class AuthService {
       data: {
         email: registerDto.email,
         password: hashedPassword,
-        name: registerDto.name,
+        firstName: registerDto.firstName,
+        lastName: registerDto.lastName,
         verificationToken,
         verificationTokenExpiry,
       },
@@ -264,10 +265,20 @@ export class AuthService {
       return this.mapUserToDto(user);
     }
 
+    // Split Google profile name into firstName and lastName
+    let firstName: string | undefined;
+    let lastName: string | undefined;
+    if (profile.name) {
+      const nameParts = profile.name.trim().split(/\s+/);
+      firstName = nameParts[0];
+      lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : undefined;
+    }
+
     const newUser = await this.prisma.user.create({
       data: {
         email: profile.email,
-        name: profile.name,
+        firstName,
+        lastName,
         emailVerified: true,
         accounts: {
           create: {
@@ -386,14 +397,16 @@ export class AuthService {
   private mapUserToDto(user: {
     id: string;
     email: string;
-    name: string | null;
+    firstName: string | null;
+    lastName: string | null;
     emailVerified: boolean;
     createdAt: Date;
   }): UserResponseDto {
     return {
       id: user.id,
       email: user.email,
-      name: user.name ?? undefined,
+      firstName: user.firstName ?? undefined,
+      lastName: user.lastName ?? undefined,
       emailVerified: user.emailVerified,
       createdAt: user.createdAt.toISOString(),
     };

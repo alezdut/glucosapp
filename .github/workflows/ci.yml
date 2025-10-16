@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [master, develop]
   pull_request:
-    branches: [ master ]
+    branches: [master, develop]
 
 jobs:
   build:
@@ -28,4 +28,3 @@ jobs:
         run: pnpm lint || true
       - name: Typecheck
         run: pnpm typecheck
-
