@@ -2,18 +2,10 @@
 import { useState, FormEvent, Suspense, useRef, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  TextField,
-  IconButton,
-  InputAdornment,
-  Button,
-  Box,
-  Typography,
-  Alert,
-  CircularProgress,
-} from "@mui/material";
-import { Visibility, VisibilityOff } from "@mui/icons-material";
+import { Button, Box, Typography, Alert, CircularProgress } from "@mui/material";
 import { resetPassword } from "@/lib/auth-api";
+import { PasswordField } from "@/components/PasswordField";
+import { type PasswordStrength } from "@/utils/password-validation";
 import styles from "@/components/auth-form.module.css";
 
 /**
@@ -22,8 +14,7 @@ import styles from "@/components/auth-form.module.css";
 function ResetPasswordContent() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState<PasswordStrength>("weak");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -59,8 +50,10 @@ function ResetPasswordContent() {
       return;
     }
 
-    if (newPassword.length < 8) {
-      setError("La contraseña debe tener al menos 8 caracteres");
+    if (passwordStrength !== "strong") {
+      setError(
+        "La contraseña debe tener al menos 8 caracteres e incluir mayúsculas, números y símbolos especiales",
+      );
       return;
     }
 
@@ -155,57 +148,23 @@ function ResetPasswordContent() {
           onSubmit={handleSubmit}
           sx={{ display: "flex", flexDirection: "column", gap: 2 }}
         >
-          <TextField
+          <PasswordField
             label="Nueva Contraseña"
-            type={showPassword ? "text" : "password"}
             value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
+            onChange={setNewPassword}
             required
             disabled={isLoading}
-            placeholder="••••••••"
-            fullWidth
-            variant="outlined"
-            inputProps={{ minLength: 8 }}
-            helperText="Mínimo 8 caracteres"
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                    onClick={() => setShowPassword(!showPassword)}
-                    edge="end"
-                  >
-                    {showPassword ? <VisibilityOff /> : <Visibility />}
-                  </IconButton>
-                </InputAdornment>
-              ),
-            }}
+            showStrengthIndicator
+            helperText="Debe incluir mayúsculas, números y símbolos especiales"
+            onStrengthChange={setPasswordStrength}
           />
 
-          <TextField
+          <PasswordField
             label="Confirmar Contraseña"
-            type={showConfirmPassword ? "text" : "password"}
             value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
+            onChange={setConfirmPassword}
             required
             disabled={isLoading}
-            placeholder="••••••••"
-            fullWidth
-            variant="outlined"
-            inputProps={{ minLength: 8 }}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    aria-label={showConfirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    edge="end"
-                  >
-                    {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
-                  </IconButton>
-                </InputAdornment>
-              ),
-            }}
           />
 
           <Button

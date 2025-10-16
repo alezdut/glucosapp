@@ -2,35 +2,11 @@
 import { useState, FormEvent, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  TextField,
-  IconButton,
-  InputAdornment,
-  Button,
-  Box,
-  Typography,
-  Alert,
-  LinearProgress,
-} from "@mui/material";
-import { Visibility, VisibilityOff } from "@mui/icons-material";
+import { TextField, Button, Box, Typography, Alert } from "@mui/material";
 import { useAuth } from "@/contexts/auth-context";
+import { PasswordField } from "@/components/PasswordField";
+import { type PasswordStrength } from "@/utils/password-validation";
 import styles from "@/components/auth-form.module.css";
-
-type PasswordStrength = "weak" | "medium" | "strong";
-
-/**
- * Validates password strength
- */
-function validatePassword(pwd: string): PasswordStrength {
-  const hasUpper = /[A-Z]/.test(pwd);
-  const hasNumber = /\d/.test(pwd);
-  const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pwd);
-  const isLongEnough = pwd.length >= 8;
-
-  if (hasUpper && hasNumber && hasSpecial && isLongEnough) return "strong";
-  if ((hasUpper || hasNumber) && isLongEnough) return "medium";
-  return "weak";
-}
 
 /**
  * Registration page component
@@ -41,8 +17,6 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState<PasswordStrength>("weak");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -61,14 +35,6 @@ export default function RegisterPage() {
       }
     };
   }, []);
-
-  /**
-   * Handles password change and updates strength indicator
-   */
-  const handlePasswordChange = (value: string) => {
-    setPassword(value);
-    setPasswordStrength(validatePassword(value));
-  };
 
   /**
    * Handles form submission with validation
@@ -94,9 +60,9 @@ export default function RegisterPage() {
       return;
     }
 
-    if (passwordStrength === "weak") {
+    if (passwordStrength !== "strong") {
       setError(
-        "La contraseña es muy débil. Debe tener al menos 8 caracteres y contener mayúsculas, números o símbolos especiales",
+        "La contraseña debe tener al menos 8 caracteres e incluir mayúsculas, números y símbolos especiales",
       );
       return;
     }
@@ -146,24 +112,6 @@ export default function RegisterPage() {
       </div>
     );
   }
-
-  /**
-   * Gets color for password strength
-   */
-  const getStrengthColor = () => {
-    if (passwordStrength === "strong") return "#22c55e";
-    if (passwordStrength === "medium") return "#eab308";
-    return "#ef4444";
-  };
-
-  /**
-   * Gets strength value for progress bar
-   */
-  const getStrengthValue = () => {
-    if (passwordStrength === "strong") return 100;
-    if (passwordStrength === "medium") return 66;
-    return 33;
-  };
 
   return (
     <div className={styles.container}>
@@ -223,94 +171,23 @@ export default function RegisterPage() {
             variant="outlined"
           />
 
-          <Box>
-            <TextField
-              label="Contraseña"
-              type={showPassword ? "text" : "password"}
-              value={password}
-              onChange={(e) => handlePasswordChange(e.target.value)}
-              required
-              disabled={isLoading}
-              placeholder="••••••••"
-              fullWidth
-              variant="outlined"
-              inputProps={{ minLength: 8 }}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                      onClick={() => setShowPassword(!showPassword)}
-                      edge="end"
-                    >
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-            />
-            {password && (
-              <Box sx={{ mt: 1 }}>
-                <LinearProgress
-                  variant="determinate"
-                  value={getStrengthValue()}
-                  sx={{
-                    height: 4,
-                    borderRadius: 2,
-                    backgroundColor: "#e0e0e0",
-                    "& .MuiLinearProgress-bar": {
-                      backgroundColor: getStrengthColor(),
-                      transition: "background-color 0.3s ease",
-                    },
-                  }}
-                />
-                <Typography
-                  variant="caption"
-                  sx={{
-                    display: "block",
-                    mt: 0.5,
-                    color: getStrengthColor(),
-                    fontWeight: 500,
-                  }}
-                >
-                  Fortaleza:{" "}
-                  {passwordStrength === "strong"
-                    ? "Fuerte"
-                    : passwordStrength === "medium"
-                      ? "Media"
-                      : "Débil"}
-                </Typography>
-              </Box>
-            )}
-            <Typography variant="caption" sx={{ display: "block", mt: 0.5, color: "#666" }}>
-              Debe incluir mayúsculas, números y símbolos especiales
-            </Typography>
-          </Box>
-
-          <TextField
-            label="Confirmar Contraseña"
-            type={showConfirmPassword ? "text" : "password"}
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
+          <PasswordField
+            label="Contraseña"
+            value={password}
+            onChange={setPassword}
             required
             disabled={isLoading}
-            placeholder="••••••••"
-            fullWidth
-            variant="outlined"
-            inputProps={{ minLength: 8 }}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    aria-label={showConfirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    edge="end"
-                  >
-                    {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
-                  </IconButton>
-                </InputAdornment>
-              ),
-            }}
+            showStrengthIndicator
+            helperText="Debe incluir mayúsculas, números y símbolos especiales"
+            onStrengthChange={setPasswordStrength}
+          />
+
+          <PasswordField
+            label="Confirmar Contraseña"
+            value={confirmPassword}
+            onChange={setConfirmPassword}
+            required
+            disabled={isLoading}
           />
 
           <Button

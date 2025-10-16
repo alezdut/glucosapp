@@ -90,6 +90,64 @@ import { Visibility, VisibilityOff } from "@mui/icons-material";
 />;
 ```
 
+#### Componente PasswordField (Personalizado)
+
+**⭐ RECOMENDADO**: Utiliza nuestro componente `PasswordField` reutilizable que incluye toggle de visibilidad y validación de fortaleza integrada.
+
+**Ubicación**: `apps/web/src/components/PasswordField.tsx`  
+**Utilidades**: `apps/web/src/utils/password-validation.ts`
+
+```tsx
+import { PasswordField } from "@/components/PasswordField";
+
+// Campo de contraseña con indicador de fortaleza
+<PasswordField
+  label="Contraseña"
+  value={password}
+  onChange={setPassword}
+  required
+  disabled={isLoading}
+  showStrengthIndicator
+  helperText="Debe incluir mayúsculas, números y símbolos especiales"
+  onStrengthChange={setPasswordStrength}
+/>
+
+// Campo de confirmación (sin indicador)
+<PasswordField
+  label="Confirmar Contraseña"
+  value={confirmPassword}
+  onChange={setConfirmPassword}
+  required
+  disabled={isLoading}
+/>
+```
+
+**Props disponibles:**
+
+- `label` - Etiqueta del campo (requerido)
+- `value` - Valor actual (requerido)
+- `onChange` - Handler para cambios: `(value: string) => void` (requerido)
+- `disabled` - Deshabilitar el campo (opcional, default: false)
+- `placeholder` - Texto placeholder (opcional, default: "••••••••")
+- `required` - Campo requerido (opcional, default: false)
+- `showStrengthIndicator` - Mostrar indicador de fortaleza (opcional, default: false)
+- `helperText` - Texto de ayuda (opcional)
+- `onStrengthChange` - Callback cuando cambia la fortaleza: `(strength: PasswordStrength) => void` (opcional)
+
+**Validación de contraseñas:**
+
+El componente utiliza `validatePassword()` de `@/utils/password-validation` que evalúa:
+
+- ✅ **Fuerte (strong)**: 8+ caracteres + mayúsculas + números + símbolos especiales
+- ⚠️ **Media (medium)**: 8+ caracteres + mayúsculas O números
+- ❌ **Débil (weak)**: Menos de 8 caracteres o sin mayúsculas/números
+
+**Uso consistente:**
+
+- ✅ Usa `PasswordField` en formularios de registro y reseteo de contraseña
+- ✅ Activa `showStrengthIndicator` en el campo principal, no en confirmación
+- ✅ Valida que `passwordStrength === "strong"` antes de enviar el formulario
+
 ### 2. Botones
 
 #### Button
