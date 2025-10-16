@@ -9,7 +9,9 @@ export function makeApiClient(baseUrl: string) {
       try {
         const response = await fetch(`${baseUrl}${path}`, { ...init, method: "GET" });
         if (!response.ok) {
-          return { error: { status: response.status, message: response.statusText } };
+          const errorData = await response.json().catch(() => ({}));
+          const message = errorData.message || response.statusText;
+          return { error: { status: response.status, message } };
         }
         const data = await response.json();
         return { data };
@@ -30,7 +32,9 @@ export function makeApiClient(baseUrl: string) {
           body: body ? JSON.stringify(body) : undefined,
         });
         if (!response.ok) {
-          return { error: { status: response.status, message: response.statusText } };
+          const errorData = await response.json().catch(() => ({}));
+          const message = errorData.message || response.statusText;
+          return { error: { status: response.status, message } };
         }
         const data = await response.json();
         return { data };
