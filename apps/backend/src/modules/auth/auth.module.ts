@@ -11,6 +11,7 @@ import { LocalStrategy } from "./strategies/local.strategy";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { RefreshTokenStrategy } from "./strategies/refresh-token.strategy";
 import { GoogleStrategy } from "./strategies/google.strategy";
+import { GoogleMobileStrategy } from "./strategies/google-mobile.strategy";
 
 /**
  * Module handling authentication
@@ -34,6 +35,7 @@ import { GoogleStrategy } from "./strategies/google.strategy";
     JwtStrategy,
     RefreshTokenStrategy,
     GoogleStrategy,
+    GoogleMobileStrategy,
   ],
   exports: [AuthService],
 })
