@@ -13,15 +13,24 @@ model User {
   password                String?
   firstName               String?
   lastName                String?
+  avatarUrl               String?
   emailVerified           Boolean        @default(false)
   verificationToken       String?        @unique
   verificationTokenExpiry DateTime?
   resetPasswordToken      String?        @unique
   resetPasswordExpiry     DateTime?
+  birthDate               DateTime?
+  weight                  Float?
+  diabetesType            String?
+  glucoseUnit             String         @default("mg/dL")
+  theme                   String         @default("Claro")
+  language                String         @default("Español")
   createdAt               DateTime       @default(now())
   entries                 GlucoseEntry[]
   accounts                Account[]
   refreshTokens           RefreshToken[]
+  insulinDoses            InsulinDose[]
+  meals                   Meal[]
 }
 
 model Account {
@@ -57,4 +66,26 @@ model GlucoseEntry {
   note       String?
   user       User     @relation(fields: [userId], references: [id])
   userId     String
+}
+
+model InsulinDose {
+  id         String   @id @default(cuid())
+  userId     String
+  units      Float
+  recordedAt DateTime @default(now())
+  type       String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Meal {
+  id            String   @id @default(cuid())
+  userId        String
+  name          String
+  carbohydrates Float?
+  recordedAt    DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

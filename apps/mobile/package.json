@@ -16,6 +16,8 @@
     "@babel/runtime": "^7.28.4",
     "@glucosapp/api-client": "workspace:*",
     "@glucosapp/theme": "workspace:*",
+    "@glucosapp/types": "workspace:*",
+    "@react-native-community/datetimepicker": "^8.4.4",
     "@react-navigation/bottom-tabs": "^6.5.11",
     "@react-navigation/native": "^6.1.9",
     "@react-navigation/native-stack": "^6.9.17",

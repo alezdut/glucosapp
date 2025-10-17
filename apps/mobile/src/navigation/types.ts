@@ -4,11 +4,11 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 // Define the parameter list for the bottom tab navigator
 export type RootTabParamList = {
-  Home: undefined;
-  Stats: undefined;
-  Scan: undefined;
-  Profile: undefined;
-  Settings: undefined;
+  Inicio: undefined;
+  Historial: undefined;
+  Calcular: undefined;
+  Médico: undefined;
+  Perfil: undefined;
 };
 
 // Define the parameter list for the root stack navigator (if needed in the future)
@@ -24,8 +24,8 @@ export type RootTabScreenProps<Screen extends keyof RootTabParamList> = Composit
 >;
 
 // Navigation prop types for individual screens
-export type HomeScreenProps = RootTabScreenProps<"Home">;
-export type StatsScreenProps = RootTabScreenProps<"Stats">;
-export type ScanScreenProps = RootTabScreenProps<"Scan">;
-export type ProfileScreenProps = RootTabScreenProps<"Profile">;
-export type SettingsScreenProps = RootTabScreenProps<"Settings">;
+export type HomeScreenProps = RootTabScreenProps<"Inicio">;
+export type HistoryScreenProps = RootTabScreenProps<"Historial">;
+export type CalculatorScreenProps = RootTabScreenProps<"Calcular">;
+export type DoctorScreenProps = RootTabScreenProps<"Médico">;
+export type ProfileScreenProps = RootTabScreenProps<"Perfil">;

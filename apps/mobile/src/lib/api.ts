@@ -19,7 +19,8 @@ export async function storeTokens(accessToken: string, refreshToken: string): Pr
  * Retrieve access token from secure storage
  */
 export async function getAccessToken(): Promise<string | null> {
-  return await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+  const token = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+  return token;
 }
 
 /**
@@ -46,21 +47,32 @@ export function createApiClient() {
   // Create a wrapper that automatically adds auth headers
   const authenticatedClient = {
     ...client,
-    GET: async (path: string, init?: any) => {
+    GET: async (path: string, init?: Record<string, unknown>) => {
       const accessToken = await getAccessToken();
       const headers = {
-        ...init?.headers,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ...(init as any)?.headers,
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       };
       return client.GET(path, { ...init, headers });
     },
-    POST: async (path: string, body?: any, init?: any) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    POST: async (path: string, body?: any, init?: RequestInit) => {
       const accessToken = await getAccessToken();
       const headers = {
         ...init?.headers,
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       };
       return client.POST(path, body, { ...init, headers });
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    PATCH: async (path: string, body?: any, init?: RequestInit) => {
+      const accessToken = await getAccessToken();
+      const headers = {
+        ...init?.headers,
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      };
+      return client.PATCH(path, body, { ...init, headers });
     },
   };
 
