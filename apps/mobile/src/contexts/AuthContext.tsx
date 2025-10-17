@@ -218,16 +218,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Call logout endpoint
       const client = createApiClient();
       await client.POST("/auth/logout", {});
-
-      // Clear local tokens
-      await clearTokens();
-
-      // Clear user state
-      setUser(null);
-      setNeedsOnboarding(false);
     } catch (error) {
       console.error("Sign out failed:", error);
     } finally {
+      // Always clear local tokens and user state, even if logout API fails
+      try {
+        await clearTokens();
+      } catch (error) {
+        console.error("Failed to clear tokens:", error);
+      }
+
+      setUser(null);
+      setNeedsOnboarding(false);
       setIsLoading(false);
     }
   };
