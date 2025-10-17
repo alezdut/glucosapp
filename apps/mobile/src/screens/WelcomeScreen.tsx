@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { theme } from "../theme";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
   iconContainer: {
     width: 80,
     height: 80,
-    borderRadius: 16,
+    borderRadius: theme.borderRadius.xl,
     backgroundColor: theme.colors.background,
     alignItems: "center",
     justifyContent: "center",

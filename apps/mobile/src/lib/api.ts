@@ -54,13 +54,13 @@ export function createApiClient() {
       };
       return client.GET(path, { ...init, headers });
     },
-    POST: async (path: string, init?: any) => {
+    POST: async (path: string, body?: any, init?: any) => {
       const accessToken = await getAccessToken();
       const headers = {
         ...init?.headers,
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       };
-      return client.POST(path, { ...init, headers });
+      return client.POST(path, body, { ...init, headers });
     },
   };
 

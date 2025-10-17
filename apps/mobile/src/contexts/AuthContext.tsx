@@ -121,7 +121,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             await storeTokens(accessToken, refreshToken);
 
             // Parse and set user
-            const parsedUser = JSON.parse(decodeURIComponent(userData));
+            // TODO: Check if userData is already parsed
+            const parsedUser = JSON.parse(userData);
             setUser(parsedUser);
 
             // Check if user needs onboarding
@@ -191,7 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await storeTokens(accessToken, refreshToken);
 
           // Parse and set user
-          const parsedUser = JSON.parse(decodeURIComponent(userData));
+          const parsedUser = JSON.parse(userData);
           setUser(parsedUser);
 
           // Check if user needs onboarding

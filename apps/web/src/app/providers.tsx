@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import { AuthProvider } from "@/contexts/auth-context";
-import { colors } from "@glucosapp/theme";
+import { borderRadius, colors } from "@glucosapp/theme";
 
 // Create custom MUI theme with shared colors
 const muiTheme = createTheme({
@@ -50,7 +50,7 @@ const muiTheme = createTheme({
     },
   },
   shape: {
-    borderRadius: 8,
+    borderRadius: borderRadius.md,
   },
   typography: {
     fontFamily:
