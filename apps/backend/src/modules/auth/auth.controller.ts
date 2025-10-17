@@ -22,6 +22,7 @@ import { AuthResponseDto, UserResponseDto } from "./dto/auth-response.dto";
 import { LocalAuthGuard } from "./guards/local-auth.guard";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { GoogleAuthGuard } from "./guards/google-auth.guard";
+import { GoogleMobileAuthGuard } from "./guards/google-mobile-auth.guard";
 import { Request, Response } from "express";
 
 /**
@@ -208,5 +209,37 @@ export class AuthController {
 
     // Redirect without tokens in URL
     res.redirect(`${frontendUrl}/auth/callback`);
+  }
+
+  /**
+   * Google OAuth callback for mobile (redirects with tokens in URL)
+   */
+  @Get("google/mobile/callback")
+  @UseGuards(GoogleMobileAuthGuard)
+  @ApiOperation({ summary: "Google OAuth callback for mobile apps" })
+  @ApiResponse({ status: 302, description: "Redirect to mobile app with tokens" })
+  async googleAuthMobileCallback(@Req() req: Request, @Res() res: Response): Promise<void> {
+    const user = req.user as UserResponseDto;
+    const authResponse = await this.authService.login(user);
+
+    // Redirect to mobile app with tokens in URL
+    const params = new URLSearchParams({
+      accessToken: authResponse.accessToken,
+      refreshToken: authResponse.refreshToken,
+      user: JSON.stringify(authResponse.user),
+    });
+
+    res.redirect(`glucosapp://auth/callback?${params.toString()}`);
+  }
+
+  /**
+   * Initiate Google OAuth flow for mobile
+   */
+  @Get("google/mobile")
+  @UseGuards(GoogleMobileAuthGuard)
+  @ApiOperation({ summary: "Initiate Google OAuth login for mobile" })
+  @ApiResponse({ status: 302, description: "Redirect to Google OAuth" })
+  async googleAuthMobile(): Promise<void> {
+    // Guard redirects to Google
   }
 }

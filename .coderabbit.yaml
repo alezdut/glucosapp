@@ -23,58 +23,43 @@ reviews:
   # base_branches:
   #   - develop
   #   - feature/*
+  auto_title_placeholder: "<!-- CODERABBIT TITLE -->"
+
+  # Path-based instructions for reviewers
+  path_instructions:
+    - path: "apps/backend/**"
+      instructions: |
+        - Review NestJS best practices
+        - Check Prisma queries for performance
+        - Verify DTOs and validation
+        - Ensure proper error handling
+    - path: "apps/web/**"
+      instructions: |
+        - Review Next.js App Router patterns
+        - Check React Query usage
+        - Verify TypeScript types
+        - Review accessibility
+    - path: "apps/mobile/**"
+      instructions: |
+        - Review React Native best practices
+        - Check Expo compatibility
+        - Verify responsive design
+    - path: "packages/**"
+      instructions: |
+        - Review shared package design
+        - Ensure backward compatibility
+        - Check TypeScript exports
+    - path: "**/*.test.ts"
+      instructions: |
+        - Review test coverage
+        - Check edge cases
+        - Verify mock usage
 
 # Configure what to review
 knowledge_base:
-  enabled: true
-  learnings: true
-auto_title_placeholder: "<!-- CODERABBIT TITLE -->"
-
-# Path-based instructions for reviewers
-path_instructions:
-  - path: "apps/backend/**"
-    instructions: |
-      - Review NestJS best practices
-      - Check Prisma queries for performance
-      - Verify DTOs and validation
-      - Ensure proper error handling
-  - path: "apps/web/**"
-    instructions: |
-      - Review Next.js App Router patterns
-      - Check React Query usage
-      - Verify TypeScript types
-      - Review accessibility
-  - path: "apps/mobile/**"
-    instructions: |
-      - Review React Native best practices
-      - Check Expo compatibility
-      - Verify responsive design
-  - path: "packages/**"
-    instructions: |
-      - Review shared package design
-      - Ensure backward compatibility
-      - Check TypeScript exports
-  - path: "**/*.test.ts"
-    instructions: |
-      - Review test coverage
-      - Check edge cases
-      - Verify mock usage
-
-# Files to ignore
-ignore:
-  - "**/*.lock"
-  - "**/*.log"
-  - "**/dist/**"
-  - "**/build/**"
-  - "**/node_modules/**"
-  - "**/.next/**"
-  - "**/coverage/**"
-  - "**/*.config.js"
-  - "**/*.config.ts"
-  - "**/tsconfig.json"
-  - "**/*.md"
+  learnings:
+    scope: "auto"
 
 # Chat configuration
 chat:
   auto_reply: true
-

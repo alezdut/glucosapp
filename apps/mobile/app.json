@@ -4,7 +4,11 @@
     "slug": "glucosapp-mobile",
     "version": "1.0.0",
     "sdkVersion": "54.0.0",
-    "extra": {},
+    "extra": {
+      "eas": {
+        "projectId": "glucosapp-mobile"
+      }
+    },
     "scheme": "glucosapp",
     "platforms": ["ios", "android", "web"],
     "orientation": "portrait",
@@ -36,7 +40,35 @@
       "policy": "sdkVersion"
     },
     "ios": {
-      "bundleIdentifier": "com.anonymous.glucosapp-mobile"
+      "bundleIdentifier": "com.glucosapp.mobile",
+      "supportsTablet": true,
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": ["glucosapp"]
+          }
+        ]
+      }
+    },
+    "android": {
+      "package": "com.glucosapp.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#FFFFFF"
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "glucosapp",
+              "host": "auth",
+              "pathPrefix": "/callback"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     }
   }
 }
