@@ -1,3 +1,28 @@
+export enum DiabetesType {
+  TYPE_1 = "TYPE_1",
+  TYPE_2 = "TYPE_2",
+}
+
+export enum GlucoseUnit {
+  MG_DL = "MG_DL",
+  MMOL_L = "MMOL_L",
+}
+
+export enum Theme {
+  LIGHT = "LIGHT",
+  DARK = "DARK",
+}
+
+export enum Language {
+  ES = "ES",
+  EN = "EN",
+}
+
+export enum InsulinType {
+  BASAL = "BASAL",
+  BOLUS = "BOLUS",
+}
+
 export type User = {
   id: string;
   email: string;
@@ -11,10 +36,10 @@ export type User = {
 export type UserProfile = User & {
   birthDate?: string;
   weight?: number;
-  diabetesType?: string;
-  glucoseUnit: string;
-  theme: string;
-  language: string;
+  diabetesType?: DiabetesType;
+  glucoseUnit: GlucoseUnit;
+  theme: Theme;
+  language: Language;
 };
 
 export type GlucoseEntry = {
@@ -29,7 +54,7 @@ export type InsulinDose = {
   userId: string;
   units: number;
   recordedAt: string;
-  type: string;
+  type: InsulinType;
 };
 
 export type Meal = {

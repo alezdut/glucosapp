@@ -1,5 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsNumber, IsString, IsOptional, Min, Max, IsEnum, IsDateString } from "class-validator";
+import { IsNumber, IsOptional, Min, Max, IsEnum, IsDateString } from "class-validator";
+import { InsulinType } from "@glucosapp/types";
 
 /**
  * DTO for creating insulin dose
@@ -11,10 +12,9 @@ export class CreateInsulinDoseDto {
   @Max(100)
   units!: number;
 
-  @ApiProperty({ enum: ["basal", "bolus"] })
-  @IsString()
-  @IsEnum(["basal", "bolus"])
-  type!: string;
+  @ApiProperty({ enum: InsulinType })
+  @IsEnum(InsulinType)
+  type!: InsulinType;
 
   @ApiProperty({ required: false })
   @IsOptional()

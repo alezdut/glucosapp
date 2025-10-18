@@ -1,5 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsNumber, IsString, IsOptional, Min, Max, IsDateString } from "class-validator";
+import { IsNumber, IsEnum, IsOptional, Min, Max, IsDateString } from "class-validator";
+import { DiabetesType, GlucoseUnit, Theme, Language } from "@glucosapp/types";
 
 /**
  * DTO for updating user profile
@@ -17,23 +18,23 @@ export class UpdateProfileDto {
   @Max(300)
   weight?: number;
 
-  @ApiProperty({ required: false, enum: ["Tipo 1", "Tipo 2"] })
+  @ApiProperty({ required: false, enum: DiabetesType })
   @IsOptional()
-  @IsString()
-  diabetesType?: string;
+  @IsEnum(DiabetesType)
+  diabetesType?: DiabetesType;
 
-  @ApiProperty({ required: false, enum: ["mg/dL", "mmol/L"] })
+  @ApiProperty({ required: false, enum: GlucoseUnit })
   @IsOptional()
-  @IsString()
-  glucoseUnit?: string;
+  @IsEnum(GlucoseUnit)
+  glucoseUnit?: GlucoseUnit;
 
-  @ApiProperty({ required: false, enum: ["light", "dark"] })
+  @ApiProperty({ required: false, enum: Theme })
   @IsOptional()
-  @IsString()
-  theme?: string;
+  @IsEnum(Theme)
+  theme?: Theme;
 
-  @ApiProperty({ required: false, enum: ["Español"] })
+  @ApiProperty({ required: false, enum: Language })
   @IsOptional()
-  @IsString()
-  language?: string;
+  @IsEnum(Language)
+  language?: Language;
 }

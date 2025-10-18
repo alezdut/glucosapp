@@ -7,6 +7,31 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum DiabetesType {
+  TYPE_1
+  TYPE_2
+}
+
+enum GlucoseUnit {
+  MG_DL
+  MMOL_L
+}
+
+enum Theme {
+  LIGHT
+  DARK
+}
+
+enum Language {
+  ES
+  EN
+}
+
+enum InsulinType {
+  BASAL
+  BOLUS
+}
+
 model User {
   id                      String         @id @default(cuid())
   email                   String         @unique
@@ -21,10 +46,10 @@ model User {
   resetPasswordExpiry     DateTime?
   birthDate               DateTime?
   weight                  Float?
-  diabetesType            String?
-  glucoseUnit             String         @default("mg/dL")
-  theme                   String         @default("light")
-  language                String         @default("Español")
+  diabetesType            DiabetesType?
+  glucoseUnit             GlucoseUnit    @default(MG_DL)
+  theme                   Theme          @default(LIGHT)
+  language                Language       @default(ES)
   createdAt               DateTime       @default(now())
   entries                 GlucoseEntry[]
   accounts                Account[]
@@ -69,12 +94,12 @@ model GlucoseEntry {
 }
 
 model InsulinDose {
-  id         String   @id @default(cuid())
+  id         String      @id @default(cuid())
   userId     String
   units      Float
-  recordedAt DateTime @default(now())
-  type       String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recordedAt DateTime    @default(now())
+  type       InsulinType
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }

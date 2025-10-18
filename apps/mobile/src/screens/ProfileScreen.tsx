@@ -33,13 +33,25 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { theme } from "../theme";
 import { createApiClient } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
-import type { UserProfile } from "@glucosapp/types";
+import { type UserProfile, DiabetesType, GlucoseUnit, Theme, Language } from "@glucosapp/types";
 
 /**
- * Translate theme value to Spanish for display
+ * Translate enum values to Spanish for display
  */
-function translateTheme(theme: string): string {
-  return theme === "dark" ? "Oscuro" : "Claro";
+function translateTheme(themeValue: Theme): string {
+  return themeValue === Theme.DARK ? "Oscuro" : "Claro";
+}
+
+function translateDiabetesType(type: DiabetesType): string {
+  return type === DiabetesType.TYPE_1 ? "Tipo 1" : "Tipo 2";
+}
+
+function translateGlucoseUnit(unit: GlucoseUnit): string {
+  return unit === GlucoseUnit.MG_DL ? "mg/dL" : "mmol/L";
+}
+
+function translateLanguage(lang: Language): string {
+  return lang === Language.ES ? "Español" : "English";
 }
 
 /**
@@ -62,10 +74,10 @@ export default function ProfileScreen() {
   const { user, signOut } = useAuth();
   const queryClient = useQueryClient();
 
-  const [birthDate, setBirthDate] = useState<Date>(new Date());
+  const [birthDate, setBirthDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [weight, setWeight] = useState("");
-  const [diabetesType, setDiabetesType] = useState("");
+  const [diabetesType, setDiabetesType] = useState<DiabetesType | null>(null);
 
   // Fetch profile
   const { data: profile, isLoading } = useQuery<UserProfile>({
@@ -131,13 +143,13 @@ export default function ProfileScreen() {
     const isValidWeight = weightNum !== undefined;
 
     // Validate birthDate (only if not already saved)
-    if (!profile?.birthDate && (!birthDate || birthDate.getTime() === new Date().getTime())) {
+    if (!profile?.birthDate && birthDate === null) {
       Alert.alert("Error", "Por favor selecciona tu fecha de nacimiento");
       return;
     }
 
     // Validar que la fecha de nacimiento resulte en una edad válida
-    if (!profile?.birthDate && birthDate) {
+    if (!profile?.birthDate && birthDate !== null) {
       const calculatedAge = calculateAge(birthDate);
       if (calculatedAge < 1 || calculatedAge > 120) {
         Alert.alert("Error", "La edad debe estar entre 1 y 120 años");
@@ -168,12 +180,12 @@ export default function ProfileScreen() {
     };
 
     // Only send birthDate if not already saved
-    if (!profile?.birthDate) {
+    if (!profile?.birthDate && birthDate !== null) {
       updateData.birthDate = birthDate.toISOString();
     }
 
     // Only send diabetesType if not already saved
-    if (!profile?.diabetesType) {
+    if (!profile?.diabetesType && diabetesType !== null) {
       updateData.diabetesType = diabetesType;
     }
 
@@ -261,7 +273,7 @@ export default function ProfileScreen() {
                 onPress={() => setShowDatePicker(true)}
               >
                 <Text style={styles.datePickerText}>
-                  {birthDate && birthDate.getTime() !== new Date().getTime()
+                  {birthDate !== null
                     ? birthDate.toLocaleDateString("es-ES", {
                         year: "numeric",
                         month: "long",
@@ -288,7 +300,7 @@ export default function ProfileScreen() {
                       </TouchableOpacity>
                     </View>
                     <DateTimePicker
-                      value={birthDate}
+                      value={birthDate || new Date(2000, 0, 1)}
                       mode="date"
                       display="spinner"
                       onChange={handleDateChange}
@@ -306,7 +318,7 @@ export default function ProfileScreen() {
         {/* Date Picker for Android */}
         {Platform.OS === "android" && showDatePicker && (
           <DateTimePicker
-            value={birthDate}
+            value={birthDate || new Date(2000, 0, 1)}
             mode="date"
             display="default"
             onChange={handleDateChange}
@@ -342,7 +354,7 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.fieldContent}>
               <Text style={styles.fieldLabel}>Tipo de Diabetes</Text>
-              <Text style={styles.fieldValue}>{profile.diabetesType}</Text>
+              <Text style={styles.fieldValue}>{translateDiabetesType(profile.diabetesType)}</Text>
             </View>
           </View>
         ) : (
@@ -357,14 +369,14 @@ export default function ProfileScreen() {
                 <TouchableOpacity
                   style={[
                     styles.diabetesTypeButton,
-                    diabetesType === "Tipo 1" && styles.diabetesTypeButtonActive,
+                    diabetesType === DiabetesType.TYPE_1 && styles.diabetesTypeButtonActive,
                   ]}
-                  onPress={() => setDiabetesType("Tipo 1")}
+                  onPress={() => setDiabetesType(DiabetesType.TYPE_1)}
                 >
                   <Text
                     style={[
                       styles.diabetesTypeText,
-                      diabetesType === "Tipo 1" && styles.diabetesTypeTextActive,
+                      diabetesType === DiabetesType.TYPE_1 && styles.diabetesTypeTextActive,
                     ]}
                   >
                     Tipo 1
@@ -373,14 +385,14 @@ export default function ProfileScreen() {
                 <TouchableOpacity
                   style={[
                     styles.diabetesTypeButton,
-                    diabetesType === "Tipo 2" && styles.diabetesTypeButtonActive,
+                    diabetesType === DiabetesType.TYPE_2 && styles.diabetesTypeButtonActive,
                   ]}
-                  onPress={() => setDiabetesType("Tipo 2")}
+                  onPress={() => setDiabetesType(DiabetesType.TYPE_2)}
                 >
                   <Text
                     style={[
                       styles.diabetesTypeText,
-                      diabetesType === "Tipo 2" && styles.diabetesTypeTextActive,
+                      diabetesType === DiabetesType.TYPE_2 && styles.diabetesTypeTextActive,
                     ]}
                   >
                     Tipo 2
@@ -415,7 +427,9 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.fieldContent}>
             <Text style={styles.fieldLabel}>Unidades</Text>
-            <Text style={styles.fieldValue}>{profile?.glucoseUnit || "mg/dL"}</Text>
+            <Text style={styles.fieldValue}>
+              {translateGlucoseUnit(profile?.glucoseUnit || GlucoseUnit.MG_DL)}
+            </Text>
           </View>
           <ChevronRight size={20} color={theme.colors.textTertiary} />
         </View>
@@ -426,7 +440,7 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.fieldContent}>
             <Text style={styles.fieldLabel}>Tema Visual</Text>
-            <Text style={styles.fieldValue}>{translateTheme(profile?.theme || "light")}</Text>
+            <Text style={styles.fieldValue}>{translateTheme(profile?.theme || Theme.LIGHT)}</Text>
           </View>
           <ChevronRight size={20} color={theme.colors.textTertiary} />
         </View>
@@ -437,7 +451,9 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.fieldContent}>
             <Text style={styles.fieldLabel}>Idioma</Text>
-            <Text style={styles.fieldValue}>{profile?.language || "Español"}</Text>
+            <Text style={styles.fieldValue}>
+              {translateLanguage(profile?.language || Language.ES)}
+            </Text>
           </View>
           <ChevronRight size={20} color={theme.colors.textTertiary} />
         </View>
