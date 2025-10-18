@@ -1,23 +1,95 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { Camera } from "lucide-react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+} from "react-native";
+import { Activity, Beaker, UtensilsCrossed } from "lucide-react-native";
+import { useQuery } from "@tanstack/react-query";
 import { theme } from "../theme";
+import { createApiClient } from "../lib/api";
+import type { Statistics } from "@glucosapp/types";
 
+/**
+ * HomeScreen component - Display statistics and main actions
+ */
 export default function HomeScreen() {
-  const handleScanPress = () => {
-    // TODO: Navigate to scan screen or open camera
-    console.log("Scan button pressed");
-  };
+  // Fetch statistics
+  const {
+    data: statistics,
+    isLoading,
+    error,
+  } = useQuery<Statistics>({
+    queryKey: ["statistics"],
+    queryFn: async () => {
+      const client = createApiClient();
+      const response = await client.GET("/statistics/summary", {});
+      if (response.error) {
+        throw new Error("Failed to fetch statistics");
+      }
+      return response.data as Statistics;
+    },
+  });
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Resumen diario</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.logoContainer}>
+          <Text style={styles.logoIcon}>✱</Text>
+        </View>
+        <Text style={styles.appName}>GlucosApp</Text>
+        <Text style={styles.tagline}>Tu control, más simple cada día</Text>
+      </View>
 
-      <TouchableOpacity style={styles.scanButton} onPress={handleScanPress}>
-        <Camera size={24} color={theme.colors.background} />
-        <Text style={styles.scanButtonText}>Escanear</Text>
-      </TouchableOpacity>
-    </View>
+      {/* Statistics Cards */}
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Error al cargar estadísticas</Text>
+        </View>
+      ) : (
+        <View style={styles.statsContainer}>
+          {/* Average Glucose Card */}
+          <View style={styles.statCard}>
+            <Activity size={32} color={theme.colors.background} style={styles.statIcon} />
+            <Text style={styles.statValue}>{statistics?.averageGlucose || 0} mg/dL</Text>
+            <Text style={styles.statLabel}>Glucosa Media</Text>
+          </View>
+
+          {/* Daily Insulin Dose Card */}
+          <View style={styles.statCard}>
+            <Beaker size={32} color={theme.colors.background} style={styles.statIcon} />
+            <Text style={styles.statValue}>{statistics?.dailyInsulinDose || 0} U</Text>
+            <Text style={styles.statLabel}>Dosis Diaria Total</Text>
+          </View>
+
+          {/* Meals Registered Card */}
+          <View style={styles.statCard}>
+            <UtensilsCrossed size={32} color={theme.colors.background} style={styles.statIcon} />
+            <Text style={styles.statValue}>{statistics?.mealsRegistered || 0} comidas</Text>
+            <Text style={styles.statLabel}>Comidas Registradas</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Action Buttons */}
+      <View style={styles.actionsContainer}>
+        <TouchableOpacity style={styles.primaryButton}>
+          <Text style={styles.primaryButtonText}>Calcular dosis</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.outlinedButton}>
+          <Text style={styles.outlinedButtonText}>Ver historial</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
   );
 }
 
@@ -25,26 +97,61 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  scrollContent: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.xxl,
+    paddingBottom: theme.spacing.xl,
+  },
+  header: {
+    alignItems: "center",
+    marginBottom: theme.spacing.xl,
+  },
+  logoContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: theme.borderRadius.lg,
+    backgroundColor: theme.colors.background,
     alignItems: "center",
     justifyContent: "center",
-    padding: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
   },
-  title: {
-    fontSize: theme.fontSize.xxxl,
+  logoIcon: {
+    fontSize: 36,
     fontWeight: "bold",
     color: theme.colors.text,
-    marginBottom: theme.spacing.xxl,
+  },
+  appName: {
+    fontSize: theme.fontSize.xxl,
+    fontWeight: "bold",
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
+  },
+  tagline: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.textSecondary,
     textAlign: "center",
   },
-  scanButton: {
-    backgroundColor: theme.colors.primary,
-    flexDirection: "row",
+  loadingContainer: {
+    paddingVertical: theme.spacing.xxxl,
     alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: theme.spacing.xl,
-    paddingVertical: theme.spacing.lg,
+  },
+  errorContainer: {
+    paddingVertical: theme.spacing.xl,
+    alignItems: "center",
+  },
+  errorText: {
+    fontSize: theme.fontSize.md,
+    color: theme.colors.error,
+    textAlign: "center",
+  },
+  statsContainer: {
+    backgroundColor: theme.colors.primary,
     borderRadius: theme.borderRadius.lg,
-    gap: theme.spacing.sm,
+    padding: theme.spacing.lg,
+    marginBottom: theme.spacing.xl,
     shadowColor: theme.colors.shadow,
     shadowOffset: {
       width: 0,
@@ -54,8 +161,60 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  scanButtonText: {
+  statCard: {
+    alignItems: "center",
+    paddingVertical: theme.spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255, 255, 255, 0.2)",
+  },
+  statIcon: {
+    marginBottom: theme.spacing.sm,
+  },
+  statValue: {
+    fontSize: theme.fontSize.xxxl,
+    fontWeight: "bold",
     color: theme.colors.background,
+    marginBottom: theme.spacing.xs,
+  },
+  statLabel: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.background,
+    opacity: 0.9,
+  },
+  actionsContainer: {
+    gap: theme.spacing.md,
+  },
+  primaryButton: {
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: theme.colors.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  primaryButtonText: {
+    color: theme.colors.background,
+    fontSize: theme.fontSize.lg,
+    fontWeight: "600",
+  },
+  outlinedButton: {
+    backgroundColor: "transparent",
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
+  },
+  outlinedButtonText: {
+    color: theme.colors.primary,
     fontSize: theme.fontSize.lg,
     fontWeight: "600",
   },

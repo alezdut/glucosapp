@@ -225,6 +225,7 @@ export class AuthService {
     id: string;
     email: string;
     name?: string;
+    avatarUrl?: string;
   }): Promise<UserResponseDto> {
     let account = await this.prisma.account.findUnique({
       where: {
@@ -237,7 +238,15 @@ export class AuthService {
     });
 
     if (account) {
-      return this.mapUserToDto(account.user);
+      // Update avatarUrl if user doesn't have one but Google provides it
+      let user = account.user;
+      if (!user.avatarUrl && profile.avatarUrl) {
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: { avatarUrl: profile.avatarUrl },
+        });
+      }
+      return this.mapUserToDto(user);
     }
 
     let user = await this.prisma.user.findUnique({
@@ -254,12 +263,20 @@ export class AuthService {
         include: { user: true },
       });
 
+      // Update user if email not verified or avatarUrl not set
+      const updateData: { emailVerified?: boolean; avatarUrl?: string } = {};
       if (!user.emailVerified) {
-        await this.prisma.user.update({
+        updateData.emailVerified = true;
+      }
+      if (!user.avatarUrl && profile.avatarUrl) {
+        updateData.avatarUrl = profile.avatarUrl;
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        user = await this.prisma.user.update({
           where: { id: user.id },
-          data: { emailVerified: true },
+          data: updateData,
         });
-        user.emailVerified = true;
       }
 
       return this.mapUserToDto(user);
@@ -279,6 +296,7 @@ export class AuthService {
         email: profile.email,
         firstName,
         lastName,
+        avatarUrl: profile.avatarUrl,
         emailVerified: true,
         accounts: {
           create: {
@@ -399,6 +417,7 @@ export class AuthService {
     email: string;
     firstName: string | null;
     lastName: string | null;
+    avatarUrl: string | null;
     emailVerified: boolean;
     createdAt: Date;
   }): UserResponseDto {
@@ -407,6 +426,7 @@ export class AuthService {
       email: user.email,
       firstName: user.firstName ?? undefined,
       lastName: user.lastName ?? undefined,
+      avatarUrl: user.avatarUrl ?? undefined,
       emailVerified: user.emailVerified,
       createdAt: user.createdAt.toISOString(),
     };

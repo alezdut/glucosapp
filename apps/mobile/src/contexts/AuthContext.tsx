@@ -241,7 +241,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
 
-      const client = createApiClient();
       // TODO: Implement update profile endpoint in backend
       // For now, we'll just update locally
 

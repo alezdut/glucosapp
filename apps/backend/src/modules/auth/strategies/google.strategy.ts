@@ -37,19 +37,21 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
     profile: Profile,
     done: VerifyCallback,
   ): Promise<void> {
-    const { id, emails, displayName } = profile;
+    const { id, emails, displayName, photos } = profile;
 
     if (!emails || emails.length === 0) {
       return done(new Error("No email provided by Google"), undefined);
     }
 
     const email = emails[0].value;
+    const avatarUrl = photos && photos.length > 0 ? photos[0].value : undefined;
 
     try {
       const user = await this.authService.validateGoogleUser({
         id,
         email,
         name: displayName,
+        avatarUrl,
       });
       done(null, user);
     } catch (error) {

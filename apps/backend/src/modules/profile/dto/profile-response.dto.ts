@@ -1,9 +1,9 @@
 import { ApiProperty } from "@nestjs/swagger";
 
 /**
- * User data returned in auth responses
+ * DTO for profile response
  */
-export class UserResponseDto {
+export class ProfileResponseDto {
   @ApiProperty()
   id!: string;
 
@@ -22,20 +22,24 @@ export class UserResponseDto {
   @ApiProperty()
   emailVerified!: boolean;
 
+  @ApiProperty({ required: false, type: String, format: "date-time" })
+  birthDate?: string;
+
+  @ApiProperty({ required: false })
+  weight?: number;
+
+  @ApiProperty({ required: false })
+  diabetesType?: string;
+
+  @ApiProperty()
+  glucoseUnit!: string;
+
+  @ApiProperty()
+  theme!: string;
+
+  @ApiProperty()
+  language!: string;
+
   @ApiProperty()
   createdAt!: string;
-}
-
-/**
- * DTO for authentication response with tokens
- */
-export class AuthResponseDto {
-  @ApiProperty()
-  accessToken!: string;
-
-  @ApiProperty()
-  refreshToken!: string;
-
-  @ApiProperty({ type: UserResponseDto })
-  user!: UserResponseDto;
 }

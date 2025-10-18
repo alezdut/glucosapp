@@ -1,61 +1,57 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { Home, BarChart3, Camera, User, Settings } from "lucide-react-native";
+import { Home, BookOpen, Calculator, Stethoscope, User } from "lucide-react-native";
 
-import { getPlatformTheme } from "../theme";
-import { getTabBarScreenOptions, getScanTabOptions } from "./screenOptions";
+import { getTabBarScreenOptions } from "./screenOptions";
 import { RootTabParamList } from "./types";
 
 // Import screens
 import HomeScreen from "../screens/HomeScreen";
-import ScanScreen from "../screens/ScanScreen";
-import StatsScreen from "../screens/StatsScreen";
+import HistoryScreen from "../screens/HistoryScreen";
+import CalculatorScreen from "../screens/CalculatorScreen";
+import DoctorScreen from "../screens/DoctorScreen";
 import ProfileScreen from "../screens/ProfileScreen";
-import SettingsScreen from "../screens/SettingsScreen";
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
 export default function TabNavigator() {
-  const { platformConfig } = getPlatformTheme();
-
   return (
     <Tab.Navigator screenOptions={getTabBarScreenOptions()}>
       <Tab.Screen
-        name="Home"
+        name="Inicio"
         component={HomeScreen}
         options={{
           tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
+          headerShown: false,
         }}
       />
       <Tab.Screen
-        name="Stats"
-        component={StatsScreen}
+        name="Historial"
+        component={HistoryScreen}
         options={{
-          tabBarIcon: ({ color, size }) => <BarChart3 size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <BookOpen size={size} color={color} />,
         }}
       />
       <Tab.Screen
-        name="Scan"
-        component={ScanScreen}
+        name="Calcular"
+        component={CalculatorScreen}
         options={{
-          tabBarIcon: ({ size }) => (
-            <Camera size={size + 8} color={platformConfig.tabBarIconActive} />
-          ),
-          ...getScanTabOptions(),
+          tabBarIcon: ({ color, size }) => <Calculator size={size} color={color} />,
         }}
       />
       <Tab.Screen
-        name="Profile"
+        name="Médico"
+        component={DoctorScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => <Stethoscope size={size} color={color} />,
+        }}
+      />
+      <Tab.Screen
+        name="Perfil"
         component={ProfileScreen}
         options={{
           tabBarIcon: ({ color, size }) => <User size={size} color={color} />,
-        }}
-      />
-      <Tab.Screen
-        name="Settings"
-        component={SettingsScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => <Settings size={size} color={color} />,
+          headerShown: false,
         }}
       />
     </Tab.Navigator>
