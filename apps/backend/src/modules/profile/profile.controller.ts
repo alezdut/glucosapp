@@ -1,10 +1,11 @@
-import { Controller, Get, Patch, Body, UseGuards, Req } from "@nestjs/common";
+import { Controller, Get, Patch, Body, UseGuards } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
 import { ProfileService } from "./profile.service";
 import { UpdateProfileDto } from "./dto/update-profile.dto";
 import { ProfileResponseDto } from "./dto/profile-response.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
-import { Request } from "express";
+import { AuthUser } from "../auth/decorators/auth-user.decorator";
+import { UserResponseDto } from "../auth/dto/auth-response.dto";
 
 /**
  * Controller handling profile endpoints
@@ -27,8 +28,7 @@ export class ProfileController {
     type: ProfileResponseDto,
   })
   @ApiResponse({ status: 401, description: "Unauthorized" })
-  async getProfile(@Req() req: Request): Promise<ProfileResponseDto> {
-    const user = req.user as any;
+  async getProfile(@AuthUser() user: UserResponseDto): Promise<ProfileResponseDto> {
     return this.profileService.getProfile(user.id);
   }
 
@@ -45,10 +45,9 @@ export class ProfileController {
   @ApiResponse({ status: 401, description: "Unauthorized" })
   @ApiResponse({ status: 400, description: "Invalid input" })
   async updateProfile(
-    @Req() req: Request,
+    @AuthUser() user: UserResponseDto,
     @Body() updateProfileDto: UpdateProfileDto,
   ): Promise<ProfileResponseDto> {
-    const user = req.user as any;
     return this.profileService.updateProfile(user.id, updateProfileDto);
   }
 }

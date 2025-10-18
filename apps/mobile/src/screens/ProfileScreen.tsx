@@ -36,6 +36,13 @@ import { useAuth } from "../contexts/AuthContext";
 import type { UserProfile } from "@glucosapp/types";
 
 /**
+ * Translate theme value to Spanish for display
+ */
+function translateTheme(theme: string): string {
+  return theme === "dark" ? "Oscuro" : "Claro";
+}
+
+/**
  * ProfileScreen component - Display and edit user profile
  */
 /**
@@ -118,7 +125,10 @@ export default function ProfileScreen() {
   };
 
   const handleSaveProfile = () => {
-    const weightNum = weight ? parseFloat(weight) : undefined;
+    const normalized = weight ? weight.trim().replace(",", ".") : "";
+    const parsed = normalized ? parseFloat(normalized) : NaN;
+    const weightNum = !isNaN(parsed) ? parsed : undefined;
+    const isValidWeight = weightNum !== undefined;
 
     // Validate birthDate (only if not already saved)
     if (!profile?.birthDate && (!birthDate || birthDate.getTime() === new Date().getTime())) {
@@ -138,6 +148,12 @@ export default function ProfileScreen() {
     // Validate diabetes type (only if not already saved)
     if (!profile?.diabetesType && !diabetesType) {
       Alert.alert("Error", "Por favor selecciona tu tipo de diabetes");
+      return;
+    }
+
+    // Validate weight input if provided
+    if (weight && !isValidWeight) {
+      Alert.alert("Error", "Por favor ingresa un peso válido");
       return;
     }
 
@@ -410,7 +426,7 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.fieldContent}>
             <Text style={styles.fieldLabel}>Tema Visual</Text>
-            <Text style={styles.fieldValue}>{profile?.theme || "Claro"}</Text>
+            <Text style={styles.fieldValue}>{translateTheme(profile?.theme || "light")}</Text>
           </View>
           <ChevronRight size={20} color={theme.colors.textTertiary} />
         </View>

@@ -1,9 +1,10 @@
-import { Controller, Get, UseGuards, Req } from "@nestjs/common";
+import { Controller, Get, UseGuards } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
 import { StatisticsService } from "./statistics.service";
 import { StatisticsResponseDto } from "./dto/statistics-response.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
-import { Request } from "express";
+import { AuthUser } from "../auth/decorators/auth-user.decorator";
+import { UserResponseDto } from "../auth/dto/auth-response.dto";
 
 /**
  * Controller handling statistics endpoints
@@ -26,8 +27,7 @@ export class StatisticsController {
     type: StatisticsResponseDto,
   })
   @ApiResponse({ status: 401, description: "Unauthorized" })
-  async getSummary(@Req() req: Request): Promise<StatisticsResponseDto> {
-    const user = req.user as any;
+  async getSummary(@AuthUser() user: UserResponseDto): Promise<StatisticsResponseDto> {
     return this.statisticsService.getSummary(user.id);
   }
 }

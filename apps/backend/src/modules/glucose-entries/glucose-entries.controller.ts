@@ -1,9 +1,10 @@
-import { Controller, Post, Body, UseGuards, Req } from "@nestjs/common";
+import { Controller, Post, Body, UseGuards } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
 import { GlucoseEntriesService } from "./glucose-entries.service";
 import { CreateGlucoseEntryDto } from "./dto/create-glucose-entry.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
-import { Request } from "express";
+import { AuthUser } from "../auth/decorators/auth-user.decorator";
+import { UserResponseDto } from "../auth/dto/auth-response.dto";
 
 /**
  * Controller handling glucose entries endpoints
@@ -23,8 +24,7 @@ export class GlucoseEntriesController {
   @ApiResponse({ status: 201, description: "Entry created successfully" })
   @ApiResponse({ status: 401, description: "Unauthorized" })
   @ApiResponse({ status: 400, description: "Invalid input" })
-  async create(@Req() req: Request, @Body() createDto: CreateGlucoseEntryDto) {
-    const user = req.user as any;
+  async create(@AuthUser() user: UserResponseDto, @Body() createDto: CreateGlucoseEntryDto) {
     return this.glucoseEntriesService.create(user.id, createDto);
   }
 }

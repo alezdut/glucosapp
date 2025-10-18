@@ -27,7 +27,7 @@ export class UpdateProfileDto {
   @IsString()
   glucoseUnit?: string;
 
-  @ApiProperty({ required: false, enum: ["Claro", "Oscuro"] })
+  @ApiProperty({ required: false, enum: ["light", "dark"] })
   @IsOptional()
   @IsString()
   theme?: string;

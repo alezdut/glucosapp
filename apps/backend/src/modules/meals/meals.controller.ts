@@ -1,9 +1,10 @@
-import { Controller, Post, Body, UseGuards, Req } from "@nestjs/common";
+import { Controller, Post, Body, UseGuards } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
 import { MealsService } from "./meals.service";
 import { CreateMealDto } from "./dto/create-meal.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
-import { Request } from "express";
+import { AuthUser } from "../auth/decorators/auth-user.decorator";
+import { UserResponseDto } from "../auth/dto/auth-response.dto";
 
 /**
  * Controller handling meals endpoints
@@ -23,8 +24,7 @@ export class MealsController {
   @ApiResponse({ status: 201, description: "Meal created successfully" })
   @ApiResponse({ status: 401, description: "Unauthorized" })
   @ApiResponse({ status: 400, description: "Invalid input" })
-  async create(@Req() req: Request, @Body() createDto: CreateMealDto) {
-    const user = req.user as any;
+  async create(@AuthUser() user: UserResponseDto, @Body() createDto: CreateMealDto) {
     return this.mealsService.create(user.id, createDto);
   }
 }

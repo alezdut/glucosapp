@@ -23,7 +23,7 @@ model User {
   weight                  Float?
   diabetesType            String?
   glucoseUnit             String         @default("mg/dL")
-  theme                   String         @default("Claro")
+  theme                   String         @default("light")
   language                String         @default("Español")
   createdAt               DateTime       @default(now())
   entries                 GlucoseEntry[]
