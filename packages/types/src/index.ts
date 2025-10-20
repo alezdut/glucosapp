@@ -40,6 +40,11 @@ export type UserProfile = User & {
   glucoseUnit: GlucoseUnit;
   theme: Theme;
   language: Language;
+  carbRatio: number;
+  insulinSensitivityFactor: number;
+  targetGlucose?: number;
+  minTargetGlucose: number;
+  maxTargetGlucose: number;
 };
 
 export type GlucoseEntry = {
@@ -53,6 +58,8 @@ export type InsulinDose = {
   id: string;
   userId: string;
   units: number;
+  calculatedUnits?: number;
+  wasManuallyEdited: boolean;
   recordedAt: string;
   type: InsulinType;
 };
@@ -71,6 +78,27 @@ export type Statistics = {
   mealsRegistered: number;
 };
 
+export type LogEntry = {
+  id: string;
+  userId: string;
+  recordedAt: string;
+  glucoseEntry?: GlucoseEntry;
+  insulinDose?: InsulinDose;
+  meal?: Meal;
+};
+
+export type FoodItem = {
+  name: string;
+  carbohydratesPer100g: number;
+  brand?: string;
+};
+
+export type FoodListItem = {
+  name: string;
+  quantity: number;
+  carbohydrates: number;
+};
+
 export enum AuthProvider {
   LOCAL = "local",
   GOOGLE = "google",
@@ -81,3 +109,9 @@ export type AuthResponse = {
   refreshToken: string;
   user: User;
 };
+
+// Export constants
+export * from "./constants";
+
+// Export insulin calculation utilities
+export * from "./insulin-calculations";

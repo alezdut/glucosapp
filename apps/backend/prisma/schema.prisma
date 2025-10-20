@@ -33,29 +33,35 @@ enum InsulinType {
 }
 
 model User {
-  id                      String         @id @default(cuid())
-  email                   String         @unique
-  password                String?
-  firstName               String?
-  lastName                String?
-  avatarUrl               String?
-  emailVerified           Boolean        @default(false)
-  verificationToken       String?        @unique
-  verificationTokenExpiry DateTime?
-  resetPasswordToken      String?        @unique
-  resetPasswordExpiry     DateTime?
-  birthDate               DateTime?
-  weight                  Float?
-  diabetesType            DiabetesType?
-  glucoseUnit             GlucoseUnit    @default(MG_DL)
-  theme                   Theme          @default(LIGHT)
-  language                Language       @default(ES)
-  createdAt               DateTime       @default(now())
-  entries                 GlucoseEntry[]
-  accounts                Account[]
-  refreshTokens           RefreshToken[]
-  insulinDoses            InsulinDose[]
-  meals                   Meal[]
+  id                       String         @id @default(cuid())
+  email                    String         @unique
+  password                 String?
+  firstName                String?
+  lastName                 String?
+  avatarUrl                String?
+  emailVerified            Boolean        @default(false)
+  verificationToken        String?        @unique
+  verificationTokenExpiry  DateTime?
+  resetPasswordToken       String?        @unique
+  resetPasswordExpiry      DateTime?
+  birthDate                DateTime?
+  weight                   Float?
+  diabetesType             DiabetesType?
+  glucoseUnit              GlucoseUnit    @default(MG_DL)
+  theme                    Theme          @default(LIGHT)
+  language                 Language       @default(ES)
+  carbRatio                Float          @default(10)
+  insulinSensitivityFactor Float          @default(50)
+  targetGlucose            Int?
+  minTargetGlucose         Int            @default(80)
+  maxTargetGlucose         Int            @default(140)
+  createdAt                DateTime       @default(now())
+  entries                  GlucoseEntry[]
+  accounts                 Account[]
+  refreshTokens            RefreshToken[]
+  insulinDoses             InsulinDose[]
+  meals                    Meal[]
+  logEntries               LogEntry[]
 }
 
 model Account {
@@ -85,32 +91,52 @@ model RefreshToken {
 }
 
 model GlucoseEntry {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   mgdl       Int
-  recordedAt DateTime @default(now())
+  recordedAt DateTime  @default(now())
   note       String?
-  user       User     @relation(fields: [userId], references: [id])
+  user       User      @relation(fields: [userId], references: [id])
   userId     String
+  logEntry   LogEntry?
 }
 
 model InsulinDose {
-  id         String      @id @default(cuid())
-  userId     String
-  units      Float
-  recordedAt DateTime    @default(now())
-  type       InsulinType
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String      @id @default(cuid())
+  userId            String
+  units             Float
+  calculatedUnits   Float?
+  wasManuallyEdited Boolean     @default(false)
+  recordedAt        DateTime    @default(now())
+  type              InsulinType
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logEntry          LogEntry?
 
   @@index([userId])
 }
 
 model Meal {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   userId        String
   name          String
   carbohydrates Float?
-  recordedAt    DateTime @default(now())
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recordedAt    DateTime  @default(now())
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logEntry      LogEntry?
+
+  @@index([userId])
+}
+
+model LogEntry {
+  id             String        @id @default(cuid())
+  userId         String
+  recordedAt     DateTime      @default(now())
+  glucoseEntryId String?       @unique
+  insulinDoseId  String?       @unique
+  mealId         String?       @unique
+  glucoseEntry   GlucoseEntry? @relation(fields: [glucoseEntryId], references: [id], onDelete: Cascade)
+  insulinDose    InsulinDose?  @relation(fields: [insulinDoseId], references: [id], onDelete: Cascade)
+  meal           Meal?         @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }

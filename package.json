@@ -41,5 +41,8 @@
     "extends": [
       "@commitlint/config-conventional"
     ]
+  },
+  "dependencies": {
+    "mdi-insulin-algorithm": "link:/Users/alejandrozdut/Documents/mdi-insulin-algorithm"
   }
 }
