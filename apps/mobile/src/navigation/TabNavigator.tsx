@@ -1,14 +1,14 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { Home, BookOpen, Calculator, Stethoscope, User } from "lucide-react-native";
+import { Home, BookOpen, PlusCircle, Stethoscope, User } from "lucide-react-native";
 
 import { getTabBarScreenOptions } from "./screenOptions";
 import { RootTabParamList } from "./types";
 
-// Import screens
-import HomeScreen from "../screens/HomeScreen";
+// Import navigators and screens
+import HomeStackNavigator from "./HomeStackNavigator";
 import HistoryScreen from "../screens/HistoryScreen";
-import CalculatorScreen from "../screens/CalculatorScreen";
+import RegistrarScreen from "../screens/RegistrarScreen";
 import DoctorScreen from "../screens/DoctorScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 
@@ -19,7 +19,7 @@ export default function TabNavigator() {
     <Tab.Navigator screenOptions={getTabBarScreenOptions()}>
       <Tab.Screen
         name="Inicio"
-        component={HomeScreen}
+        component={HomeStackNavigator}
         options={{
           tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
           headerShown: false,
@@ -33,10 +33,10 @@ export default function TabNavigator() {
         }}
       />
       <Tab.Screen
-        name="Calcular"
-        component={CalculatorScreen}
+        name="Registrar"
+        component={RegistrarScreen}
         options={{
-          tabBarIcon: ({ color, size }) => <Calculator size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <PlusCircle size={size} color={color} />,
         }}
       />
       <Tab.Screen

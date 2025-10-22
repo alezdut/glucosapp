@@ -8,12 +8,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Platform,
-  Modal,
-  TouchableWithoutFeedback,
   Image,
 } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
 import {
   User as UserIcon,
   Cake,
@@ -27,13 +23,13 @@ import {
   FileText,
   LogOut,
   ChevronRight,
-  Calendar,
 } from "lucide-react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { theme } from "../theme";
 import { createApiClient } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { type UserProfile, DiabetesType, GlucoseUnit, Theme, Language } from "@glucosapp/types";
+import { CustomDateTimePicker } from "../components";
 
 /**
  * Translate enum values to Spanish for display
@@ -75,7 +71,6 @@ export default function ProfileScreen() {
   const queryClient = useQueryClient();
 
   const [birthDate, setBirthDate] = useState<Date | null>(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [weight, setWeight] = useState("");
   const [diabetesType, setDiabetesType] = useState<DiabetesType | null>(null);
 
@@ -118,23 +113,6 @@ export default function ProfileScreen() {
       Alert.alert("Error", "No se pudo actualizar el perfil");
     },
   });
-
-  const handleDateChange = (_event: unknown, selectedDate?: Date) => {
-    // En Android, el picker se cierra automáticamente
-    // En iOS, lo mantenemos abierto hasta que el usuario confirme o cierre manualmente
-    if (Platform.OS === "android") {
-      setShowDatePicker(false);
-    }
-
-    if (selectedDate) {
-      setBirthDate(selectedDate);
-      // No calculamos la edad aquí, solo actualizamos la fecha seleccionada
-    }
-  };
-
-  const handleCloseDatePicker = () => {
-    setShowDatePicker(false);
-  };
 
   const handleSaveProfile = () => {
     const normalized = weight ? weight.trim().replace(",", ".") : "";
@@ -264,67 +242,19 @@ export default function ProfileScreen() {
           // Age not set - allow date selection
           <View style={styles.fieldRow}>
             <View style={styles.fieldIconContainer}>
-              <Calendar size={20} color={theme.colors.textSecondary} />
+              <Cake size={20} color={theme.colors.textSecondary} />
             </View>
             <View style={styles.fieldContent}>
-              <Text style={styles.fieldLabel}>Fecha de Nacimiento</Text>
-              <TouchableOpacity
-                style={styles.datePickerButton}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Text style={styles.datePickerText}>
-                  {birthDate !== null
-                    ? birthDate.toLocaleDateString("es-ES", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })
-                    : "Seleccionar fecha"}
-                </Text>
-                <Calendar size={16} color={theme.colors.primary} />
-              </TouchableOpacity>
+              <CustomDateTimePicker
+                value={birthDate}
+                onDateChange={setBirthDate}
+                label="Fecha de Nacimiento"
+                placeholder="Seleccionar fecha"
+                minimumDate={new Date(1900, 0, 1)}
+                maximumDate={new Date(2015, 11, 31)}
+              />
             </View>
           </View>
-        )}
-
-        {/* Date Picker Modal for iOS */}
-        {Platform.OS === "ios" && showDatePicker && (
-          <Modal transparent animationType="fade" visible={showDatePicker}>
-            <TouchableWithoutFeedback onPress={handleCloseDatePicker}>
-              <View style={styles.modalOverlay}>
-                <TouchableWithoutFeedback>
-                  <View style={styles.datePickerContainer}>
-                    <View style={styles.datePickerHeader}>
-                      <TouchableOpacity onPress={handleCloseDatePicker}>
-                        <Text style={styles.datePickerDoneButton}>Listo</Text>
-                      </TouchableOpacity>
-                    </View>
-                    <DateTimePicker
-                      value={birthDate || new Date(2000, 0, 1)}
-                      mode="date"
-                      display="spinner"
-                      onChange={handleDateChange}
-                      maximumDate={new Date(2015, 11, 31)}
-                      minimumDate={new Date(1900, 0, 1)}
-                      style={styles.datePickerIOS}
-                    />
-                  </View>
-                </TouchableWithoutFeedback>
-              </View>
-            </TouchableWithoutFeedback>
-          </Modal>
-        )}
-
-        {/* Date Picker for Android */}
-        {Platform.OS === "android" && showDatePicker && (
-          <DateTimePicker
-            value={birthDate || new Date(2000, 0, 1)}
-            mode="date"
-            display="default"
-            onChange={handleDateChange}
-            maximumDate={new Date(2015, 11, 31)}
-            minimumDate={new Date(1900, 0, 1)}
-          />
         )}
 
         {/* Weight */}
@@ -607,52 +537,6 @@ const styles = StyleSheet.create({
   diabetesTypeTextActive: {
     color: theme.colors.background,
     fontWeight: "600",
-  },
-  datePickerButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    marginTop: theme.spacing.xs,
-  },
-  datePickerText: {
-    fontSize: theme.fontSize.md,
-    color: theme.colors.text,
-    fontWeight: "500",
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  datePickerContainer: {
-    backgroundColor: theme.colors.background,
-    borderTopLeftRadius: theme.borderRadius.lg,
-    borderTopRightRadius: theme.borderRadius.lg,
-    paddingBottom: theme.spacing.xl,
-  },
-  datePickerHeader: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.md,
-    paddingBottom: theme.spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  datePickerDoneButton: {
-    fontSize: theme.fontSize.lg,
-    color: theme.colors.primary,
-    fontWeight: "600",
-  },
-  datePickerIOS: {
-    height: 200,
-    backgroundColor: theme.colors.background,
   },
   saveButton: {
     backgroundColor: theme.colors.primary,

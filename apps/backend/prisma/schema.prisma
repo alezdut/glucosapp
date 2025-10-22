@@ -32,30 +32,55 @@ enum InsulinType {
   BOLUS
 }
 
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+  CORRECTION
+}
+
 model User {
-  id                      String         @id @default(cuid())
-  email                   String         @unique
-  password                String?
-  firstName               String?
-  lastName                String?
-  avatarUrl               String?
-  emailVerified           Boolean        @default(false)
-  verificationToken       String?        @unique
-  verificationTokenExpiry DateTime?
-  resetPasswordToken      String?        @unique
-  resetPasswordExpiry     DateTime?
-  birthDate               DateTime?
-  weight                  Float?
-  diabetesType            DiabetesType?
-  glucoseUnit             GlucoseUnit    @default(MG_DL)
-  theme                   Theme          @default(LIGHT)
-  language                Language       @default(ES)
-  createdAt               DateTime       @default(now())
-  entries                 GlucoseEntry[]
-  accounts                Account[]
-  refreshTokens           RefreshToken[]
-  insulinDoses            InsulinDose[]
-  meals                   Meal[]
+  id                       String         @id @default(cuid())
+  email                    String         @unique
+  password                 String?
+  firstName                String?
+  lastName                 String?
+  avatarUrl                String?
+  emailVerified            Boolean        @default(false)
+  verificationToken        String?        @unique
+  verificationTokenExpiry  DateTime?
+  resetPasswordToken       String?        @unique
+  resetPasswordExpiry      DateTime?
+  birthDate                DateTime?
+  weight                   Float?
+  diabetesType             DiabetesType?
+  glucoseUnit              GlucoseUnit    @default(MG_DL)
+  theme                    Theme          @default(LIGHT)
+  language                 Language       @default(ES)
+  // Insulin Profile - Time-of-day specific IC Ratios
+  icRatioBreakfast         Float          @default(15)
+  icRatioLunch             Float          @default(12)
+  icRatioDinner            Float          @default(10)
+  insulinSensitivityFactor Float          @default(50)
+  diaHours                 Float          @default(4)
+  targetGlucose            Int?
+  minTargetGlucose         Int            @default(80)
+  maxTargetGlucose         Int            @default(140)
+  // Meal time ranges (in minutes from midnight, 0-1439)
+  mealTimeBreakfastStart   Int            @default(300) // 5:00 AM
+  mealTimeBreakfastEnd     Int            @default(660) // 11:00 AM
+  mealTimeLunchStart       Int            @default(660) // 11:00 AM
+  mealTimeLunchEnd         Int            @default(1020) // 5:00 PM
+  mealTimeDinnerStart      Int            @default(1020) // 5:00 PM
+  mealTimeDinnerEnd        Int            @default(300) // 5:00 AM (next day)
+  createdAt                DateTime       @default(now())
+  entries                  GlucoseEntry[]
+  accounts                 Account[]
+  refreshTokens            RefreshToken[]
+  insulinDoses             InsulinDose[]
+  meals                    Meal[]
+  logEntries               LogEntry[]
 }
 
 model Account {
@@ -85,32 +110,59 @@ model RefreshToken {
 }
 
 model GlucoseEntry {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   mgdl       Int
-  recordedAt DateTime @default(now())
+  recordedAt DateTime  @default(now())
   note       String?
-  user       User     @relation(fields: [userId], references: [id])
+  user       User      @relation(fields: [userId], references: [id])
   userId     String
+  logEntry   LogEntry?
 }
 
 model InsulinDose {
-  id         String      @id @default(cuid())
-  userId     String
-  units      Float
-  recordedAt DateTime    @default(now())
-  type       InsulinType
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String      @id @default(cuid())
+  userId            String
+  units             Float
+  calculatedUnits   Float?
+  wasManuallyEdited Boolean     @default(false)
+  recordedAt        DateTime    @default(now())
+  type              InsulinType
+  mealType          MealType?
+  isCorrection      Boolean     @default(false)
+  // Calculation breakdown (for transparency)
+  carbInsulin       Float?
+  correctionInsulin Float?
+  iobSubtracted     Float?
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logEntry          LogEntry?
 
   @@index([userId])
 }
 
 model Meal {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   userId        String
   name          String
   carbohydrates Float?
-  recordedAt    DateTime @default(now())
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mealType      MealType?
+  recordedAt    DateTime  @default(now())
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logEntry      LogEntry?
+
+  @@index([userId])
+}
+
+model LogEntry {
+  id             String        @id @default(cuid())
+  userId         String
+  recordedAt     DateTime      @default(now())
+  glucoseEntryId String?       @unique
+  insulinDoseId  String?       @unique
+  mealId         String?       @unique
+  glucoseEntry   GlucoseEntry? @relation(fields: [glucoseEntryId], references: [id], onDelete: Cascade)
+  insulinDose    InsulinDose?  @relation(fields: [insulinDoseId], references: [id], onDelete: Cascade)
+  meal           Meal?         @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }

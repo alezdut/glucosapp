@@ -8,6 +8,9 @@ import { StatisticsModule } from "./modules/statistics/statistics.module";
 import { GlucoseEntriesModule } from "./modules/glucose-entries/glucose-entries.module";
 import { InsulinDosesModule } from "./modules/insulin-doses/insulin-doses.module";
 import { MealsModule } from "./modules/meals/meals.module";
+import { LogEntriesModule } from "./modules/log-entries/log-entries.module";
+import { FoodSearchModule } from "./modules/food-search/food-search.module";
+import { InsulinCalculationModule } from "./modules/insulin-calculation/insulin-calculation.module";
 
 @Module({
   imports: [
@@ -19,6 +22,9 @@ import { MealsModule } from "./modules/meals/meals.module";
     GlucoseEntriesModule,
     InsulinDosesModule,
     MealsModule,
+    LogEntriesModule,
+    FoodSearchModule,
+    InsulinCalculationModule,
   ],
   providers: [PrismaService],
 })

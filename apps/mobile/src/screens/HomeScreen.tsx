@@ -9,14 +9,20 @@ import {
 } from "react-native";
 import { Activity, Beaker, UtensilsCrossed } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { theme } from "../theme";
 import { createApiClient } from "../lib/api";
 import type { Statistics } from "@glucosapp/types";
+import type { HomeStackParamList } from "../navigation/HomeStackNavigator";
+
+type HomeScreenNavigationProp = NativeStackNavigationProp<HomeStackParamList, "Home">;
 
 /**
  * HomeScreen component - Display statistics and main actions
  */
 export default function HomeScreen() {
+  const navigation = useNavigation<HomeScreenNavigationProp>();
   // Fetch statistics
   const {
     data: statistics,
@@ -81,11 +87,17 @@ export default function HomeScreen() {
 
       {/* Action Buttons */}
       <View style={styles.actionsContainer}>
-        <TouchableOpacity style={styles.primaryButton}>
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={() => navigation.navigate("Calculator")}
+        >
           <Text style={styles.primaryButtonText}>Calcular dosis</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.outlinedButton}>
+        <TouchableOpacity
+          style={styles.outlinedButton}
+          onPress={() => navigation.getParent()?.navigate("Historial")}
+        >
           <Text style={styles.outlinedButtonText}>Ver historial</Text>
         </TouchableOpacity>
       </View>

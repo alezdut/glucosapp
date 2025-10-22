@@ -23,6 +23,14 @@ export enum InsulinType {
   BOLUS = "BOLUS",
 }
 
+export enum MealCategory {
+  BREAKFAST = "BREAKFAST",
+  LUNCH = "LUNCH",
+  DINNER = "DINNER",
+  SNACK = "SNACK",
+  CORRECTION = "CORRECTION",
+}
+
 export type User = {
   id: string;
   email: string;
@@ -40,6 +48,22 @@ export type UserProfile = User & {
   glucoseUnit: GlucoseUnit;
   theme: Theme;
   language: Language;
+  // Insulin Profile - Time-of-day specific IC Ratios
+  icRatioBreakfast: number;
+  icRatioLunch: number;
+  icRatioDinner: number;
+  insulinSensitivityFactor: number;
+  diaHours: number;
+  targetGlucose?: number;
+  minTargetGlucose: number;
+  maxTargetGlucose: number;
+  // Meal time ranges (in minutes from midnight, 0-1439)
+  mealTimeBreakfastStart: number;
+  mealTimeBreakfastEnd: number;
+  mealTimeLunchStart: number;
+  mealTimeLunchEnd: number;
+  mealTimeDinnerStart: number;
+  mealTimeDinnerEnd: number;
 };
 
 export type GlucoseEntry = {
@@ -53,8 +77,15 @@ export type InsulinDose = {
   id: string;
   userId: string;
   units: number;
+  calculatedUnits?: number;
+  wasManuallyEdited: boolean;
   recordedAt: string;
   type: InsulinType;
+  mealType?: MealCategory;
+  isCorrection?: boolean;
+  carbInsulin?: number;
+  correctionInsulin?: number;
+  iobSubtracted?: number;
 };
 
 export type Meal = {
@@ -62,6 +93,7 @@ export type Meal = {
   userId: string;
   name: string;
   carbohydrates?: number;
+  mealType?: MealCategory;
   recordedAt: string;
 };
 
@@ -69,6 +101,27 @@ export type Statistics = {
   averageGlucose: number;
   dailyInsulinDose: number;
   mealsRegistered: number;
+};
+
+export type LogEntry = {
+  id: string;
+  userId: string;
+  recordedAt: string;
+  glucoseEntry?: GlucoseEntry;
+  insulinDose?: InsulinDose;
+  meal?: Meal;
+};
+
+export type FoodItem = {
+  name: string;
+  carbohydratesPer100g: number;
+  brand?: string;
+};
+
+export type FoodListItem = {
+  name: string;
+  quantity: number;
+  carbohydrates: number;
 };
 
 export enum AuthProvider {
@@ -81,3 +134,14 @@ export type AuthResponse = {
   refreshToken: string;
   user: User;
 };
+
+// Export constants
+export * from "./constants";
+
+// Export insulin profile types (mdi-insulin-algorithm compatible)
+// Re-export MealType from insulin-profile as MealTypeString to avoid collision
+export type { MealType as MealTypeString } from "./insulin-profile";
+export * from "./insulin-profile";
+
+// Export insulin calculation utilities
+export * from "./insulin-calculations";

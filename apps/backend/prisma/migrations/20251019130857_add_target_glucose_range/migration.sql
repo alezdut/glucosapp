@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN "minTargetGlucose" INTEGER NOT NULL DEFAULT 80,
+ADD COLUMN "maxTargetGlucose" INTEGER NOT NULL DEFAULT 140;
+
