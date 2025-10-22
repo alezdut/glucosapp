@@ -23,7 +23,7 @@ export enum InsulinType {
   BOLUS = "BOLUS",
 }
 
-export enum MealType {
+export enum MealCategory {
   BREAKFAST = "BREAKFAST",
   LUNCH = "LUNCH",
   DINNER = "DINNER",
@@ -81,7 +81,7 @@ export type InsulinDose = {
   wasManuallyEdited: boolean;
   recordedAt: string;
   type: InsulinType;
-  mealType?: MealType;
+  mealType?: MealCategory;
   isCorrection?: boolean;
   carbInsulin?: number;
   correctionInsulin?: number;
@@ -93,7 +93,7 @@ export type Meal = {
   userId: string;
   name: string;
   carbohydrates?: number;
-  mealType?: MealType;
+  mealType?: MealCategory;
   recordedAt: string;
 };
 
@@ -139,6 +139,8 @@ export type AuthResponse = {
 export * from "./constants";
 
 // Export insulin profile types (mdi-insulin-algorithm compatible)
+// Re-export MealType from insulin-profile as MealTypeString to avoid collision
+export type { MealType as MealTypeString } from "./insulin-profile";
 export * from "./insulin-profile";
 
 // Export insulin calculation utilities

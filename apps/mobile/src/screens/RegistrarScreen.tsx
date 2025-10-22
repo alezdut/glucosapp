@@ -14,7 +14,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { theme } from "../theme";
 import { createApiClient } from "../lib/api";
 import type { RegistrarScreenProps } from "../navigation/types";
-import { InsulinType, MealType, type UserProfile, type DoseResult } from "@glucosapp/types";
+import { InsulinType, MealCategory, type UserProfile, type DoseResult } from "@glucosapp/types";
 import { TextInput } from "../components";
 import Button from "../components/Button";
 import ScreenHeader from "../components/ScreenHeader";
@@ -55,7 +55,7 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
   const [glucoseLevel, setGlucoseLevel] = useState<number | undefined>(undefined);
   const [carbohydrates, setCarbohydrates] = useState<number | undefined>(prefilledCarbs);
   const [targetGlucose, setTargetGlucose] = useState<number | undefined>(undefined);
-  const [mealType, setMealType] = useState<MealType>(MealType.LUNCH);
+  const [mealType, setMealCategory] = useState<MealCategory>(MealCategory.LUNCH);
   const [appliedInsulin, setAppliedInsulin] = useState<number | undefined>(undefined);
   const [wasManuallyEdited, setWasManuallyEdited] = useState(false);
   const [isEditingInsulin, setIsEditingInsulin] = useState(false);
@@ -63,20 +63,18 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
   const [isTargetGlucoseEdited, setIsTargetGlucoseEdited] = useState(false);
   const [isFasting, setIsFasting] = useState(false);
   const [recordedAt, setRecordedAt] = useState<Date>(new Date());
-  const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const [showDateTimePicker, setShowDateTimePicker] = useState(false);
   const [isTimeManuallyEdited, setIsTimeManuallyEdited] = useState(false);
   const insulinInputRef = useRef<RNTextInput>(null);
 
   // Debounced validation hooks
-  const { validation: glucoseValidation, isValidating: isGlucoseValidating } =
-    useDebouncedValidation(
-      glucoseLevel,
-      validateGlucose,
-      1000, // 1 second delay
-    );
+  const { validation: glucoseValidation } = useDebouncedValidation(
+    glucoseLevel,
+    validateGlucose,
+    1000, // 1 second delay
+  );
 
-  const { validation: carbValidation, isValidating: isCarbValidating } = useDebouncedValidation(
+  const { validation: carbValidation } = useDebouncedValidation(
     carbohydrates,
     validateCarbohydrates,
     1000, // 1 second delay
@@ -88,12 +86,11 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
     [glucoseLevel],
   );
 
-  const { validation: targetGlucoseValidation, isValidating: isTargetGlucoseValidating } =
-    useDebouncedValidation(
-      targetGlucose,
-      validateTargetGlucoseWithCurrent,
-      1000, // 1 second delay
-    );
+  const { validation: targetGlucoseValidation } = useDebouncedValidation(
+    targetGlucose,
+    validateTargetGlucoseWithCurrent,
+    1000, // 1 second delay
+  );
 
   // Context states for dose calculation
   const [recentExercise, setRecentExercise] = useState(false);
@@ -114,7 +111,7 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
     setGlucoseLevel(undefined);
     setCarbohydrates(undefined);
     setTargetGlucose(undefined);
-    setMealType(MealType.LUNCH);
+    setMealCategory(MealCategory.LUNCH);
     setAppliedInsulin(undefined);
     setWasManuallyEdited(false);
     setIsEditingInsulin(false);
@@ -122,7 +119,6 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
     setIsTargetGlucoseEdited(false);
     setIsFasting(false);
     setRecordedAt(new Date());
-    setCurrentTime(new Date());
     setShowDateTimePicker(false);
     setIsTimeManuallyEdited(false);
 
@@ -139,13 +135,7 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
   };
 
   // Real-time dose calculation hook for meal mode
-  const {
-    doseResult: realTimeDoseResult,
-    error: doseCalculationError,
-    isLoading: isCalculatingDose,
-    isCalculating,
-    hasValidData,
-  } = useRealTimeDoseCalculation({
+  const { doseResult: realTimeDoseResult } = useRealTimeDoseCalculation({
     glucose: glucoseLevel || 0,
     carbohydrates: carbohydrates || 0,
     mealType: mealType as "BREAKFAST" | "LUNCH" | "DINNER",
@@ -164,13 +154,7 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
   });
 
   // Real-time correction calculation hook for fasting mode
-  const {
-    doseResult: realTimeCorrectionResult,
-    error: correctionCalculationError,
-    isLoading: isCalculatingCorrection,
-    isCalculating: isCalculatingCorrectionDose,
-    hasValidData: hasValidCorrectionData,
-  } = useRealTimeCorrectionCalculation({
+  const { doseResult: realTimeCorrectionResult } = useRealTimeCorrectionCalculation({
     glucose: glucoseLevel || 0,
     enabled: !wasManuallyEdited && isFasting && targetGlucose !== undefined,
     debounceDelay: 800, // 800ms delay for better UX
@@ -204,8 +188,8 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
   /**
    * Get meal type based on time and user profile meal time ranges
    */
-  const getMealTypeFromTime = (date: Date, profile: UserProfile | undefined): MealType => {
-    if (!profile) return MealType.LUNCH; // Default fallback
+  const getMealCategoryFromTime = (date: Date, profile: UserProfile | undefined): MealCategory => {
+    if (!profile) return MealCategory.LUNCH; // Default fallback
 
     const minutesFromMidnight = date.getHours() * 60 + date.getMinutes();
 
@@ -216,7 +200,7 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
         minutesFromMidnight >= profile.mealTimeBreakfastStart &&
         minutesFromMidnight < profile.mealTimeBreakfastEnd
       ) {
-        return MealType.BREAKFAST;
+        return MealCategory.BREAKFAST;
       }
     } else {
       // Wrap-around range (e.g., 10:00 PM - 6:00 AM)
@@ -224,7 +208,7 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
         minutesFromMidnight >= profile.mealTimeBreakfastStart ||
         minutesFromMidnight < profile.mealTimeBreakfastEnd
       ) {
-        return MealType.BREAKFAST;
+        return MealCategory.BREAKFAST;
       }
     }
 
@@ -235,7 +219,7 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
         minutesFromMidnight >= profile.mealTimeLunchStart &&
         minutesFromMidnight < profile.mealTimeLunchEnd
       ) {
-        return MealType.LUNCH;
+        return MealCategory.LUNCH;
       }
     } else {
       // Wrap-around range
@@ -243,7 +227,7 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
         minutesFromMidnight >= profile.mealTimeLunchStart ||
         minutesFromMidnight < profile.mealTimeLunchEnd
       ) {
-        return MealType.LUNCH;
+        return MealCategory.LUNCH;
       }
     }
 
@@ -254,7 +238,7 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
         minutesFromMidnight >= profile.mealTimeDinnerStart &&
         minutesFromMidnight < profile.mealTimeDinnerEnd
       ) {
-        return MealType.DINNER;
+        return MealCategory.DINNER;
       }
     } else {
       // Wrap-around range (e.g., 5:00 PM - 5:00 AM next day)
@@ -262,19 +246,19 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
         minutesFromMidnight >= profile.mealTimeDinnerStart ||
         minutesFromMidnight < profile.mealTimeDinnerEnd
       ) {
-        return MealType.DINNER;
+        return MealCategory.DINNER;
       }
     }
 
     // Default to lunch if no range matches
-    return MealType.LUNCH;
+    return MealCategory.LUNCH;
   };
 
   // Auto-update meal type when recordedAt or userProfile changes (only in meal mode)
   useEffect(() => {
     if (!isFasting && userProfile) {
-      const newMealType = getMealTypeFromTime(recordedAt, userProfile);
-      setMealType(newMealType);
+      const newMealCategory = getMealCategoryFromTime(recordedAt, userProfile);
+      setMealCategory(newMealCategory);
     }
   }, [recordedAt, userProfile, isFasting]);
 
@@ -282,7 +266,6 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
   useEffect(() => {
     const interval = setInterval(() => {
       if (!isTimeManuallyEdited) {
-        setCurrentTime(new Date());
         setRecordedAt(new Date());
       }
     }, 30000); // Update every 30 seconds
@@ -294,11 +277,11 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
   const getCurrentIcRatio = () => {
     if (!userProfile) return 12; // Default
     switch (mealType) {
-      case MealType.BREAKFAST:
+      case MealCategory.BREAKFAST:
         return userProfile.icRatioBreakfast;
-      case MealType.LUNCH:
+      case MealCategory.LUNCH:
         return userProfile.icRatioLunch;
-      case MealType.DINNER:
+      case MealCategory.DINNER:
         return userProfile.icRatioDinner;
       default:
         return userProfile.icRatioLunch;
@@ -309,7 +292,6 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
 
   // Calculate insulin units
   const carbsNum = carbohydrates || 0;
-  const glucoseNum = glucoseLevel || 0;
 
   // Update calculated dose when real-time calculation completes (meal mode)
   useEffect(() => {
@@ -340,13 +322,6 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
       }
     }
   }, [realTimeCorrectionResult, wasManuallyEdited, isEditingInsulin, isFasting]);
-
-  // Reset calculated dose when data is invalid
-  useEffect(() => {
-    if (!hasValidData && !hasValidCorrectionData) {
-      setCalculatedDose(null);
-    }
-  }, [hasValidData, hasValidCorrectionData]);
 
   const breakdown = calculatedDose?.breakdown;
   const prandialInsulin = breakdown?.prandial || 0;
@@ -412,19 +387,6 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
     }
   };
 
-  const handleInsulinChange = (text: string) => {
-    const value = parseFloat(text);
-    const newValue = isNaN(value) ? undefined : value;
-    setAppliedInsulin(newValue);
-
-    // Mark as manually edited if difference is greater than 0.05 units
-    if (newValue !== undefined && calculatedInsulin > 0) {
-      const difference = Math.abs(newValue - calculatedInsulin);
-      setWasManuallyEdited(difference > 0.05);
-    }
-    // Validation is handled by the debounced hook
-  };
-
   /**
    * Handle click on insulin value to enable editing
    */
@@ -433,13 +395,6 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
     setTimeout(() => {
       insulinInputRef.current?.focus();
     }, 100);
-  };
-
-  /**
-   * Handle blur on insulin input
-   */
-  const handleInsulinBlur = () => {
-    setIsEditingInsulin(false);
   };
 
   /**
@@ -460,10 +415,10 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
         insulinType: InsulinType.BOLUS,
         mealName: prefilledMealName || undefined,
         carbohydrates: isFasting ? undefined : carbsNum > 0 ? carbsNum : undefined,
-        mealType: isFasting ? MealType.CORRECTION : mealType,
+        mealType: isFasting ? MealCategory.CORRECTION : mealType,
         recordedAt: recordedAt.toISOString(),
       });
-      console.log("response", response);
+
       if (response.error) {
         throw new Error("Error al crear registro");
       }
@@ -744,8 +699,7 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
         <View style={styles.section}>
           <View style={styles.labelContainer}>
             <Text style={styles.label}>Cálculo de Unidades</Text>
-            {((isCalculating && hasValidData) ||
-              (isCalculatingCorrectionDose && hasValidCorrectionData)) && (
+            {realTimeDoseResult && (
               <View style={styles.calculatingIndicator}>
                 <ActivityIndicator size="small" color={theme.colors.primary} />
                 <Text style={styles.calculatingText}>Calculando...</Text>
@@ -791,11 +745,6 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
                   )}
                 </>
               )}
-              {doseCalculationError && (
-                <Text style={styles.errorText}>
-                  Error en cálculo: {doseCalculationError.message}
-                </Text>
-              )}
             </View>
             {
               <Text style={styles.calculatedValue}>
@@ -813,11 +762,6 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
                   (warning.includes("🚨") ||
                     warning.includes("HYPOGLYCEMIA") ||
                     warning.includes("Very high glucose"));
-                const isWarning =
-                  warning &&
-                  (warning.includes("⚠️") ||
-                    warning.includes("High IOB") ||
-                    warning.includes("Very high dose"));
 
                 return (
                   <View
@@ -1074,7 +1018,7 @@ const styles = StyleSheet.create({
   mealTypeTextActive: {
     color: theme.colors.background,
   },
-  autoMealTypeContainer: {
+  autoMealCategoryContainer: {
     backgroundColor: theme.colors.primary + "15",
     padding: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
@@ -1082,13 +1026,13 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.primary + "30",
     alignItems: "center",
   },
-  autoMealTypeText: {
+  autoMealCategoryText: {
     fontSize: theme.fontSize.lg,
     fontWeight: "600",
     color: theme.colors.primary,
     marginBottom: theme.spacing.xs,
   },
-  autoMealTypeSubtext: {
+  autoMealCategorySubtext: {
     fontSize: theme.fontSize.sm,
     color: theme.colors.text + "80",
     fontStyle: "italic",

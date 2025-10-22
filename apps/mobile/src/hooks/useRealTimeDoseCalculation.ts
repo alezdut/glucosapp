@@ -4,12 +4,6 @@ import { createApiClient } from "../lib/api";
 import { DoseResult } from "@glucosapp/types";
 import { useDebounce } from "./useDebounce";
 
-interface DoseCalculationParams {
-  glucose: number;
-  carbohydrates: number;
-  mealType: "BREAKFAST" | "LUNCH" | "DINNER" | "CORRECTION";
-}
-
 interface UseRealTimeDoseCalculationProps {
   glucose: number;
   carbohydrates: number;

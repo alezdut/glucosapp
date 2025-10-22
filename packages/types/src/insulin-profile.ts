@@ -1,6 +1,12 @@
 /**
  * Insulin profile types matching mdi-insulin-algorithm
  * These types align with the mdi-insulin-algorithm library for accurate dose calculations
+ *
+ * BREAKING CHANGE NOTICE:
+ * - DoseBreakdown.carbDose → DoseBreakdown.prandial
+ * - DoseBreakdown.correctionDose → DoseBreakdown.correction
+ * - LegacyDoseBreakdown interface available for backwards compatibility
+ * - Use DoseBreakdownUtils for conversion between formats
  */
 
 /**
@@ -61,13 +67,14 @@ export interface DoseContext {
 
 /**
  * Breakdown of dose calculation components
+ * Matches the mdi-insulin-algorithm naming convention
  */
 export interface DoseBreakdown {
-  /** Insulin for carbohydrates */
-  carbDose: number;
-  /** Insulin for glucose correction */
-  correctionDose: number;
-  /** Active insulin on board (subtracted) */
+  /** Insulin to cover carbohydrates (prandial) - matches algorithm */
+  prandial: number;
+  /** Correction insulin (glucose adjustment) - matches algorithm */
+  correction: number;
+  /** Insulin On Board (IOB) subtracted - matches algorithm */
   iob: number;
   /** Total carbohydrates */
   carbohydrates: number;
@@ -75,9 +82,9 @@ export interface DoseBreakdown {
   glucose: number;
   /** Target glucose */
   targetGlucose: number;
-  /** Safety reduction applied (in units) */
+  /** Safety reduction applied (in units) - algorithm-specific field */
   safetyReduction: number;
-  /** Percentage adjustments applied */
+  /** Applied adjustments (exercise, nocturnal, etc.) in percentage - matches algorithm */
   adjustments?: {
     exercise?: number;
     nocturnal?: number;
@@ -95,6 +102,33 @@ export interface DoseResult {
   breakdown: DoseBreakdown;
   /** Warnings or precautions */
   warnings: string[];
+}
+
+/**
+ * Legacy DoseBreakdown interface for backwards compatibility
+ * @deprecated Use DoseBreakdown with prandial/correction fields instead
+ */
+export interface LegacyDoseBreakdown {
+  /** @deprecated Use prandial instead */
+  carbDose: number;
+  /** @deprecated Use correction instead */
+  correctionDose: number;
+  /** Active insulin on board (subtracted) */
+  iob: number;
+  /** Total carbohydrates */
+  carbohydrates: number;
+  /** Current glucose */
+  glucose: number;
+  /** Target glucose */
+  targetGlucose: number;
+  /** Safety reduction applied (in units) */
+  safetyReduction: number;
+  /** Percentage adjustments applied */
+  adjustments?: {
+    exercise?: number;
+    nocturnal?: number;
+    betweenMeals?: number;
+  };
 }
 
 /**
@@ -144,3 +178,44 @@ export interface BetweenMealCorrectionResult {
   /** Any warnings */
   warnings: string[];
 }
+
+/**
+ * Utility functions for dose breakdown conversion
+ */
+export const DoseBreakdownUtils = {
+  /**
+   * Convert legacy DoseBreakdown to new format
+   * @param legacy Legacy dose breakdown
+   * @returns New format dose breakdown
+   */
+  fromLegacy(legacy: LegacyDoseBreakdown): DoseBreakdown {
+    return {
+      prandial: legacy.carbDose,
+      correction: legacy.correctionDose,
+      iob: legacy.iob,
+      carbohydrates: legacy.carbohydrates,
+      glucose: legacy.glucose,
+      targetGlucose: legacy.targetGlucose,
+      safetyReduction: legacy.safetyReduction,
+      adjustments: legacy.adjustments,
+    };
+  },
+
+  /**
+   * Convert new format to legacy DoseBreakdown
+   * @param breakdown New format dose breakdown
+   * @returns Legacy format dose breakdown
+   */
+  toLegacy(breakdown: DoseBreakdown): LegacyDoseBreakdown {
+    return {
+      carbDose: breakdown.prandial,
+      correctionDose: breakdown.correction,
+      iob: breakdown.iob,
+      carbohydrates: breakdown.carbohydrates,
+      glucose: breakdown.glucose,
+      targetGlucose: breakdown.targetGlucose,
+      safetyReduction: breakdown.safetyReduction,
+      adjustments: breakdown.adjustments,
+    };
+  },
+};

@@ -12,11 +12,9 @@ import {
 } from "class-validator";
 import {
   InsulinType,
-  MealType,
+  MealCategory,
   MIN_GLUCOSE_READING,
   MAX_GLUCOSE_READING,
-  MIN_INSULIN_DOSE,
-  MAX_INSULIN_DOSE,
 } from "@glucosapp/types";
 
 /**
@@ -77,14 +75,14 @@ export class CreateLogEntryDto {
 
   @ApiProperty({
     required: false,
-    enum: MealType,
+    enum: MealCategory,
     description: "Type of meal (breakfast, lunch, dinner, snack)",
   })
   @IsOptional()
   @IsEnum(["BREAKFAST", "LUNCH", "DINNER", "SNACK", "CORRECTION"], {
     message: "Meal type must be BREAKFAST, LUNCH, DINNER, SNACK, or CORRECTION",
   })
-  mealType?: MealType;
+  mealType?: MealCategory;
 
   @ApiProperty({ required: false })
   @IsOptional()

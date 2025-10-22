@@ -73,7 +73,7 @@ export const useRealTimeCorrectionCalculation = ({
         targetGlucose: debouncedTargetGlucose,
         context: debouncedContext,
       });
-      console.log("correction response", response);
+
       if (response.data) {
         // Backend returns DoseResult directly for correction endpoint
         return response.data as DoseResult;
