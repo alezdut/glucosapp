@@ -16,7 +16,7 @@ import {
   type Injection,
   type PreSleepEvaluation,
   SupportedLanguage,
-} from "mdi-insulin-algorithm";
+} from "@glucosapp/mdi-insulin-algorithm";
 import type { CalculateDoseDto } from "./dto/calculate-dose.dto";
 import type { User } from "@prisma/client";
 
