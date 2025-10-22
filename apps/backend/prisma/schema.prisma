@@ -32,6 +32,14 @@ enum InsulinType {
   BOLUS
 }
 
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+  CORRECTION
+}
+
 model User {
   id                       String         @id @default(cuid())
   email                    String         @unique
@@ -50,11 +58,22 @@ model User {
   glucoseUnit              GlucoseUnit    @default(MG_DL)
   theme                    Theme          @default(LIGHT)
   language                 Language       @default(ES)
-  carbRatio                Float          @default(10)
+  // Insulin Profile - Time-of-day specific IC Ratios
+  icRatioBreakfast         Float          @default(15)
+  icRatioLunch             Float          @default(12)
+  icRatioDinner            Float          @default(10)
   insulinSensitivityFactor Float          @default(50)
+  diaHours                 Float          @default(4)
   targetGlucose            Int?
   minTargetGlucose         Int            @default(80)
   maxTargetGlucose         Int            @default(140)
+  // Meal time ranges (in minutes from midnight, 0-1439)
+  mealTimeBreakfastStart   Int            @default(300) // 5:00 AM
+  mealTimeBreakfastEnd     Int            @default(660) // 11:00 AM
+  mealTimeLunchStart       Int            @default(660) // 11:00 AM
+  mealTimeLunchEnd         Int            @default(1020) // 5:00 PM
+  mealTimeDinnerStart      Int            @default(1020) // 5:00 PM
+  mealTimeDinnerEnd        Int            @default(300) // 5:00 AM (next day)
   createdAt                DateTime       @default(now())
   entries                  GlucoseEntry[]
   accounts                 Account[]
@@ -108,6 +127,12 @@ model InsulinDose {
   wasManuallyEdited Boolean     @default(false)
   recordedAt        DateTime    @default(now())
   type              InsulinType
+  mealType          MealType?
+  isCorrection      Boolean     @default(false)
+  // Calculation breakdown (for transparency)
+  carbInsulin       Float?
+  correctionInsulin Float?
+  iobSubtracted     Float?
   user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   logEntry          LogEntry?
 
@@ -119,6 +144,7 @@ model Meal {
   userId        String
   name          String
   carbohydrates Float?
+  mealType      MealType?
   recordedAt    DateTime  @default(now())
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   logEntry      LogEntry?

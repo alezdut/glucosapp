@@ -23,6 +23,14 @@ export enum InsulinType {
   BOLUS = "BOLUS",
 }
 
+export enum MealType {
+  BREAKFAST = "BREAKFAST",
+  LUNCH = "LUNCH",
+  DINNER = "DINNER",
+  SNACK = "SNACK",
+  CORRECTION = "CORRECTION",
+}
+
 export type User = {
   id: string;
   email: string;
@@ -40,11 +48,22 @@ export type UserProfile = User & {
   glucoseUnit: GlucoseUnit;
   theme: Theme;
   language: Language;
-  carbRatio: number;
+  // Insulin Profile - Time-of-day specific IC Ratios
+  icRatioBreakfast: number;
+  icRatioLunch: number;
+  icRatioDinner: number;
   insulinSensitivityFactor: number;
+  diaHours: number;
   targetGlucose?: number;
   minTargetGlucose: number;
   maxTargetGlucose: number;
+  // Meal time ranges (in minutes from midnight, 0-1439)
+  mealTimeBreakfastStart: number;
+  mealTimeBreakfastEnd: number;
+  mealTimeLunchStart: number;
+  mealTimeLunchEnd: number;
+  mealTimeDinnerStart: number;
+  mealTimeDinnerEnd: number;
 };
 
 export type GlucoseEntry = {
@@ -62,6 +81,11 @@ export type InsulinDose = {
   wasManuallyEdited: boolean;
   recordedAt: string;
   type: InsulinType;
+  mealType?: MealType;
+  isCorrection?: boolean;
+  carbInsulin?: number;
+  correctionInsulin?: number;
+  iobSubtracted?: number;
 };
 
 export type Meal = {
@@ -69,6 +93,7 @@ export type Meal = {
   userId: string;
   name: string;
   carbohydrates?: number;
+  mealType?: MealType;
   recordedAt: string;
 };
 
@@ -112,6 +137,9 @@ export type AuthResponse = {
 
 // Export constants
 export * from "./constants";
+
+// Export insulin profile types (mdi-insulin-algorithm compatible)
+export * from "./insulin-profile";
 
 // Export insulin calculation utilities
 export * from "./insulin-calculations";

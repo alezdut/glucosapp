@@ -19,8 +19,15 @@ export const DEFAULT_MAX_TARGET_GLUCOSE = 140;
 /**
  * Default insulin parameters
  */
-export const DEFAULT_CARB_RATIO = 10; // grams of carbs per 1 unit of insulin
 export const DEFAULT_INSULIN_SENSITIVITY_FACTOR = 50; // mg/dL drop per 1 unit of insulin
+
+/**
+ * Default IC ratios by time of day
+ * These should be set by healthcare provider
+ */
+export const DEFAULT_IC_RATIO_BREAKFAST = 15; // Higher ratio at breakfast (less sensitive)
+export const DEFAULT_IC_RATIO_LUNCH = 12; // Medium ratio
+export const DEFAULT_IC_RATIO_DINNER = 10; // Lower ratio at dinner (more sensitive)
 
 /**
  * Carbohydrate impact on glucose

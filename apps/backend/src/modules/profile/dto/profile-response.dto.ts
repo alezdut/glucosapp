@@ -42,4 +42,26 @@ export class ProfileResponseDto {
 
   @ApiProperty()
   createdAt!: string;
+
+  @ApiProperty({ required: false })
+  targetGlucose?: number;
+
+  // Meal time ranges (in minutes from midnight, 0-1439)
+  @ApiProperty({ required: false })
+  mealTimeBreakfastStart?: number;
+
+  @ApiProperty({ required: false })
+  mealTimeBreakfastEnd?: number;
+
+  @ApiProperty({ required: false })
+  mealTimeLunchStart?: number;
+
+  @ApiProperty({ required: false })
+  mealTimeLunchEnd?: number;
+
+  @ApiProperty({ required: false })
+  mealTimeDinnerStart?: number;
+
+  @ApiProperty({ required: false })
+  mealTimeDinnerEnd?: number;
 }

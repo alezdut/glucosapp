@@ -25,17 +25,22 @@ export class LogEntriesService {
         },
       });
 
-      // Create insulin dose
-      const insulinDose = await tx.insulinDose.create({
-        data: {
-          userId,
-          units: data.insulinUnits,
-          calculatedUnits: data.calculatedInsulinUnits || data.insulinUnits,
-          wasManuallyEdited: data.wasManuallyEdited || false,
-          type: data.insulinType,
-          recordedAt,
-        },
-      });
+      // Create insulin dose only if user actually injected insulin
+      let insulinDose = null;
+      if (data.insulinUnits > 0) {
+        insulinDose = await tx.insulinDose.create({
+          data: {
+            userId,
+            units: data.insulinUnits,
+            calculatedUnits: data.calculatedInsulinUnits || data.insulinUnits,
+            wasManuallyEdited: data.wasManuallyEdited || false,
+            type: data.insulinType,
+            mealType: data.mealType,
+            isCorrection: data.carbohydrates === undefined || data.carbohydrates === 0,
+            recordedAt,
+          },
+        });
+      }
 
       // Create meal if provided
       let meal = null;
@@ -45,6 +50,7 @@ export class LogEntriesService {
             userId,
             name: data.mealName,
             carbohydrates: data.carbohydrates,
+            mealType: data.mealType,
             recordedAt,
           },
         });
@@ -56,12 +62,12 @@ export class LogEntriesService {
           userId,
           recordedAt,
           glucoseEntryId: glucoseEntry.id,
-          insulinDoseId: insulinDose.id,
+          insulinDoseId: insulinDose?.id,
           mealId: meal?.id,
         },
         include: {
           glucoseEntry: true,
-          insulinDose: true,
+          insulinDose: insulinDose ? true : false,
           meal: true,
         },
       });

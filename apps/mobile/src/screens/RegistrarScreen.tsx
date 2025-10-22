@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -10,23 +10,16 @@ import {
   TextInput as RNTextInput,
 } from "react-native";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { useFocusEffect } from "@react-navigation/native";
 import { theme } from "../theme";
 import { createApiClient } from "../lib/api";
 import type { RegistrarScreenProps } from "../navigation/types";
-import {
-  InsulinType,
-  type UserProfile,
-  calculateInsulinDose,
-  evaluateGlucoseAlert,
-  DEFAULT_CARB_RATIO,
-  DEFAULT_INSULIN_SENSITIVITY_FACTOR,
-  DEFAULT_MIN_TARGET_GLUCOSE,
-  DEFAULT_MAX_TARGET_GLUCOSE,
-  CARB_GLUCOSE_IMPACT,
-} from "@glucosapp/types";
+import { InsulinType, MealType, type UserProfile, type DoseResult } from "@glucosapp/types";
 import TextInput from "../components/TextInput";
 import Button from "../components/Button";
 import ScreenHeader from "../components/ScreenHeader";
+import { CustomDateTimePicker } from "../components";
+import { useRealTimeDoseCalculation, useRealTimeCorrectionCalculation } from "../hooks";
 
 /**
  * RegistrarScreen component - Register glucose, insulin, and meal entry
@@ -52,69 +45,289 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
   const [glucoseLevel, setGlucoseLevel] = useState<number | undefined>(undefined);
   const [carbohydrates, setCarbohydrates] = useState<number | undefined>(prefilledCarbs);
   const [targetGlucose, setTargetGlucose] = useState<number | undefined>(undefined);
-  const [insulinType, setInsulinType] = useState<InsulinType>(InsulinType.BOLUS);
+  const [mealType, setMealType] = useState<MealType>(MealType.LUNCH);
   const [appliedInsulin, setAppliedInsulin] = useState<number | undefined>(undefined);
   const [wasManuallyEdited, setWasManuallyEdited] = useState(false);
   const [isEditingInsulin, setIsEditingInsulin] = useState(false);
+  const [calculatedDose, setCalculatedDose] = useState<DoseResult | null>(null);
+  const [isTargetGlucoseEdited, setIsTargetGlucoseEdited] = useState(false);
+  const [isFasting, setIsFasting] = useState(false);
+  const [recordedAt, setRecordedAt] = useState<Date>(new Date());
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  const [showDateTimePicker, setShowDateTimePicker] = useState(false);
   const insulinInputRef = useRef<RNTextInput>(null);
+
+  // Context states for dose calculation
+  const [recentExercise, setRecentExercise] = useState(false);
+  const [alcohol, setAlcohol] = useState(false);
+  const [illness, setIllness] = useState(false);
+  const [stress, setStress] = useState(false);
+  const [menstruation, setMenstruation] = useState(false);
+  const [highFatMeal, setHighFatMeal] = useState(false);
+  const [isContextExpanded, setIsContextExpanded] = useState(false);
+  // Hour of day is taken from the selected recordedAt time
+  const hourOfDay = recordedAt.getHours();
+  const formattedTime = `${recordedAt.getHours().toString().padStart(2, "0")}:${recordedAt.getMinutes().toString().padStart(2, "0")}`;
+
+  /**
+   * Reset all form fields to their initial state
+   */
+  const resetFormFields = () => {
+    setGlucoseLevel(undefined);
+    setCarbohydrates(undefined);
+    setTargetGlucose(undefined);
+    setMealType(MealType.LUNCH);
+    setAppliedInsulin(undefined);
+    setWasManuallyEdited(false);
+    setIsEditingInsulin(false);
+    setCalculatedDose(null);
+    setIsTargetGlucoseEdited(false);
+    setIsFasting(false);
+    setRecordedAt(new Date());
+    setCurrentTime(new Date());
+    setShowDateTimePicker(false);
+
+    // Reset context states
+    setRecentExercise(false);
+    setAlcohol(false);
+    setIllness(false);
+    setStress(false);
+    setMenstruation(false);
+    setHighFatMeal(false);
+    setIsContextExpanded(false);
+  };
+
+  // Real-time dose calculation hook for meal mode
+  const {
+    doseResult: realTimeDoseResult,
+    error: doseCalculationError,
+    isLoading: isCalculatingDose,
+    isCalculating,
+    hasValidData,
+  } = useRealTimeDoseCalculation({
+    glucose: glucoseLevel || 0,
+    carbohydrates: carbohydrates || 0,
+    mealType: mealType as "BREAKFAST" | "LUNCH" | "DINNER",
+    enabled: !wasManuallyEdited && !isFasting,
+    debounceDelay: 800, // 800ms delay for better UX
+    targetGlucose: isTargetGlucoseEdited ? targetGlucose : userProfile?.targetGlucose,
+    context: {
+      recentExercise,
+      alcohol,
+      illness,
+      stress,
+      menstruation,
+      highFatMeal,
+      hourOfDay,
+    },
+  });
+
+  // Real-time correction calculation hook for fasting mode
+  const {
+    doseResult: realTimeCorrectionResult,
+    error: correctionCalculationError,
+    isLoading: isCalculatingCorrection,
+    isCalculating: isCalculatingCorrectionDose,
+    hasValidData: hasValidCorrectionData,
+  } = useRealTimeCorrectionCalculation({
+    glucose: glucoseLevel || 0,
+    enabled: !wasManuallyEdited && isFasting && targetGlucose !== undefined,
+    debounceDelay: 800, // 800ms delay for better UX
+    targetGlucose: isTargetGlucoseEdited ? targetGlucose : userProfile?.targetGlucose,
+    context: {
+      recentExercise,
+      alcohol,
+      illness,
+      stress,
+      menstruation,
+      highFatMeal,
+      hourOfDay,
+    },
+  });
 
   // Set default target glucose from user profile when profile loads
   useEffect(() => {
-    if (insulinType === InsulinType.BASAL) {
-      setTargetGlucose(undefined);
-    } else if (insulinType === InsulinType.BOLUS && userProfile?.targetGlucose && !targetGlucose) {
+    if (userProfile?.targetGlucose && !isTargetGlucoseEdited && !isFasting) {
       setTargetGlucose(userProfile.targetGlucose);
     }
-  }, [insulinType, userProfile?.targetGlucose]);
+  }, [userProfile?.targetGlucose, isTargetGlucoseEdited, isFasting]);
 
-  // Get user's insulin parameters or use defaults
-  const carbRatio = userProfile?.carbRatio || DEFAULT_CARB_RATIO;
-  const insulinSensitivityFactor =
-    userProfile?.insulinSensitivityFactor || DEFAULT_INSULIN_SENSITIVITY_FACTOR;
+  // Clear target glucose when switching to fasting mode
+  useEffect(() => {
+    if (isFasting) {
+      setTargetGlucose(undefined);
+      setIsTargetGlucoseEdited(false);
+    }
+  }, [isFasting]);
 
-  // Get user's personalized target range (warning level - yellow)
-  const minTargetGlucose = userProfile?.minTargetGlucose || DEFAULT_MIN_TARGET_GLUCOSE;
-  const maxTargetGlucose = userProfile?.maxTargetGlucose || DEFAULT_MAX_TARGET_GLUCOSE;
+  /**
+   * Get meal type based on time and user profile meal time ranges
+   */
+  const getMealTypeFromTime = (date: Date, profile: UserProfile | undefined): MealType => {
+    if (!profile) return MealType.LUNCH; // Default fallback
+
+    const minutesFromMidnight = date.getHours() * 60 + date.getMinutes();
+
+    // Check breakfast range
+    if (profile.mealTimeBreakfastStart <= profile.mealTimeBreakfastEnd) {
+      // Normal range (e.g., 5:00 AM - 11:00 AM)
+      if (
+        minutesFromMidnight >= profile.mealTimeBreakfastStart &&
+        minutesFromMidnight < profile.mealTimeBreakfastEnd
+      ) {
+        return MealType.BREAKFAST;
+      }
+    } else {
+      // Wrap-around range (e.g., 10:00 PM - 6:00 AM)
+      if (
+        minutesFromMidnight >= profile.mealTimeBreakfastStart ||
+        minutesFromMidnight < profile.mealTimeBreakfastEnd
+      ) {
+        return MealType.BREAKFAST;
+      }
+    }
+
+    // Check lunch range
+    if (profile.mealTimeLunchStart <= profile.mealTimeLunchEnd) {
+      // Normal range (e.g., 11:00 AM - 5:00 PM)
+      if (
+        minutesFromMidnight >= profile.mealTimeLunchStart &&
+        minutesFromMidnight < profile.mealTimeLunchEnd
+      ) {
+        return MealType.LUNCH;
+      }
+    } else {
+      // Wrap-around range
+      if (
+        minutesFromMidnight >= profile.mealTimeLunchStart ||
+        minutesFromMidnight < profile.mealTimeLunchEnd
+      ) {
+        return MealType.LUNCH;
+      }
+    }
+
+    // Check dinner range
+    if (profile.mealTimeDinnerStart <= profile.mealTimeDinnerEnd) {
+      // Normal range (e.g., 5:00 PM - 10:00 PM)
+      if (
+        minutesFromMidnight >= profile.mealTimeDinnerStart &&
+        minutesFromMidnight < profile.mealTimeDinnerEnd
+      ) {
+        return MealType.DINNER;
+      }
+    } else {
+      // Wrap-around range (e.g., 5:00 PM - 5:00 AM next day)
+      if (
+        minutesFromMidnight >= profile.mealTimeDinnerStart ||
+        minutesFromMidnight < profile.mealTimeDinnerEnd
+      ) {
+        return MealType.DINNER;
+      }
+    }
+
+    // Default to lunch if no range matches
+    return MealType.LUNCH;
+  };
+
+  // Auto-update meal type when recordedAt or userProfile changes (only in meal mode)
+  useEffect(() => {
+    if (!isFasting && userProfile) {
+      const newMealType = getMealTypeFromTime(recordedAt, userProfile);
+      setMealType(newMealType);
+    }
+  }, [recordedAt, userProfile, isFasting]);
+
+  // Update current time every minute
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Get IC ratio based on meal type
+  const getCurrentIcRatio = () => {
+    if (!userProfile) return 12; // Default
+    switch (mealType) {
+      case MealType.BREAKFAST:
+        return userProfile.icRatioBreakfast;
+      case MealType.LUNCH:
+        return userProfile.icRatioLunch;
+      case MealType.DINNER:
+        return userProfile.icRatioDinner;
+      default:
+        return userProfile.icRatioLunch;
+    }
+  };
+
+  const carbRatio = getCurrentIcRatio();
 
   // Calculate insulin units
   const carbsNum = carbohydrates || 0;
   const glucoseNum = glucoseLevel || 0;
-  const targetGlucoseNum = targetGlucose;
 
-  // Calculate insulin dose using shared utility
-  const calculationResult = calculateInsulinDose({
-    carbohydrates: carbsNum,
-    glucoseLevel: glucoseNum,
-    targetGlucose: targetGlucoseNum,
-    insulinType,
-    carbRatio,
-    insulinSensitivityFactor,
-  });
+  // Update calculated dose when real-time calculation completes (meal mode)
+  useEffect(() => {
+    if (realTimeDoseResult && !wasManuallyEdited && !isFasting) {
+      setCalculatedDose(realTimeDoseResult);
+      // Auto-fill insulin field with calculated dose
+      if (!isEditingInsulin) {
+        setAppliedInsulin(realTimeDoseResult.dose);
+      }
+    }
+  }, [realTimeDoseResult, wasManuallyEdited, isEditingInsulin, isFasting]);
 
-  const { carbInsulin, correctionInsulin, totalInsulin: calculatedInsulin } = calculationResult;
+  // Update calculated dose when real-time correction calculation completes (fasting mode)
+  useEffect(() => {
+    if (
+      realTimeCorrectionResult &&
+      !wasManuallyEdited &&
+      isFasting &&
+      typeof realTimeCorrectionResult === "object" &&
+      realTimeCorrectionResult !== null &&
+      "dose" in realTimeCorrectionResult &&
+      typeof realTimeCorrectionResult.dose === "number"
+    ) {
+      setCalculatedDose(realTimeCorrectionResult as DoseResult);
+      // Auto-fill insulin field with calculated dose
+      if (!isEditingInsulin) {
+        setAppliedInsulin(realTimeCorrectionResult.dose);
+      }
+    }
+  }, [realTimeCorrectionResult, wasManuallyEdited, isEditingInsulin, isFasting]);
 
-  // Calculate projected glucose with applied insulin (may differ from calculated)
-  const appliedInsulinNum = appliedInsulin || 0;
-  const projectedGlucoseWithApplied =
-    glucoseNum + carbsNum * CARB_GLUCOSE_IMPACT - appliedInsulinNum * insulinSensitivityFactor;
+  // Reset calculated dose when data is invalid
+  useEffect(() => {
+    if (!hasValidData && !hasValidCorrectionData) {
+      setCalculatedDose(null);
+    }
+  }, [hasValidData, hasValidCorrectionData]);
 
-  // Evaluate glucose alert using shared utility
-  const glucoseAlert = evaluateGlucoseAlert(
-    projectedGlucoseWithApplied,
-    minTargetGlucose,
-    maxTargetGlucose,
-    glucoseNum,
-    appliedInsulinNum,
-  );
+  const breakdown = calculatedDose?.breakdown;
+  const prandialInsulin = breakdown?.prandial || 0;
+  const correctionInsulin = breakdown?.correction || 0;
+  const iobInsulin = breakdown?.iob || 0;
+  const calculatedInsulin = calculatedDose?.dose || 0;
+  const safetyReduction = breakdown?.safetyReduction || 0;
 
-  const { level: alertLevel, message: alertMessage } = glucoseAlert;
+  // Get warnings from backend calculation result
+  const backendWarnings = Array.isArray(calculatedDose?.warnings) ? calculatedDose.warnings : [];
 
   // Update appliedInsulin when calculatedInsulin changes (if not manually edited)
   useEffect(() => {
-    if (!wasManuallyEdited && calculatedInsulin > 0) {
+    if (!wasManuallyEdited && !isEditingInsulin && calculatedInsulin > 0) {
       setAppliedInsulin(parseFloat(calculatedInsulin.toFixed(1)));
     }
-  }, [calculatedInsulin, wasManuallyEdited]);
+  }, [calculatedInsulin, wasManuallyEdited, isEditingInsulin]);
+
+  // Reset form fields when screen gains focus (user enters screen)
+  useFocusEffect(
+    useCallback(() => {
+      // Reset form when entering screen to ensure clean state
+      resetFormFields();
+    }, []),
+  );
 
   /**
    * Handle text input changes and convert to number
@@ -131,7 +344,22 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
 
   const handleTargetGlucoseChange = (text: string) => {
     const value = parseFloat(text);
-    setTargetGlucose(isNaN(value) ? undefined : value);
+
+    // Mark as edited when user starts typing
+    if (!isTargetGlucoseEdited) {
+      setIsTargetGlucoseEdited(true);
+    }
+
+    // If user clears the field, reset to profile value
+    if (text === "" && userProfile?.targetGlucose) {
+      setTargetGlucose(undefined);
+      setIsTargetGlucoseEdited(false);
+      // Clear calculated dose when target glucose is cleared
+      setAppliedInsulin(undefined);
+      setWasManuallyEdited(false);
+    } else {
+      setTargetGlucose(isNaN(value) ? undefined : value);
+    }
   };
 
   const handleInsulinChange = (text: string) => {
@@ -140,8 +368,9 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
     setAppliedInsulin(newValue);
 
     // Mark as manually edited if difference is greater than 0.05 units
-    if (newValue !== undefined) {
-      setWasManuallyEdited(Math.abs(newValue - calculatedInsulin) > 0.05);
+    if (newValue !== undefined && calculatedInsulin > 0) {
+      const difference = Math.abs(newValue - calculatedInsulin);
+      setWasManuallyEdited(difference > 0.05);
     }
   };
 
@@ -171,23 +400,19 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
         throw new Error("Glucosa debe estar entre 20 y 600 mg/dL");
       }
 
-      if (!appliedInsulin || appliedInsulin < 0.5) {
-        throw new Error("Las unidades de insulina deben ser al menos 0.5");
-      }
-
       const client = createApiClient();
       const response = await client.POST("/log-entries", {
-        body: {
-          glucoseMgdl: Math.round(glucoseLevel),
-          insulinUnits: appliedInsulin,
-          calculatedInsulinUnits: calculatedInsulin,
-          wasManuallyEdited: wasManuallyEdited,
-          insulinType,
-          mealName: prefilledMealName || undefined,
-          carbohydrates: carbsNum > 0 ? carbsNum : undefined,
-        },
+        glucoseMgdl: Math.round(glucoseLevel),
+        insulinUnits: appliedInsulin || 0,
+        calculatedInsulinUnits: calculatedInsulin || 0,
+        wasManuallyEdited: wasManuallyEdited,
+        insulinType: InsulinType.BOLUS,
+        mealName: prefilledMealName || undefined,
+        carbohydrates: isFasting ? undefined : carbsNum > 0 ? carbsNum : undefined,
+        mealType: isFasting ? MealType.CORRECTION : mealType,
+        recordedAt: recordedAt.toISOString(),
       });
-
+      console.log("response", response);
       if (response.error) {
         throw new Error("Error al crear registro");
       }
@@ -201,13 +426,8 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
         {
           text: "OK",
           onPress: () => {
-            // Reset form
-            setGlucoseLevel(undefined);
-            setCarbohydrates(undefined);
-            setTargetGlucose(undefined);
-            setAppliedInsulin(undefined);
-            setWasManuallyEdited(false);
-            setInsulinType(InsulinType.BOLUS);
+            // Reset all form fields
+            resetFormFields();
             // Navigate to home
             navigation.navigate("Inicio");
           },
@@ -252,121 +472,299 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
         />
       </View>
 
-      {/* Carbohydrates Input */}
+      {/* Fasting/Meal Selector */}
       <View style={styles.section}>
-        <TextInput
-          label="Carbohidratos a consumir"
-          value={carbohydrates?.toString() || ""}
-          onChangeText={handleCarbsChange}
-          keyboardType="decimal-pad"
-          placeholder="Ej: 60"
-          unit="g"
-        />
-      </View>
-
-      {/* Insulin Type Selector */}
-      <View style={styles.section}>
-        <Text style={styles.label}>Tipo de insulina</Text>
-        <View style={styles.insulinTypeContainer}>
+        <Text style={styles.label}>Tipo de registro</Text>
+        <View style={styles.fastingSelectorContainer}>
           <TouchableOpacity
-            style={[
-              styles.insulinTypeButton,
-              insulinType === InsulinType.BOLUS && styles.insulinTypeButtonActive,
-            ]}
-            onPress={() => setInsulinType(InsulinType.BOLUS)}
+            style={[styles.fastingSelectorButton, !isFasting && styles.fastingSelectorButtonActive]}
+            onPress={() => setIsFasting(false)}
           >
             <Text
-              style={[
-                styles.insulinTypeText,
-                insulinType === InsulinType.BOLUS && styles.insulinTypeTextActive,
-              ]}
+              style={[styles.fastingSelectorText, !isFasting && styles.fastingSelectorTextActive]}
             >
-              Rápida
+              🍽️ Comida
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[
-              styles.insulinTypeButton,
-              insulinType === InsulinType.BASAL && styles.insulinTypeButtonActive,
-            ]}
-            onPress={() => setInsulinType(InsulinType.BASAL)}
+            style={[styles.fastingSelectorButton, isFasting && styles.fastingSelectorButtonActive]}
+            onPress={() => setIsFasting(true)}
           >
             <Text
-              style={[
-                styles.insulinTypeText,
-                insulinType === InsulinType.BASAL && styles.insulinTypeTextActive,
-              ]}
+              style={[styles.fastingSelectorText, isFasting && styles.fastingSelectorTextActive]}
             >
-              Lenta
+              ⏰ Ayuno
             </Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Target Glucose Input (only for rapid insulin) */}
-      {insulinType === InsulinType.BOLUS && (
+      {/* Carbohydrates Input */}
+      {!isFasting && (
         <View style={styles.section}>
           <TextInput
-            label="Glucosa objetivo (opcional)"
-            value={targetGlucose?.toString() || ""}
-            onChangeText={handleTargetGlucoseChange}
-            keyboardType="number-pad"
-            placeholder="Ej: 100"
-            unit="mg/dL"
+            label="Carbohidratos a consumir"
+            value={carbohydrates?.toString() || ""}
+            onChangeText={handleCarbsChange}
+            keyboardType="decimal-pad"
+            placeholder="Ej: 60"
+            unit="g"
           />
         </View>
       )}
 
-      {/* Calculated Insulin Display (Editable) */}
+      {/* Target Glucose Input */}
       <View style={styles.section}>
-        <Text style={styles.label}>Cálculo de Unidades</Text>
-        <TouchableOpacity
-          style={styles.calculationContainer}
-          onPress={handleInsulinPress}
-          activeOpacity={0.7}
-        >
-          <View style={styles.calculationDetails}>
-            <Text style={styles.calculationLabel}>Ratio: 1:{carbRatio}</Text>
-            {correctionInsulin > 0 && (
-              <>
-                <Text style={styles.calculationBreakdown}>
-                  Carbohidratos: {carbInsulin.toFixed(1)} U
-                </Text>
-                <Text style={styles.calculationBreakdown}>
-                  Corrección: {correctionInsulin.toFixed(1)} U (Factor: {insulinSensitivityFactor})
-                </Text>
-              </>
+        <TextInput
+          label={isFasting ? "Corregir glucosa (opcional)" : "Glucosa objetivo (opcional)"}
+          value={isTargetGlucoseEdited ? targetGlucose?.toString() || "" : ""}
+          onChangeText={handleTargetGlucoseChange}
+          keyboardType="number-pad"
+          placeholder={userProfile?.targetGlucose ? `${userProfile.targetGlucose}` : "Ej: 100"}
+          unit="mg/dL"
+        />
+      </View>
+
+      {/* Context Section - Show in meal mode OR fasting mode with target glucose */}
+      {(!isFasting || (isFasting && targetGlucose && isTargetGlucoseEdited)) && (
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.contextHeader}
+            onPress={() => setIsContextExpanded(!isContextExpanded)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.label, styles.contextHeaderTitle]}>Contexto Adicional</Text>
+            <Text style={styles.contextToggleIcon}>{isContextExpanded ? "▼" : "▶"}</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.contextSubtitle}>
+            Factores que pueden afectar el cálculo: Marca las opciones que apliquen para un cálculo
+            más preciso
+          </Text>
+
+          {isContextExpanded && (
+            <>
+              <View style={styles.contextGrid}>
+                {/* First Column */}
+                <View style={styles.contextColumn}>
+                  <TouchableOpacity
+                    style={[styles.contextCheckbox, recentExercise && styles.contextCheckboxActive]}
+                    onPress={() => setRecentExercise(!recentExercise)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.contextCheckboxText,
+                        recentExercise && styles.contextCheckboxTextActive,
+                      ]}
+                      numberOfLines={2}
+                    >
+                      🏃‍♂️ Ejercicio Reciente (~4hs)
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.contextCheckbox, alcohol && styles.contextCheckboxActive]}
+                    onPress={() => setAlcohol(!alcohol)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.contextCheckboxText,
+                        alcohol && styles.contextCheckboxTextActive,
+                      ]}
+                      numberOfLines={2}
+                    >
+                      🍷 Alcohol
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.contextCheckbox, illness && styles.contextCheckboxActive]}
+                    onPress={() => setIllness(!illness)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.contextCheckboxText,
+                        illness && styles.contextCheckboxTextActive,
+                      ]}
+                      numberOfLines={2}
+                    >
+                      🤒 Enfermedad
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Second Column */}
+                <View style={styles.contextColumn}>
+                  <TouchableOpacity
+                    style={[styles.contextCheckbox, stress && styles.contextCheckboxActive]}
+                    onPress={() => setStress(!stress)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.contextCheckboxText,
+                        stress && styles.contextCheckboxTextActive,
+                      ]}
+                      numberOfLines={2}
+                    >
+                      😰 Estrés alto
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.contextCheckbox, menstruation && styles.contextCheckboxActive]}
+                    onPress={() => setMenstruation(!menstruation)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.contextCheckboxText,
+                        menstruation && styles.contextCheckboxTextActive,
+                      ]}
+                      numberOfLines={2}
+                    >
+                      🩸 Menstruación
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.contextCheckbox, highFatMeal && styles.contextCheckboxActive]}
+                    onPress={() => setHighFatMeal(!highFatMeal)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.contextCheckboxText,
+                        highFatMeal && styles.contextCheckboxTextActive,
+                      ]}
+                      numberOfLines={2}
+                    >
+                      🥓 Comida alta en grasa
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </>
+          )}
+        </View>
+      )}
+
+      {/* Calculated Insulin Display (Editable) */}
+      {(!isFasting || (isFasting && targetGlucose && isTargetGlucoseEdited)) && (
+        <View style={styles.section}>
+          <View style={styles.labelContainer}>
+            <Text style={styles.label}>Cálculo de Unidades</Text>
+            {((isCalculating && hasValidData) ||
+              (isCalculatingCorrectionDose && hasValidCorrectionData)) && (
+              <View style={styles.calculatingIndicator}>
+                <ActivityIndicator size="small" color={theme.colors.primary} />
+                <Text style={styles.calculatingText}>Calculando...</Text>
+              </View>
             )}
           </View>
-          {isEditingInsulin ? (
-            <RNTextInput
-              ref={insulinInputRef}
-              style={styles.calculatedValue}
-              value={appliedInsulin?.toString() || ""}
-              onChangeText={handleInsulinChange}
-              onBlur={handleInsulinBlur}
-              keyboardType="decimal-pad"
-              selectTextOnFocus
-            />
-          ) : (
-            <Text style={styles.calculatedValue}>
-              {(appliedInsulin || calculatedInsulin).toFixed(1)} U
-            </Text>
-          )}
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.calculationContainer}
+            onPress={handleInsulinPress}
+            activeOpacity={0.7}
+          >
+            <View style={styles.calculationDetails}>
+              <Text style={styles.calculationLabel}>Ratio: 1:{carbRatio}</Text>
+              {breakdown && (
+                <>
+                  <Text style={styles.calculationBreakdown}>
+                    Dosis Prandial: {prandialInsulin.toFixed(1)} U
+                  </Text>
+                  {correctionInsulin > 0 && (
+                    <Text style={styles.calculationBreakdown}>
+                      Corrección: {correctionInsulin.toFixed(1)} U
+                    </Text>
+                  )}
+                  {iobInsulin > 0 && (
+                    <Text style={styles.calculationBreakdown}>
+                      IOB restado: -{iobInsulin.toFixed(1)} U
+                    </Text>
+                  )}
+                  {safetyReduction > 0 && (
+                    <Text style={styles.calculationBreakdown}>
+                      Reducción seguridad: -{safetyReduction.toFixed(1)} U
+                    </Text>
+                  )}
+                  {breakdown.glucose && breakdown.targetGlucose && (
+                    <Text style={styles.calculationBreakdown}>
+                      Glucosa: {breakdown.glucose} → {breakdown.targetGlucose} mg/dL
+                    </Text>
+                  )}
+                  {breakdown.carbohydrates > 0 && (
+                    <Text style={styles.calculationBreakdown}>
+                      Carbohidratos: {breakdown.carbohydrates}g
+                    </Text>
+                  )}
+                </>
+              )}
+              {doseCalculationError && (
+                <Text style={styles.errorText}>
+                  Error en cálculo: {doseCalculationError.message}
+                </Text>
+              )}
+            </View>
+            {isEditingInsulin ? (
+              <RNTextInput
+                ref={insulinInputRef}
+                style={styles.calculatedValue}
+                value={appliedInsulin?.toString() || ""}
+                onChangeText={handleInsulinChange}
+                onBlur={handleInsulinBlur}
+                keyboardType="decimal-pad"
+                selectTextOnFocus
+              />
+            ) : (
+              <Text style={styles.calculatedValue}>
+                {(appliedInsulin || calculatedInsulin).toFixed(1)} U
+              </Text>
+            )}
+          </TouchableOpacity>
 
-        {/* Glucose Range Alerts */}
-        {alertLevel === "warning" && (
-          <View style={styles.warningContainer}>
-            <Text style={styles.warningText}>{alertMessage}</Text>
-          </View>
-        )}
-        {alertLevel === "danger" && (
-          <View style={styles.dangerContainer}>
-            <Text style={styles.dangerText}>{alertMessage}</Text>
-          </View>
-        )}
-      </View>
+          {/* Backend Warnings */}
+          {backendWarnings.length > 0 && (
+            <View style={styles.warningsContainer}>
+              {backendWarnings.map((warning, index) => {
+                const isDanger =
+                  warning &&
+                  (warning.includes("🚨") ||
+                    warning.includes("HYPOGLYCEMIA") ||
+                    warning.includes("Very high glucose"));
+                const isWarning =
+                  warning &&
+                  (warning.includes("⚠️") ||
+                    warning.includes("High IOB") ||
+                    warning.includes("Very high dose"));
+
+                return (
+                  <View
+                    key={index}
+                    style={[
+                      styles.warningItem,
+                      isDanger ? styles.dangerContainer : styles.warningContainer,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.warningText,
+                        isDanger ? styles.dangerText : styles.warningText,
+                      ]}
+                    >
+                      {warning}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </View>
+      )}
 
       {/* Summary */}
       {prefilledMealName && (
@@ -378,6 +776,41 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
           </Text>
         </View>
       )}
+      {/* Date/Time display - Always visible */}
+      <View style={styles.timeDisplaySection}>
+        <TouchableOpacity
+          style={styles.timeDisplay}
+          onPress={() => setShowDateTimePicker(true)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.timeLabel}>
+            {recordedAt.getTime() === currentTime.getTime() ? "Hora actual" : "Hora personalizada"}:{" "}
+            {recordedAt.toLocaleDateString("es-ES", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })}
+            , {formattedTime}
+          </Text>
+          <Text style={styles.timeSubLabel}>Toca para cambiar</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* DateTimePicker Modal */}
+      <CustomDateTimePicker
+        value={recordedAt}
+        onDateChange={(date) => {
+          if (date) {
+            setRecordedAt(date);
+          }
+          setShowDateTimePicker(false);
+        }}
+        mode="datetime"
+        minimumDate={new Date(2020, 0, 1)}
+        maximumDate={new Date()}
+        showButton={false}
+        visible={showDateTimePicker}
+      />
 
       {/* Register Button */}
       <Button
@@ -407,8 +840,8 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
   },
   scrollContent: {
-    padding: theme.spacing.lg,
-    paddingTop: theme.spacing.xxl,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.xxl,
   },
   section: {
     marginBottom: theme.spacing.lg,
@@ -447,11 +880,11 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: theme.colors.primary,
   },
-  insulinTypeContainer: {
+  fastingSelectorContainer: {
     flexDirection: "row",
     gap: theme.spacing.md,
   },
-  insulinTypeButton: {
+  fastingSelectorButton: {
     flex: 1,
     paddingVertical: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
@@ -460,16 +893,16 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: theme.colors.border,
   },
-  insulinTypeButtonActive: {
+  fastingSelectorButtonActive: {
     backgroundColor: theme.colors.primary,
     borderColor: theme.colors.primary,
   },
-  insulinTypeText: {
+  fastingSelectorText: {
     fontSize: theme.fontSize.lg,
     fontWeight: "600",
     color: theme.colors.text,
   },
-  insulinTypeTextActive: {
+  fastingSelectorTextActive: {
     color: theme.colors.background,
   },
   summaryContainer: {
@@ -519,5 +952,206 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.sm,
     color: theme.colors.error,
     fontWeight: "700",
+  },
+  mealTypeContainer: {
+    flexDirection: "row",
+    gap: theme.spacing.sm,
+  },
+  mealTypeButton: {
+    flex: 1,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.xs,
+    borderRadius: theme.borderRadius.md,
+    alignItems: "center",
+    backgroundColor: theme.colors.background,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+  },
+  mealTypeButtonActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  mealTypeText: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: "600",
+    color: theme.colors.text,
+  },
+  mealTypeTextActive: {
+    color: theme.colors.background,
+  },
+  autoMealTypeContainer: {
+    backgroundColor: theme.colors.primary + "15",
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.primary + "30",
+    alignItems: "center",
+  },
+  autoMealTypeText: {
+    fontSize: theme.fontSize.lg,
+    fontWeight: "600",
+    color: theme.colors.primary,
+    marginBottom: theme.spacing.xs,
+  },
+  autoMealTypeSubtext: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.text + "80",
+    fontStyle: "italic",
+  },
+  labelContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: theme.spacing.sm,
+  },
+  calculatingIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.xs,
+  },
+  calculatingText: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.primary,
+    fontWeight: "500",
+  },
+  errorText: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.error,
+    fontWeight: "500",
+    marginTop: theme.spacing.xs,
+  },
+  warningsContainer: {
+    marginTop: theme.spacing.sm,
+    gap: theme.spacing.xs,
+  },
+  warningItem: {
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    borderLeftWidth: 3,
+  },
+  adjustmentsContainer: {
+    marginTop: theme.spacing.xs,
+    padding: theme.spacing.xs,
+    backgroundColor: theme.colors.background + "40",
+    borderRadius: theme.borderRadius.sm,
+  },
+  adjustmentsTitle: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: "600",
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
+  },
+  adjustmentText: {
+    fontSize: theme.fontSize.xs,
+    color: theme.colors.text + "80",
+    marginLeft: theme.spacing.sm,
+  },
+  contextHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    backgroundColor: theme.colors.primary + "15",
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 2,
+    borderColor: theme.colors.primary + "40",
+    marginBottom: theme.spacing.sm,
+    minHeight: 60,
+    shadowColor: theme.colors.primary,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  contextHeaderTitle: {
+    color: theme.colors.primary,
+    fontWeight: "700",
+    fontSize: theme.fontSize.md,
+  },
+  contextToggleIcon: {
+    fontSize: theme.fontSize.xl,
+    color: theme.colors.primary,
+    fontWeight: "bold",
+  },
+  contextSubtitle: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.primary + "CC",
+    marginBottom: theme.spacing.md,
+    fontStyle: "italic",
+    textAlign: "center",
+  },
+  contextGrid: {
+    flexDirection: "row",
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.sm,
+    width: "100%",
+    flex: 1,
+  },
+  contextColumn: {
+    flex: 1,
+    gap: theme.spacing.sm,
+    maxWidth: "50%",
+    alignItems: "stretch",
+  },
+  contextCheckbox: {
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.background,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    maxWidth: "100%",
+    minHeight: 50,
+    flex: 1,
+    display: "flex",
+  },
+  contextCheckboxActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  contextCheckboxText: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: "500",
+    color: theme.colors.text,
+    textAlign: "center",
+    textAlignVertical: "center",
+    lineHeight: 16,
+    flexWrap: "wrap",
+    width: "100%",
+    alignSelf: "center",
+  },
+  contextCheckboxTextActive: {
+    color: theme.colors.background,
+    fontWeight: "600",
+  },
+  timeDisplaySection: {
+    marginBottom: theme.spacing.lg,
+  },
+  timeDisplay: {
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.primary + "15",
+    borderRadius: theme.borderRadius.md,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: theme.colors.primary + "30",
+  },
+  timeLabel: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: "600",
+    color: theme.colors.primary,
+    textAlign: "center",
+  },
+  timeSubLabel: {
+    fontSize: theme.fontSize.xs,
+    color: theme.colors.text + "60",
+    marginTop: theme.spacing.xs,
+    fontStyle: "italic",
   },
 });

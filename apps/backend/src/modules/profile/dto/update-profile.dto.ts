@@ -38,17 +38,42 @@ export class UpdateProfileDto {
   @IsEnum(Language)
   language?: Language;
 
+  // Insulin Profile - Time-of-day specific IC Ratios
   @ApiProperty({
     required: false,
     minimum: 1,
-    maximum: 100,
-    description: "Carb-to-insulin ratio (grams of carbs per 1 unit of insulin)",
+    maximum: 30,
+    description: "Breakfast IC Ratio (grams of carbs per 1 unit of insulin)",
   })
   @IsOptional()
   @IsNumber()
   @Min(1)
-  @Max(100)
-  carbRatio?: number;
+  @Max(30)
+  icRatioBreakfast?: number;
+
+  @ApiProperty({
+    required: false,
+    minimum: 1,
+    maximum: 30,
+    description: "Lunch IC Ratio (grams of carbs per 1 unit of insulin)",
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(30)
+  icRatioLunch?: number;
+
+  @ApiProperty({
+    required: false,
+    minimum: 1,
+    maximum: 30,
+    description: "Dinner IC Ratio (grams of carbs per 1 unit of insulin)",
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(30)
+  icRatioDinner?: number;
 
   @ApiProperty({
     required: false,
@@ -61,6 +86,18 @@ export class UpdateProfileDto {
   @Min(10)
   @Max(200)
   insulinSensitivityFactor?: number;
+
+  @ApiProperty({
+    required: false,
+    minimum: 2,
+    maximum: 8,
+    description: "Duration of Insulin Action in hours",
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(2)
+  @Max(8)
+  diaHours?: number;
 
   @ApiProperty({
     required: false,
@@ -97,4 +134,77 @@ export class UpdateProfileDto {
   @Min(80)
   @Max(200)
   maxTargetGlucose?: number;
+
+  // Meal time ranges (in minutes from midnight, 0-1439)
+  @ApiProperty({
+    required: false,
+    minimum: 0,
+    maximum: 1439,
+    description: "Breakfast start time in minutes from midnight",
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1439)
+  mealTimeBreakfastStart?: number;
+
+  @ApiProperty({
+    required: false,
+    minimum: 0,
+    maximum: 1439,
+    description: "Breakfast end time in minutes from midnight",
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1439)
+  mealTimeBreakfastEnd?: number;
+
+  @ApiProperty({
+    required: false,
+    minimum: 0,
+    maximum: 1439,
+    description: "Lunch start time in minutes from midnight",
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1439)
+  mealTimeLunchStart?: number;
+
+  @ApiProperty({
+    required: false,
+    minimum: 0,
+    maximum: 1439,
+    description: "Lunch end time in minutes from midnight",
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1439)
+  mealTimeLunchEnd?: number;
+
+  @ApiProperty({
+    required: false,
+    minimum: 0,
+    maximum: 1439,
+    description: "Dinner start time in minutes from midnight",
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1439)
+  mealTimeDinnerStart?: number;
+
+  @ApiProperty({
+    required: false,
+    minimum: 0,
+    maximum: 1439,
+    description: "Dinner end time in minutes from midnight",
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1439)
+  mealTimeDinnerEnd?: number;
 }

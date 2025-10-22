@@ -12,6 +12,7 @@ import {
 } from "class-validator";
 import {
   InsulinType,
+  MealType,
   MIN_GLUCOSE_READING,
   MAX_GLUCOSE_READING,
   MIN_INSULIN_DOSE,
@@ -24,30 +25,30 @@ import {
 export class CreateLogEntryDto {
   @ApiProperty({ minimum: MIN_GLUCOSE_READING, maximum: MAX_GLUCOSE_READING })
   @IsInt()
-  @Min(MIN_GLUCOSE_READING)
-  @Max(MAX_GLUCOSE_READING)
+  @Min(20)
+  @Max(600)
   glucoseMgdl!: number;
 
   @ApiProperty({
-    minimum: MIN_INSULIN_DOSE,
-    maximum: MAX_INSULIN_DOSE,
+    minimum: 0,
+    maximum: 100,
     description: "Insulin units actually applied",
   })
   @IsNumber()
-  @Min(MIN_INSULIN_DOSE)
-  @Max(MAX_INSULIN_DOSE)
+  @Min(0)
+  @Max(100)
   insulinUnits!: number;
 
   @ApiProperty({
     required: false,
-    minimum: MIN_INSULIN_DOSE,
-    maximum: MAX_INSULIN_DOSE,
+    minimum: 0,
+    maximum: 100,
     description: "System calculated insulin units",
   })
   @IsOptional()
   @IsNumber()
-  @Min(MIN_INSULIN_DOSE)
-  @Max(MAX_INSULIN_DOSE)
+  @Min(0)
+  @Max(100)
   calculatedInsulinUnits?: number;
 
   @ApiProperty({
@@ -73,6 +74,17 @@ export class CreateLogEntryDto {
   @Min(0)
   @Max(500)
   carbohydrates?: number;
+
+  @ApiProperty({
+    required: false,
+    enum: MealType,
+    description: "Type of meal (breakfast, lunch, dinner, snack)",
+  })
+  @IsOptional()
+  @IsEnum(["BREAKFAST", "LUNCH", "DINNER", "SNACK", "CORRECTION"], {
+    message: "Meal type must be BREAKFAST, LUNCH, DINNER, SNACK, or CORRECTION",
+  })
+  mealType?: MealType;
 
   @ApiProperty({ required: false })
   @IsOptional()
