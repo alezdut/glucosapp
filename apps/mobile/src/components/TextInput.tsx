@@ -5,25 +5,31 @@ import { theme } from "../theme";
 interface CustomTextInputProps extends TextInputProps {
   label: string;
   error?: string;
+  warning?: string;
   unit?: string;
 }
 
 /**
  * Reusable text input component with label and optional unit
  */
-export default function TextInput({ label, error, unit, ...props }: CustomTextInputProps) {
+export default function TextInput({ label, error, warning, unit, ...props }: CustomTextInputProps) {
   return (
     <View style={styles.container}>
       <Text style={styles.label}>{label}</Text>
       <View style={styles.inputContainer}>
         <RNTextInput
-          style={[styles.input, error && styles.inputError]}
+          style={[
+            styles.input,
+            error && styles.inputError,
+            warning && !error && styles.inputWarning,
+          ]}
           placeholderTextColor={theme.colors.textSecondary}
           {...props}
         />
         {unit && <Text style={styles.unit}>{unit}</Text>}
       </View>
       {error && <Text style={styles.errorText}>{error}</Text>}
+      {warning && !error && <Text style={styles.warningText}>{warning}</Text>}
     </View>
   );
 }
@@ -56,6 +62,9 @@ const styles = StyleSheet.create({
   inputError: {
     borderColor: theme.colors.error,
   },
+  inputWarning: {
+    borderColor: theme.colors.warning,
+  },
   unit: {
     marginLeft: theme.spacing.sm,
     fontSize: theme.fontSize.md,
@@ -65,6 +74,11 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: theme.fontSize.sm,
     color: theme.colors.error,
+    marginTop: theme.spacing.xs,
+  },
+  warningText: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.warning,
     marginTop: theme.spacing.xs,
   },
 });

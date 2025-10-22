@@ -77,6 +77,13 @@ export const CustomDateTimePicker: React.FC<DateTimePickerProps> = ({
     setShowDatePicker(false);
   };
 
+  const handleNowButton = () => {
+    const now = new Date();
+    setTempValue(now);
+    onDateChange(now);
+    setShowDatePicker(false);
+  };
+
   const handleOpenDatePicker = () => {
     if (!disabled) {
       setShowDatePicker(true);
@@ -137,6 +144,9 @@ export const CustomDateTimePicker: React.FC<DateTimePickerProps> = ({
               <TouchableWithoutFeedback>
                 <View style={styles.datePickerContainer}>
                   <View style={styles.datePickerHeader}>
+                    <TouchableOpacity onPress={handleNowButton}>
+                      <Text style={styles.datePickerNowButton}>Ahora</Text>
+                    </TouchableOpacity>
                     <TouchableOpacity onPress={handleCloseDatePicker}>
                       <Text style={styles.datePickerDoneButton}>Listo</Text>
                     </TouchableOpacity>
@@ -217,12 +227,17 @@ const styles = StyleSheet.create({
   },
   datePickerHeader: {
     flexDirection: "row",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
     paddingHorizontal: theme.spacing.lg,
     paddingTop: theme.spacing.md,
     paddingBottom: theme.spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
+  },
+  datePickerNowButton: {
+    fontSize: theme.fontSize.lg,
+    color: theme.colors.warning,
+    fontWeight: "600",
   },
   datePickerDoneButton: {
     fontSize: theme.fontSize.lg,

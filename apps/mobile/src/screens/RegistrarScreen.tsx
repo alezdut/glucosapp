@@ -15,11 +15,21 @@ import { theme } from "../theme";
 import { createApiClient } from "../lib/api";
 import type { RegistrarScreenProps } from "../navigation/types";
 import { InsulinType, MealType, type UserProfile, type DoseResult } from "@glucosapp/types";
-import TextInput from "../components/TextInput";
+import { TextInput } from "../components";
 import Button from "../components/Button";
 import ScreenHeader from "../components/ScreenHeader";
 import { CustomDateTimePicker } from "../components";
-import { useRealTimeDoseCalculation, useRealTimeCorrectionCalculation } from "../hooks";
+import {
+  useRealTimeDoseCalculation,
+  useRealTimeCorrectionCalculation,
+  useDebouncedValidation,
+} from "../hooks";
+import {
+  validateGlucose,
+  validateCarbohydrates,
+  validateTargetGlucose,
+  validateForm,
+} from "../utils/validation";
 
 /**
  * RegistrarScreen component - Register glucose, insulin, and meal entry
@@ -55,7 +65,35 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
   const [recordedAt, setRecordedAt] = useState<Date>(new Date());
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const [showDateTimePicker, setShowDateTimePicker] = useState(false);
+  const [isTimeManuallyEdited, setIsTimeManuallyEdited] = useState(false);
   const insulinInputRef = useRef<RNTextInput>(null);
+
+  // Debounced validation hooks
+  const { validation: glucoseValidation, isValidating: isGlucoseValidating } =
+    useDebouncedValidation(
+      glucoseLevel,
+      validateGlucose,
+      1000, // 1 second delay
+    );
+
+  const { validation: carbValidation, isValidating: isCarbValidating } = useDebouncedValidation(
+    carbohydrates,
+    validateCarbohydrates,
+    1000, // 1 second delay
+  );
+
+  // Memoize the validation function to prevent infinite loops
+  const validateTargetGlucoseWithCurrent = useCallback(
+    (value: number | undefined) => validateTargetGlucose(value, glucoseLevel),
+    [glucoseLevel],
+  );
+
+  const { validation: targetGlucoseValidation, isValidating: isTargetGlucoseValidating } =
+    useDebouncedValidation(
+      targetGlucose,
+      validateTargetGlucoseWithCurrent,
+      1000, // 1 second delay
+    );
 
   // Context states for dose calculation
   const [recentExercise, setRecentExercise] = useState(false);
@@ -86,6 +124,7 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
     setRecordedAt(new Date());
     setCurrentTime(new Date());
     setShowDateTimePicker(false);
+    setIsTimeManuallyEdited(false);
 
     // Reset context states
     setRecentExercise(false);
@@ -95,6 +134,8 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
     setMenstruation(false);
     setHighFatMeal(false);
     setIsContextExpanded(false);
+
+    // Validation states are automatically reset by the debounced hooks
   };
 
   // Real-time dose calculation hook for meal mode
@@ -237,14 +278,17 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
     }
   }, [recordedAt, userProfile, isFasting]);
 
-  // Update current time every minute
+  // Update current time every minute (only if time hasn't been manually edited)
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 60000); // Update every minute
+      if (!isTimeManuallyEdited) {
+        setCurrentTime(new Date());
+        setRecordedAt(new Date());
+      }
+    }, 30000); // Update every 30 seconds
 
     return () => clearInterval(interval);
-  }, []);
+  }, [isTimeManuallyEdited]);
 
   // Get IC ratio based on meal type
   const getCurrentIcRatio = () => {
@@ -334,12 +378,16 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
    */
   const handleGlucoseChange = (text: string) => {
     const value = parseFloat(text);
-    setGlucoseLevel(isNaN(value) ? undefined : value);
+    const newValue = isNaN(value) ? undefined : value;
+    setGlucoseLevel(newValue);
+    // Validation is handled by the debounced hook
   };
 
   const handleCarbsChange = (text: string) => {
     const value = parseFloat(text);
-    setCarbohydrates(isNaN(value) ? undefined : value);
+    const newValue = isNaN(value) ? undefined : value;
+    setCarbohydrates(newValue);
+    // Validation is handled by the debounced hook
   };
 
   const handleTargetGlucoseChange = (text: string) => {
@@ -358,7 +406,9 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
       setAppliedInsulin(undefined);
       setWasManuallyEdited(false);
     } else {
-      setTargetGlucose(isNaN(value) ? undefined : value);
+      const newValue = isNaN(value) ? undefined : value;
+      setTargetGlucose(newValue);
+      // Validation is handled by the debounced hook
     }
   };
 
@@ -372,6 +422,7 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
       const difference = Math.abs(newValue - calculatedInsulin);
       setWasManuallyEdited(difference > 0.05);
     }
+    // Validation is handled by the debounced hook
   };
 
   /**
@@ -443,6 +494,29 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
    * Handle register button press
    */
   const handleRegister = () => {
+    // Validate all form fields before submission
+    const formValidation = validateForm({
+      glucoseLevel,
+      carbohydrates: isFasting ? undefined : carbohydrates,
+      targetGlucose: isFasting ? targetGlucose : undefined,
+      appliedInsulin,
+      recordedAt,
+    });
+
+    if (!formValidation.isValid) {
+      Alert.alert("Datos inválidos", formValidation.errors.join("\n"), [{ text: "OK" }]);
+      return;
+    }
+
+    // Show warnings if any
+    if (formValidation.warnings.length > 0) {
+      Alert.alert("Advertencias", formValidation.warnings.join("\n"), [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Continuar", onPress: () => createLogEntryMutation.mutate() },
+      ]);
+      return;
+    }
+
     createLogEntryMutation.mutate();
   };
 
@@ -469,6 +543,12 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
           keyboardType="number-pad"
           placeholder="Ej: 120"
           unit="mg/dL"
+          error={!glucoseValidation.isValid ? glucoseValidation.message : undefined}
+          warning={
+            glucoseValidation.message && glucoseValidation.severity === "warning"
+              ? glucoseValidation.message
+              : undefined
+          }
         />
       </View>
 
@@ -509,6 +589,12 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
             keyboardType="decimal-pad"
             placeholder="Ej: 60"
             unit="g"
+            error={!carbValidation.isValid ? carbValidation.message : undefined}
+            warning={
+              carbValidation.message && carbValidation.severity === "warning"
+                ? carbValidation.message
+                : undefined
+            }
           />
         </View>
       )}
@@ -522,6 +608,7 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
           keyboardType="number-pad"
           placeholder={userProfile?.targetGlucose ? `${userProfile.targetGlucose}` : "Ej: 100"}
           unit="mg/dL"
+          error={!targetGlucoseValidation.isValid ? targetGlucoseValidation.message : undefined}
         />
       </View>
 
@@ -710,21 +797,11 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
                 </Text>
               )}
             </View>
-            {isEditingInsulin ? (
-              <RNTextInput
-                ref={insulinInputRef}
-                style={styles.calculatedValue}
-                value={appliedInsulin?.toString() || ""}
-                onChangeText={handleInsulinChange}
-                onBlur={handleInsulinBlur}
-                keyboardType="decimal-pad"
-                selectTextOnFocus
-              />
-            ) : (
+            {
               <Text style={styles.calculatedValue}>
                 {(appliedInsulin || calculatedInsulin).toFixed(1)} U
               </Text>
-            )}
+            }
           </TouchableOpacity>
 
           {/* Backend Warnings */}
@@ -779,20 +856,28 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
       {/* Date/Time display - Always visible */}
       <View style={styles.timeDisplaySection}>
         <TouchableOpacity
-          style={styles.timeDisplay}
+          style={[styles.timeDisplay, isTimeManuallyEdited && styles.timeDisplayEdited]}
           onPress={() => setShowDateTimePicker(true)}
           activeOpacity={0.7}
         >
-          <Text style={styles.timeLabel}>
-            {recordedAt.getTime() === currentTime.getTime() ? "Hora actual" : "Hora personalizada"}:{" "}
-            {recordedAt.toLocaleDateString("es-ES", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            })}
+          <Text style={[styles.timeLabel, isTimeManuallyEdited && styles.timeLabelEdited]}>
+            {isTimeManuallyEdited ? "Hora personalizada" : "Hora actual"}:{" "}
+            {isTimeManuallyEdited
+              ? recordedAt.toLocaleDateString("es-ES", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })
+              : new Date().toLocaleDateString("es-ES", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
             , {formattedTime}
           </Text>
-          <Text style={styles.timeSubLabel}>Toca para cambiar</Text>
+          <Text style={styles.timeSubLabel}>
+            {isTimeManuallyEdited ? "Hora editada manualmente" : "Toca para cambiar"}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -802,6 +887,16 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
         onDateChange={(date) => {
           if (date) {
             setRecordedAt(date);
+            // Check if the date is very close to current time (within 1 minute)
+            const now = new Date();
+            const timeDiff = Math.abs(date.getTime() - now.getTime());
+            const isCurrentTime = timeDiff < 60000; // 1 minute in milliseconds
+
+            if (isCurrentTime) {
+              setIsTimeManuallyEdited(false);
+            } else {
+              setIsTimeManuallyEdited(true);
+            }
           }
           setShowDateTimePicker(false);
         }}
@@ -1142,16 +1237,32 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.primary + "30",
   },
+  timeDisplayEdited: {
+    backgroundColor: theme.colors.warning + "20",
+    borderColor: theme.colors.warning + "50",
+    borderWidth: 2,
+  },
   timeLabel: {
     fontSize: theme.fontSize.sm,
     fontWeight: "600",
     color: theme.colors.primary,
     textAlign: "center",
   },
+  timeLabelEdited: {
+    color: theme.colors.warning,
+    fontWeight: "700",
+  },
   timeSubLabel: {
     fontSize: theme.fontSize.xs,
     color: theme.colors.text + "60",
     marginTop: theme.spacing.xs,
     fontStyle: "italic",
+  },
+  errorValue: {
+    color: theme.colors.error,
+    borderColor: theme.colors.error,
+    borderWidth: 1,
+    borderRadius: theme.borderRadius.sm,
+    paddingHorizontal: theme.spacing.sm,
   },
 });

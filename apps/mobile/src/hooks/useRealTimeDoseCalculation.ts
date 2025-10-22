@@ -51,7 +51,15 @@ export const useRealTimeDoseCalculation = ({
 
   // Check if we have valid data for calculation
   const hasValidData =
-    debouncedGlucose > 0 && debouncedCarbohydrates >= 0 && debouncedMealType && enabled;
+    debouncedGlucose >= 40 && // Backend requires minimum 40 mg/dL
+    debouncedGlucose <= 600 && // Backend requires maximum 600 mg/dL
+    debouncedCarbohydrates >= 0 &&
+    debouncedMealType &&
+    (debouncedTargetGlucose === undefined ||
+      (debouncedTargetGlucose >= 70 &&
+        debouncedTargetGlucose <= 200 &&
+        debouncedTargetGlucose <= debouncedGlucose)) && // Target cannot be higher than current glucose
+    enabled;
 
   // Query for dose calculation
   const {

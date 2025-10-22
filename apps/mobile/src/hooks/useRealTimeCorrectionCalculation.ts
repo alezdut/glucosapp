@@ -41,9 +41,12 @@ export const useRealTimeCorrectionCalculation = ({
 
   // Check if we have valid data for calculation
   const hasValidData =
-    debouncedGlucose > 0 &&
+    debouncedGlucose >= 40 && // Backend requires minimum 40 mg/dL
+    debouncedGlucose <= 600 && // Backend requires maximum 600 mg/dL
     debouncedTargetGlucose !== undefined &&
-    debouncedTargetGlucose > 0 &&
+    debouncedTargetGlucose >= 70 && // Backend requires minimum 70 mg/dL for target
+    debouncedTargetGlucose <= 200 && // Backend requires maximum 200 mg/dL for target
+    debouncedTargetGlucose <= debouncedGlucose && // Target cannot be higher than current glucose
     enabled;
 
   // Query for correction calculation
