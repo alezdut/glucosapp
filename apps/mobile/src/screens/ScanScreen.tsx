@@ -154,7 +154,8 @@ export default function ScanScreen() {
           </Text>
           {analysisResult.carbs_per_100g && (
             <Text style={styles.resultNutrition}>
-              Carbohidratos: {analysisResult.carbs_per_100g}g por 100g
+              Carbohidratos: {parseFloat(analysisResult.carbs_per_100g.toString()).toFixed(2)}g por
+              100g
             </Text>
           )}
           {analysisResult.name && (

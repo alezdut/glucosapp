@@ -10,7 +10,7 @@ import { theme } from "../theme";
 
 interface ButtonProps extends TouchableOpacityProps {
   title: string;
-  variant?: "primary" | "outlined";
+  variant?: "primary" | "secondary" | "outlined";
   loading?: boolean;
   icon?: React.ReactNode;
 }
@@ -24,26 +24,40 @@ export default function Button({
   loading,
   icon,
   style,
+  disabled,
   ...props
 }: ButtonProps) {
   const isPrimary = variant === "primary";
+  const isSecondary = variant === "secondary";
+  const isOutlined = variant === "outlined";
+
+  const buttonStyle = isPrimary
+    ? styles.primaryButton
+    : isSecondary
+      ? styles.secondaryButton
+      : styles.outlinedButton;
+
+  const textStyle = isPrimary
+    ? styles.primaryButtonText
+    : isSecondary
+      ? styles.secondaryButtonText
+      : styles.outlinedButtonText;
+
+  const loadingColor = isOutlined ? theme.colors.primary : theme.colors.background;
 
   return (
     <TouchableOpacity
-      style={[styles.button, isPrimary ? styles.primaryButton : styles.outlinedButton, style]}
-      disabled={loading}
+      style={[styles.button, buttonStyle, (disabled || loading) && styles.buttonDisabled, style]}
+      disabled={disabled || loading}
       {...props}
     >
       {loading ? (
-        <ActivityIndicator color={isPrimary ? theme.colors.background : theme.colors.primary} />
+        <ActivityIndicator color={loadingColor} />
       ) : (
         <>
           {icon}
           <Text
-            style={[
-              styles.buttonText,
-              isPrimary ? styles.primaryButtonText : styles.outlinedButtonText,
-            ]}
+            style={[styles.buttonText, textStyle, (disabled || loading) && styles.textDisabled]}
           >
             {title}
           </Text>
@@ -74,6 +88,17 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  secondaryButton: {
+    backgroundColor: theme.colors.secondary,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   outlinedButton: {
     backgroundColor: "transparent",
     borderWidth: 2,
@@ -86,7 +111,16 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: theme.colors.background,
   },
+  secondaryButtonText: {
+    color: theme.colors.background,
+  },
   outlinedButtonText: {
     color: theme.colors.primary,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  textDisabled: {
+    opacity: 0.7,
   },
 });

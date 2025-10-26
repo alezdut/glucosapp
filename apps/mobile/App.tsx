@@ -2,8 +2,9 @@ import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
-import { TabNavigator, AuthNavigator } from "./src/navigation";
+import { RootNavigator, AuthNavigator } from "./src/navigation";
 import { AuthProvider, useAuth } from "./src/contexts/AuthContext";
 import { theme } from "./src/theme";
 
@@ -23,7 +24,7 @@ function AppNavigator() {
 
   return (
     <NavigationContainer>
-      {!isAuthenticated || needsOnboarding ? <AuthNavigator /> : <TabNavigator />}
+      {!isAuthenticated || needsOnboarding ? <AuthNavigator /> : <RootNavigator />}
     </NavigationContainer>
   );
 }
@@ -32,11 +33,13 @@ export default function App() {
   const [client] = React.useState(() => new QueryClient());
 
   return (
-    <QueryClientProvider client={client}>
-      <AuthProvider>
-        <AppNavigator />
-      </AuthProvider>
-    </QueryClientProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryClientProvider client={client}>
+        <AuthProvider>
+          <AppNavigator />
+        </AuthProvider>
+      </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }
 

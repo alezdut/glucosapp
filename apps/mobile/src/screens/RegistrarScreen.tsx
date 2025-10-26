@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useFocusEffect } from "@react-navigation/native";
+import { Calculator } from "lucide-react-native";
 import { theme } from "../theme";
 import { createApiClient } from "../lib/api";
 import type { RegistrarScreenProps } from "../navigation/types";
@@ -37,7 +38,6 @@ import {
 export default function RegistrarScreen({ navigation, route }: RegistrarScreenProps) {
   const queryClient = useQueryClient();
   const prefilledCarbs = route?.params?.carbohydrates;
-  const prefilledMealName = route?.params?.mealName;
 
   // Fetch user profile to get insulin parameters
   const { data: userProfile, isLoading: profileLoading } = useQuery<UserProfile>({
@@ -104,6 +104,9 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
   const hourOfDay = recordedAt.getHours();
   const formattedTime = `${recordedAt.getHours().toString().padStart(2, "0")}:${recordedAt.getMinutes().toString().padStart(2, "0")}`;
 
+  // Ref to track if we just received carbs from Calculator (to prevent reset)
+  const hasPrefilledCarbsRef = useRef(false);
+
   /**
    * Reset all form fields to their initial state
    */
@@ -135,40 +138,57 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
   };
 
   // Real-time dose calculation hook for meal mode
-  const { doseResult: realTimeDoseResult } = useRealTimeDoseCalculation({
-    glucose: glucoseLevel || 0,
-    carbohydrates: carbohydrates || 0,
-    mealType: mealType as "BREAKFAST" | "LUNCH" | "DINNER",
-    enabled: !wasManuallyEdited && !isFasting,
-    debounceDelay: 800, // 800ms delay for better UX
-    targetGlucose: isTargetGlucoseEdited ? targetGlucose : userProfile?.targetGlucose,
-    context: {
-      recentExercise,
-      alcohol,
-      illness,
-      stress,
-      menstruation,
-      highFatMeal,
-      hourOfDay,
-    },
-  });
+  const { doseResult: realTimeDoseResult, isCalculating: isDoseCalculating } =
+    useRealTimeDoseCalculation({
+      glucose: glucoseLevel || 0,
+      carbohydrates: carbohydrates || 0,
+      mealType: mealType as "BREAKFAST" | "LUNCH" | "DINNER",
+      enabled: !wasManuallyEdited && !isFasting,
+      debounceDelay: 800, // 800ms delay for better UX
+      targetGlucose: isTargetGlucoseEdited ? targetGlucose : userProfile?.targetGlucose,
+      context: {
+        recentExercise,
+        alcohol,
+        illness,
+        stress,
+        menstruation,
+        highFatMeal,
+        hourOfDay,
+      },
+    });
 
   // Real-time correction calculation hook for fasting mode
-  const { doseResult: realTimeCorrectionResult } = useRealTimeCorrectionCalculation({
-    glucose: glucoseLevel || 0,
-    enabled: !wasManuallyEdited && isFasting && targetGlucose !== undefined,
-    debounceDelay: 800, // 800ms delay for better UX
-    targetGlucose: isTargetGlucoseEdited ? targetGlucose : userProfile?.targetGlucose,
-    context: {
-      recentExercise,
-      alcohol,
-      illness,
-      stress,
-      menstruation,
-      highFatMeal,
-      hourOfDay,
-    },
-  });
+  const { doseResult: realTimeCorrectionResult, isCalculating: isCorrectionCalculating } =
+    useRealTimeCorrectionCalculation({
+      glucose: glucoseLevel || 0,
+      enabled: !wasManuallyEdited && isFasting && targetGlucose !== undefined,
+      debounceDelay: 800, // 800ms delay for better UX
+      targetGlucose: isTargetGlucoseEdited ? targetGlucose : userProfile?.targetGlucose,
+      context: {
+        recentExercise,
+        alcohol,
+        illness,
+        stress,
+        menstruation,
+        highFatMeal,
+        hourOfDay,
+      },
+    });
+
+  // Update carbohydrates when navigating with prefilled value
+  useEffect(() => {
+    const carbsParam = route?.params?.carbohydrates;
+    if (carbsParam !== undefined && carbsParam !== null) {
+      hasPrefilledCarbsRef.current = true;
+      setCarbohydrates(carbsParam);
+      // Clear the param after using it
+      navigation.setParams({ carbohydrates: undefined } as any);
+      // Reset the flag after a delay to allow normal resets later
+      setTimeout(() => {
+        hasPrefilledCarbsRef.current = false;
+      }, 1000);
+    }
+  }, [route?.params?.carbohydrates, navigation]);
 
   // Set default target glucose from user profile when profile loads
   useEffect(() => {
@@ -341,12 +361,23 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
   }, [calculatedInsulin, wasManuallyEdited, isEditingInsulin]);
 
   // Reset form fields when screen gains focus (user enters screen)
+  // BUT NOT if we just received prefilled carbohydrates from Calculator
   useFocusEffect(
     useCallback(() => {
-      // Reset form when entering screen to ensure clean state
-      resetFormFields();
+      // Don't reset if we just received carbs from Calculator
+      if (!hasPrefilledCarbsRef.current) {
+        resetFormFields();
+      }
     }, []),
   );
+
+  /**
+   * Navigate to Calculator screen
+   */
+  const handleNavigateToCalculator = () => {
+    // Navigate to Calculator in the root stack (above tabs)
+    navigation.navigate("Calculator");
+  };
 
   /**
    * Handle text input changes and convert to number
@@ -413,7 +444,6 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
         calculatedInsulinUnits: calculatedInsulin || 0,
         wasManuallyEdited: wasManuallyEdited,
         insulinType: InsulinType.BOLUS,
-        mealName: prefilledMealName || undefined,
         carbohydrates: isFasting ? undefined : carbsNum > 0 ? carbsNum : undefined,
         mealType: isFasting ? MealCategory.CORRECTION : mealType,
         recordedAt: recordedAt.toISOString(),
@@ -537,20 +567,31 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
       {/* Carbohydrates Input */}
       {!isFasting && (
         <View style={styles.section}>
-          <TextInput
-            label="Carbohidratos a consumir"
-            value={carbohydrates?.toString() || ""}
-            onChangeText={handleCarbsChange}
-            keyboardType="decimal-pad"
-            placeholder="Ej: 60"
-            unit="g"
-            error={!carbValidation.isValid ? carbValidation.message : undefined}
-            warning={
-              carbValidation.message && carbValidation.severity === "warning"
-                ? carbValidation.message
-                : undefined
-            }
-          />
+          <View style={styles.carbsInputContainer}>
+            <View style={styles.carbsInputWrapper}>
+              <TextInput
+                label="Carbohidratos a consumir"
+                value={carbohydrates?.toString() || ""}
+                onChangeText={handleCarbsChange}
+                keyboardType="decimal-pad"
+                placeholder="Ej: 60"
+                unit="g"
+                error={!carbValidation.isValid ? carbValidation.message : undefined}
+                warning={
+                  carbValidation.message && carbValidation.severity === "warning"
+                    ? carbValidation.message
+                    : undefined
+                }
+              />
+            </View>
+            <TouchableOpacity
+              style={styles.calculatorButton}
+              onPress={handleNavigateToCalculator}
+              activeOpacity={0.7}
+            >
+              <Calculator size={20} color={theme.colors.primary} />
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -699,7 +740,7 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
         <View style={styles.section}>
           <View style={styles.labelContainer}>
             <Text style={styles.label}>Cálculo de Unidades</Text>
-            {realTimeDoseResult && (
+            {(isDoseCalculating || isCorrectionCalculating) && (
               <View style={styles.calculatingIndicator}>
                 <ActivityIndicator size="small" color={theme.colors.primary} />
                 <Text style={styles.calculatingText}>Calculando...</Text>
@@ -787,16 +828,6 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
         </View>
       )}
 
-      {/* Summary */}
-      {prefilledMealName && (
-        <View style={styles.summaryContainer}>
-          <Text style={styles.summaryTitle}>Resumen</Text>
-          <Text style={styles.summaryText}>Carbohidratos Totales: {carbsNum.toFixed(1)} g</Text>
-          <Text style={styles.summaryText}>
-            Unidades de Insulina Calculadas: {calculatedInsulin.toFixed(1)} U
-          </Text>
-        </View>
-      )}
       {/* Date/Time display - Always visible */}
       <View style={styles.timeDisplaySection}>
         <TouchableOpacity
@@ -885,6 +916,23 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: theme.spacing.lg,
   },
+  carbsInputContainer: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: theme.spacing.sm,
+  },
+  carbsInputWrapper: {
+    flex: 1,
+  },
+  calculatorButton: {
+    width: 44,
+    height: 44,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.primary + "15",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 20,
+  },
   label: {
     fontSize: theme.fontSize.sm,
     color: theme.colors.text,
@@ -943,25 +991,6 @@ const styles = StyleSheet.create({
   },
   fastingSelectorTextActive: {
     color: theme.colors.background,
-  },
-  summaryContainer: {
-    backgroundColor: theme.colors.card,
-    padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    marginBottom: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  summaryTitle: {
-    fontSize: theme.fontSize.lg,
-    fontWeight: "bold",
-    color: theme.colors.text,
-    marginBottom: theme.spacing.sm,
-  },
-  summaryText: {
-    fontSize: theme.fontSize.md,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
   },
   registerButton: {
     marginBottom: theme.spacing.xl,

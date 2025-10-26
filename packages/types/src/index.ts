@@ -88,13 +88,22 @@ export type InsulinDose = {
   iobSubtracted?: number;
 };
 
+export type MealItem = {
+  id: string;
+  mealId: string;
+  name: string;
+  quantity: number;
+  carbs: number;
+};
+
 export type Meal = {
   id: string;
   userId: string;
   name: string;
-  carbohydrates?: number;
-  mealType?: MealCategory;
-  recordedAt: string;
+  carbohydrates: number;
+  foodItems: MealItem[];
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type Statistics = {
@@ -107,9 +116,11 @@ export type LogEntry = {
   id: string;
   userId: string;
   recordedAt: string;
+  mealType?: MealCategory;
+  carbohydrates?: number;
   glucoseEntry?: GlucoseEntry;
   insulinDose?: InsulinDose;
-  meal?: Meal;
+  mealTemplate?: Meal;
 };
 
 export type FoodItem = {
