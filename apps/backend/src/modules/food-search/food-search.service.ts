@@ -14,6 +14,7 @@ export class FoodSearchService {
    */
   async search(query: string): Promise<FoodItemDto[]> {
     if (!query || query.trim().length === 0) {
+      console.log("No query");
       return [];
     }
 

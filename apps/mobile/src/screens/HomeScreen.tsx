@@ -10,13 +10,22 @@ import {
 import { Activity, Beaker, UtensilsCrossed } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
+import type { CompositeNavigationProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { theme } from "../theme";
 import { createApiClient } from "../lib/api";
 import type { Statistics } from "@glucosapp/types";
 import type { HomeStackParamList } from "../navigation/HomeStackNavigator";
+import type { RootStackParamList, RootTabParamList } from "../navigation/types";
 
-type HomeScreenNavigationProp = NativeStackNavigationProp<HomeStackParamList, "Home">;
+type HomeScreenNavigationProp = CompositeNavigationProp<
+  NativeStackNavigationProp<HomeStackParamList, "Home">,
+  CompositeNavigationProp<
+    BottomTabNavigationProp<RootTabParamList>,
+    NativeStackNavigationProp<RootStackParamList>
+  >
+>;
 
 /**
  * HomeScreen component - Display statistics and main actions
@@ -91,7 +100,7 @@ export default function HomeScreen() {
           style={styles.primaryButton}
           onPress={() => navigation.navigate("Calculator")}
         >
-          <Text style={styles.primaryButtonText}>Calcular dosis</Text>
+          <Text style={styles.primaryButtonText}>Calcular Carbohidratos</Text>
         </TouchableOpacity>
 
         <TouchableOpacity

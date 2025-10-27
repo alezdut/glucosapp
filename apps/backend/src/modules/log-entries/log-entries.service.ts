@@ -35,22 +35,7 @@ export class LogEntriesService {
             calculatedUnits: data.calculatedInsulinUnits || data.insulinUnits,
             wasManuallyEdited: data.wasManuallyEdited || false,
             type: data.insulinType,
-            mealType: data.mealType,
             isCorrection: data.carbohydrates === undefined || data.carbohydrates === 0,
-            recordedAt,
-          },
-        });
-      }
-
-      // Create meal if provided
-      let meal = null;
-      if (data.mealName && data.carbohydrates !== undefined) {
-        meal = await tx.meal.create({
-          data: {
-            userId,
-            name: data.mealName,
-            carbohydrates: data.carbohydrates,
-            mealType: data.mealType,
             recordedAt,
           },
         });
@@ -61,14 +46,15 @@ export class LogEntriesService {
         data: {
           userId,
           recordedAt,
+          mealType: data.mealType,
+          carbohydrates: data.carbohydrates,
           glucoseEntryId: glucoseEntry.id,
           insulinDoseId: insulinDose?.id,
-          mealId: meal?.id,
+          mealTemplateId: null, // Future: support template selection
         },
         include: {
           glucoseEntry: true,
           insulinDose: insulinDose ? true : false,
-          meal: true,
         },
       });
 

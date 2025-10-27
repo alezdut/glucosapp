@@ -55,12 +55,15 @@ export class StatisticsService {
         ? Math.round(insulinDoses.reduce((sum, dose) => sum + dose.units, 0))
         : 0;
 
-    // Count meals registered today
-    const mealsRegistered = await this.prisma.meal.count({
+    // Count meals registered today (from log entries with carbohydrates)
+    const mealsRegistered = await this.prisma.logEntry.count({
       where: {
         userId,
         recordedAt: {
           gte: startOfToday,
+        },
+        carbohydrates: {
+          gt: 0,
         },
       },
     });

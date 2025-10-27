@@ -61,11 +61,6 @@ export class CreateLogEntryDto {
   @IsEnum(InsulinType)
   insulinType!: InsulinType;
 
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  mealName?: string;
-
   @ApiProperty({ required: false, minimum: 0, maximum: 500 })
   @IsOptional()
   @IsNumber()

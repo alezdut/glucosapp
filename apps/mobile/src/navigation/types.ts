@@ -1,20 +1,21 @@
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
-import type { CompositeScreenProps } from "@react-navigation/native";
+import type { CompositeScreenProps, NavigatorScreenParams } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import type { HomeStackParamList } from "./HomeStackNavigator";
+
+// Define the parameter list for the root stack navigator
+export type RootStackParamList = {
+  MainTabs: NavigatorScreenParams<RootTabParamList> | undefined;
+  Calculator: undefined;
+};
 
 // Define the parameter list for the bottom tab navigator
 export type RootTabParamList = {
-  Inicio: undefined;
+  Inicio: NavigatorScreenParams<HomeStackParamList> | undefined;
   Historial: undefined;
-  Registrar: { carbohydrates?: number; mealName?: string } | undefined;
+  Registrar: { carbohydrates?: number } | undefined;
   Médico: undefined;
   Perfil: undefined;
-};
-
-// Define the parameter list for the root stack navigator (if needed in the future)
-export type RootStackParamList = {
-  MainTabs: undefined;
-  // Add other stack screens here if needed
 };
 
 // Create composite screen props for tab screens
