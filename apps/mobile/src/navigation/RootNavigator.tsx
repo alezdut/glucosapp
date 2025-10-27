@@ -2,11 +2,7 @@ import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import TabNavigator from "./TabNavigator";
 import CalculatorScreen from "../screens/CalculatorScreen";
-
-export type RootStackParamList = {
-  MainTabs: undefined;
-  Calculator: undefined;
-};
+import type { RootStackParamList } from "./types";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 

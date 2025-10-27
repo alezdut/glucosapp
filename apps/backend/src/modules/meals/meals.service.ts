@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { CreateMealDto } from "./dto/create-meal.dto";
 
@@ -56,8 +56,18 @@ export class MealsService {
    * Delete meal template
    */
   async delete(userId: string, id: string) {
-    return this.prisma.meal.delete({
+    // First, verify the meal exists and belongs to the user
+    const meal = await this.prisma.meal.findFirst({
       where: { id, userId },
+    });
+
+    if (!meal) {
+      throw new NotFoundException(`Meal with ID ${id} not found`);
+    }
+
+    // Then delete using the unique id constraint
+    return this.prisma.meal.delete({
+      where: { id },
     });
   }
 }

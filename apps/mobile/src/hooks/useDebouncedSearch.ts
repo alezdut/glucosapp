@@ -65,7 +65,10 @@ export const useDebouncedSearch = <T>(
 
     // Don't search if query is empty
     if (!searchQuery.trim()) {
+      // Increment search ID to cancel any in-flight fetches
+      searchIdRef.current++;
       setSearchResults(null);
+      setIsSearching(false);
       return;
     }
 

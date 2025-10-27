@@ -188,12 +188,17 @@ export default function CalculatorScreen() {
 
     const updatedFoods = [...addedFoods];
     const food = updatedFoods[editingIndex];
-    const carbsPer100g = (food.carbohydrates / food.quantity) * 100;
+
+    // Guard against division by zero
+    const carbsPer100g = food.quantity > 0 ? (food.carbohydrates / food.quantity) * 100 : 0;
+
+    const newCarbohydrates =
+      food.quantity > 0 ? Math.round(((carbsPer100g * newQuantity) / 100) * 100) / 100 : 0;
 
     updatedFoods[editingIndex] = {
       ...food,
       quantity: newQuantity,
-      carbohydrates: Math.round(((carbsPer100g * newQuantity) / 100) * 100) / 100,
+      carbohydrates: newCarbohydrates,
     };
 
     setAddedFoods(updatedFoods);
