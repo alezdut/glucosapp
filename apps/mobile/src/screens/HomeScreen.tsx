@@ -100,7 +100,7 @@ export default function HomeScreen() {
           style={styles.primaryButton}
           onPress={() => navigation.navigate("Calculator")}
         >
-          <Text style={styles.primaryButtonText}>Calcular dosis</Text>
+          <Text style={styles.primaryButtonText}>Calcular Carbohidratos</Text>
         </TouchableOpacity>
 
         <TouchableOpacity

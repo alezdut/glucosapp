@@ -14,6 +14,7 @@ export const useDebouncedSearch = <T>(
   const [searchResults, setSearchResults] = useState<T | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchIdRef = useRef(0);
 
   /**
    * Execute the search
@@ -25,15 +26,28 @@ export const useDebouncedSearch = <T>(
         return;
       }
 
+      // Increment search ID to track this specific search
+      const currentSearchId = ++searchIdRef.current;
+
       setIsSearching(true);
       try {
         const results = await searchFunction(query);
-        setSearchResults(results);
+
+        // Only update results if this is still the most recent search
+        if (currentSearchId === searchIdRef.current) {
+          setSearchResults(results);
+        }
       } catch (error) {
         console.error("Search error:", error);
-        setSearchResults(null);
+        // Only clear results if this is still the most recent search
+        if (currentSearchId === searchIdRef.current) {
+          setSearchResults(null);
+        }
       } finally {
-        setIsSearching(false);
+        // Only update loading state if this is still the most recent search
+        if (currentSearchId === searchIdRef.current) {
+          setIsSearching(false);
+        }
       }
     },
     [searchFunction],
@@ -72,8 +86,11 @@ export const useDebouncedSearch = <T>(
    * Clear search results and query
    */
   const clearSearch = useCallback(() => {
+    // Increment search ID to cancel any pending searches
+    searchIdRef.current++;
     setSearchQuery("");
     setSearchResults(null);
+    setIsSearching(false);
   }, []);
 
   /**

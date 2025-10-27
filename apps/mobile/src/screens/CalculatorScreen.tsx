@@ -14,6 +14,7 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -47,6 +48,7 @@ type FoodListItemWithId = FoodListItemType & { id: string };
  */
 export default function CalculatorScreen() {
   const navigation = useNavigation<CalculatorScreenNavigationProp>();
+  const insets = useSafeAreaInsets();
   const [mealName, setMealName] = useState("");
   const [addedFoods, setAddedFoods] = useState<FoodListItemWithId[]>([]);
   const [quantity, setQuantity] = useState("100");
@@ -64,7 +66,6 @@ export default function CalculatorScreen() {
       const client = createApiClient();
       const params = new URLSearchParams({ q: query.trim() });
       const response = await client.GET(`/food-search?${params.toString()}`);
-      console.log("response", response);
       if (response.error) {
         Alert.alert("Error", "No se pudo buscar alimentos");
         return [];
@@ -77,9 +78,8 @@ export default function CalculatorScreen() {
   }, []);
 
   // Use debounced search hook
-  const { searchQuery, setSearchQuery, searchResults, isSearching, searchNow } = useDebouncedSearch<
-    FoodItem[]
-  >(searchFoods, 500);
+  const { searchQuery, setSearchQuery, searchResults, isSearching, searchNow, clearSearch } =
+    useDebouncedSearch<FoodItem[]>(searchFoods, 500);
 
   /**
    * Reset quantity and editing state when starting a new search
@@ -115,7 +115,7 @@ export default function CalculatorScreen() {
     };
 
     setAddedFoods([...addedFoods, newFood]);
-    setSearchQuery("");
+    clearSearch();
     setQuantity("100");
     setEditingIndex(null);
   };
@@ -324,7 +324,7 @@ export default function CalculatorScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScreenHeader title="Calcular Carbohidratos" onBack={() => navigation.goBack()} />
 
       <ScrollView
@@ -357,6 +357,13 @@ export default function CalculatorScreen() {
                 onSubmitEditing={searchNow}
                 placeholderTextColor={theme.colors.textSecondary}
               />
+              {isSearching && (
+                <ActivityIndicator
+                  size="small"
+                  color={theme.colors.primary}
+                  style={styles.searchLoadingIcon}
+                />
+              )}
             </View>
           </TouchableWithoutFeedback>
 
@@ -388,12 +395,6 @@ export default function CalculatorScreen() {
             <Text style={styles.unitLabelCompact}>g</Text>
           </View>
 
-          {isSearching && (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color={theme.colors.primary} />
-            </View>
-          )}
-
           {searchResults && searchResults.length > 0 && (
             <ScrollView
               style={styles.resultsContainer}
@@ -421,32 +422,32 @@ export default function CalculatorScreen() {
             </ScrollView>
           )}
         </View>
+
+        {/* Added Foods List */}
+        {(!searchResults || searchResults.length === 0) && addedFoods.length > 0 && (
+          <View>
+            {addedFoods
+              .slice()
+              .reverse()
+              .map((food, reversedIndex) => {
+                const realIndex = addedFoods.length - 1 - reversedIndex;
+                return (
+                  <FoodListItem
+                    key={food.id}
+                    item={food}
+                    onDelete={() => handleDeleteFood(food.id)}
+                    onPress={() => handleEditFood(realIndex)}
+                    isSelected={editingIndex === realIndex}
+                  />
+                );
+              })}
+          </View>
+        )}
       </ScrollView>
 
       {/* Bottom Section - Always visible */}
       {(!searchResults || searchResults.length === 0) && (
-        <View style={styles.bottomSection}>
-          {/* Added Foods List - Scrollable */}
-          {addedFoods.length > 0 && (
-            <ScrollView style={styles.foodsScrollContainer} showsVerticalScrollIndicator={true}>
-              {addedFoods
-                .slice()
-                .reverse()
-                .map((food, reversedIndex) => {
-                  const realIndex = addedFoods.length - 1 - reversedIndex;
-                  return (
-                    <FoodListItem
-                      key={food.id}
-                      item={food}
-                      onDelete={() => handleDeleteFood(food.id)}
-                      onPress={() => handleEditFood(realIndex)}
-                      isSelected={editingIndex === realIndex}
-                    />
-                  );
-                })}
-            </ScrollView>
-          )}
-
+        <View style={[styles.bottomSection, { paddingBottom: insets.bottom + 16 }]}>
           {/* Total Carbs Display - Always visible */}
           <View style={styles.totalContainer}>
             <Text style={styles.totalLabel}>Total de carbohidratos</Text>
@@ -500,11 +501,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     paddingTop: theme.spacing.md,
     paddingBottom: theme.spacing.lg,
-    maxHeight: "50%",
-  },
-  foodsScrollContainer: {
-    maxHeight: 200,
-    marginBottom: theme.spacing.md,
   },
   buttonsContainer: {
     gap: theme.spacing.sm,
@@ -533,9 +529,8 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.md,
     color: theme.colors.text,
   },
-  loadingContainer: {
-    paddingVertical: theme.spacing.md,
-    alignItems: "center",
+  searchLoadingIcon: {
+    marginLeft: theme.spacing.sm,
   },
   resultsContainer: {
     marginTop: theme.spacing.md,
