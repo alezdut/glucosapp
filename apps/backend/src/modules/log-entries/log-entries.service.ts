@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { CreateLogEntryDto } from "./dto/create-log-entry.dto";
 
@@ -8,6 +9,44 @@ import { CreateLogEntryDto } from "./dto/create-log-entry.dto";
 @Injectable()
 export class LogEntriesService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Find all log entries for a user with optional date range filtering
+   */
+  async findAll(userId: string, startDate?: string, endDate?: string) {
+    const whereClause: Prisma.LogEntryWhereInput = {
+      userId,
+    };
+
+    // Add date range filtering if provided
+    if (startDate || endDate) {
+      whereClause.recordedAt = {};
+      if (startDate) {
+        whereClause.recordedAt.gte = new Date(startDate);
+      }
+      if (endDate) {
+        whereClause.recordedAt.lte = new Date(endDate);
+      }
+    }
+
+    const results = await this.prisma.logEntry.findMany({
+      where: whereClause,
+      include: {
+        glucoseEntry: true,
+        insulinDose: true,
+        mealTemplate: {
+          include: {
+            foodItems: true,
+          },
+        },
+      },
+      orderBy: {
+        recordedAt: "desc",
+      },
+    });
+
+    return results;
+  }
 
   /**
    * Create log entry with related glucose, insulin, and optional meal
@@ -37,6 +76,10 @@ export class LogEntriesService {
             type: data.insulinType,
             isCorrection: data.carbohydrates === undefined || data.carbohydrates === 0,
             recordedAt,
+            // Calculation breakdown
+            carbInsulin: data.carbInsulin,
+            correctionInsulin: data.correctionInsulin,
+            iobSubtracted: data.iobSubtracted,
           },
         });
       }
@@ -51,6 +94,13 @@ export class LogEntriesService {
           glucoseEntryId: glucoseEntry.id,
           insulinDoseId: insulinDose?.id,
           mealTemplateId: null, // Future: support template selection
+          // Context factors
+          recentExercise: data.recentExercise || false,
+          alcohol: data.alcohol || false,
+          illness: data.illness || false,
+          stress: data.stress || false,
+          menstruation: data.menstruation || false,
+          highFatMeal: data.highFatMeal || false,
         },
         include: {
           glucoseEntry: true,

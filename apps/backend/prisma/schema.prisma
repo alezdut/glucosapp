@@ -172,6 +172,13 @@ model LogEntry {
   glucoseEntryId String?       @unique
   insulinDoseId  String?       @unique
   mealTemplateId String?
+  // Context factors at time of entry
+  recentExercise Boolean       @default(false)
+  alcohol        Boolean       @default(false)
+  illness        Boolean       @default(false)
+  stress         Boolean       @default(false)
+  menstruation   Boolean       @default(false)
+  highFatMeal    Boolean       @default(false)
   glucoseEntry   GlucoseEntry? @relation(fields: [glucoseEntryId], references: [id], onDelete: Cascade)
   insulinDose    InsulinDose?  @relation(fields: [insulinDoseId], references: [id], onDelete: Cascade)
   mealTemplate   Meal?         @relation(fields: [mealTemplateId], references: [id], onDelete: SetNull)
