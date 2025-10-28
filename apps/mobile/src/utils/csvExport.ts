@@ -1,4 +1,4 @@
-import type { LogEntry, MealCategory, InsulinType } from "@glucosapp/types";
+import type { LogEntry, MealCategory } from "@glucosapp/types";
 
 /**
  * Escape CSV field to handle commas, quotes, and newlines
@@ -31,15 +31,10 @@ const getMealTypeLabel = (mealType?: MealCategory): string => {
 };
 
 /**
- * Get Spanish label for insulin type
+ * Convert boolean to Yes/No in Spanish
  */
-const getInsulinTypeLabel = (insulinType?: InsulinType): string => {
-  if (!insulinType) return "";
-  const labels: Record<InsulinType, string> = {
-    BOLUS: "Rápida",
-    BASAL: "Lenta",
-  };
-  return labels[insulinType] || "";
+const booleanToSpanish = (value: boolean): string => {
+  return value ? "Sí" : "No";
 };
 
 /**
@@ -52,10 +47,20 @@ export const convertLogEntriesToCsv = (entries: LogEntry[]): string => {
     "Hora",
     "Glucosa (mg/dL)",
     "Carbohidratos (g)",
-    "Tipo de Insulina",
-    "Dosis (U)",
+    "Dosis Aplicada (U)",
+    "Dosis Calculada (U)",
+    "Editada Manualmente",
+    "Dosis Prandial (U)",
+    "Corrección (U)",
+    "IOB Restado (U)",
     "Tipo de Comida",
     "Alimentos",
+    "Ejercicio Reciente",
+    "Alcohol",
+    "Enfermedad",
+    "Estrés",
+    "Periodo Menstrual",
+    "Comida Alta en Grasa",
   ].join(",");
 
   // CSV Rows
@@ -69,8 +74,25 @@ export const convertLogEntriesToCsv = (entries: LogEntry[]): string => {
 
     const glucose = entry.glucoseEntry?.mgdl || "";
     const carbs = entry.carbohydrates || "";
-    const insulinType = entry.insulinDose?.type ? getInsulinTypeLabel(entry.insulinDose.type) : "";
-    const insulinDose = entry.insulinDose?.units || "";
+
+    // Insulin data
+    const appliedDose = entry.insulinDose?.units || "";
+    const calculatedDose = entry.insulinDose?.calculatedUnits || "";
+    const wasManuallyEdited = entry.insulinDose?.wasManuallyEdited
+      ? booleanToSpanish(entry.insulinDose.wasManuallyEdited)
+      : "";
+
+    // Insulin calculation breakdown
+    const carbInsulin = entry.insulinDose?.carbInsulin
+      ? entry.insulinDose.carbInsulin.toFixed(1)
+      : "";
+    const correctionInsulin = entry.insulinDose?.correctionInsulin
+      ? entry.insulinDose.correctionInsulin.toFixed(1)
+      : "";
+    const iobSubtracted = entry.insulinDose?.iobSubtracted
+      ? entry.insulinDose.iobSubtracted.toFixed(1)
+      : "";
+
     const mealType = getMealTypeLabel(entry.mealType);
 
     // Build foods list from meal template if available
@@ -83,15 +105,33 @@ export const convertLogEntriesToCsv = (entries: LogEntry[]): string => {
       foods = entry.mealTemplate.name;
     }
 
+    // Context factors
+    const recentExercise = booleanToSpanish(entry.recentExercise);
+    const alcohol = booleanToSpanish(entry.alcohol);
+    const illness = booleanToSpanish(entry.illness);
+    const stress = booleanToSpanish(entry.stress);
+    const menstruation = booleanToSpanish(entry.menstruation);
+    const highFatMeal = booleanToSpanish(entry.highFatMeal);
+
     return [
       escapeCsvField(dateStr),
       escapeCsvField(timeStr),
       escapeCsvField(glucose),
       escapeCsvField(carbs),
-      escapeCsvField(insulinType),
-      escapeCsvField(insulinDose),
+      escapeCsvField(appliedDose),
+      escapeCsvField(calculatedDose),
+      escapeCsvField(wasManuallyEdited),
+      escapeCsvField(carbInsulin),
+      escapeCsvField(correctionInsulin),
+      escapeCsvField(iobSubtracted),
       escapeCsvField(mealType),
       escapeCsvField(foods),
+      escapeCsvField(recentExercise),
+      escapeCsvField(alcohol),
+      escapeCsvField(illness),
+      escapeCsvField(stress),
+      escapeCsvField(menstruation),
+      escapeCsvField(highFatMeal),
     ].join(",");
   });
 

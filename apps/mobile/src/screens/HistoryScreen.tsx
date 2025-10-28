@@ -163,6 +163,7 @@ export default function HistoryScreen() {
           "La función de compartir no está disponible en este dispositivo",
           [{ text: "OK" }],
         );
+        setIsExporting(false);
         return;
       }
 
@@ -176,16 +177,18 @@ export default function HistoryScreen() {
         encoding: FileSystem.EncodingType.UTF8,
       });
 
-      // Share the file
-      await Sharing.shareAsync(fileUri, {
+      // Share the file - reset spinner immediately after opening share dialog
+      Sharing.shareAsync(fileUri, {
         mimeType: "text/csv",
         dialogTitle: "Compartir historial de GlucosApp",
         UTI: "public.comma-separated-values-text",
       });
+
+      // Reset spinner immediately (don't wait for user to close share dialog)
+      setIsExporting(false);
     } catch (error) {
       console.error("Share error:", error);
       Alert.alert("Error", "No se pudo compartir el archivo", [{ text: "OK" }]);
-    } finally {
       setIsExporting(false);
     }
   };

@@ -69,8 +69,8 @@ export type UserProfile = User & {
 export type GlucoseEntry = {
   id: string;
   userId: string;
-  valueMgDl: number;
-  measuredAt: string;
+  mgdl: number;
+  recordedAt: string;
 };
 
 export type InsulinDose = {
@@ -121,6 +121,13 @@ export type LogEntry = {
   glucoseEntry?: GlucoseEntry;
   insulinDose?: InsulinDose;
   mealTemplate?: Meal;
+  // Context factors
+  recentExercise: boolean;
+  alcohol: boolean;
+  illness: boolean;
+  stress: boolean;
+  menstruation: boolean;
+  highFatMeal: boolean;
 };
 
 export type FoodItem = {
