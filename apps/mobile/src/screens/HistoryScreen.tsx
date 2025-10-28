@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -46,6 +46,8 @@ export default function HistoryScreen() {
   const [endDate, setEndDate] = useState<Date>(defaultRange.end);
   const [isExporting, setIsExporting] = useState(false);
   const [resetKey, setResetKey] = useState(0);
+  const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
+  const flatListRef = useRef<FlatList>(null);
 
   /**
    * Fetch log entries with date range filter
@@ -97,6 +99,7 @@ export default function HistoryScreen() {
       setStartDate(defaultRange.start);
       setEndDate(defaultRange.end);
       setResetKey((prev) => prev + 1); // Force DateRangePicker to reset
+      setExpandedEntryId(null); // Collapse all entries
     }, []),
   );
 
@@ -106,6 +109,7 @@ export default function HistoryScreen() {
   const handleDateRangeChange = (newStartDate: Date, newEndDate: Date) => {
     setStartDate(newStartDate);
     setEndDate(newEndDate);
+    setExpandedEntryId(null); // Collapse all entries when filter changes
   };
 
   /**
@@ -187,10 +191,44 @@ export default function HistoryScreen() {
   };
 
   /**
+   * Handle toggle expand/collapse for entry
+   */
+  const handleToggleEntry = useCallback(
+    (entryId: string) => {
+      setExpandedEntryId((prevId) => {
+        const newId = prevId === entryId ? null : entryId;
+
+        // If expanding an entry, scroll to it after a short delay to allow re-render
+        if (newId !== null && logEntries) {
+          const index = logEntries.findIndex((entry) => entry.id === newId);
+          if (index !== -1) {
+            setTimeout(() => {
+              flatListRef.current?.scrollToIndex({
+                index,
+                animated: true,
+                viewPosition: 0.1, // Position item at 10% from top of visible area
+              });
+            }, 100);
+          }
+        }
+
+        return newId;
+      });
+    },
+    [logEntries],
+  );
+
+  /**
    * Render individual list item
    */
   const renderItem = ({ item }: { item: LogEntry }) => {
-    return <HistoryListItem entry={item} />;
+    return (
+      <HistoryListItem
+        entry={item}
+        isExpanded={expandedEntryId === item.id}
+        onToggle={() => handleToggleEntry(item.id)}
+      />
+    );
   };
 
   /**
@@ -291,12 +329,23 @@ export default function HistoryScreen() {
           {/* History List */}
           {!isLoading && (
             <FlatList
+              ref={flatListRef}
               data={logEntries}
               renderItem={renderItem}
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.listContent}
               showsVerticalScrollIndicator={false}
               ListEmptyComponent={renderEmptyState}
+              onScrollToIndexFailed={(info) => {
+                // Wait for layout, then retry
+                setTimeout(() => {
+                  flatListRef.current?.scrollToIndex({
+                    index: info.index,
+                    animated: true,
+                    viewPosition: 0.1,
+                  });
+                }, 500);
+              }}
               refreshControl={
                 <RefreshControl
                   refreshing={isRefetching}

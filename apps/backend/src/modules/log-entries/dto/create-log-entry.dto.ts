@@ -83,4 +83,88 @@ export class CreateLogEntryDto {
   @IsOptional()
   @IsDateString()
   recordedAt?: string;
+
+  @ApiProperty({
+    required: false,
+    minimum: 0,
+    maximum: 100,
+    description: "Insulin units for carbohydrates (prandial dose)",
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  carbInsulin?: number;
+
+  @ApiProperty({
+    required: false,
+    minimum: 0,
+    maximum: 100,
+    description: "Insulin units for glucose correction",
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  correctionInsulin?: number;
+
+  @ApiProperty({
+    required: false,
+    minimum: 0,
+    maximum: 100,
+    description: "Insulin on board (IOB) subtracted from dose",
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  iobSubtracted?: number;
+
+  @ApiProperty({
+    required: false,
+    description: "Recent exercise context (~4 hours)",
+  })
+  @IsOptional()
+  @IsBoolean()
+  recentExercise?: boolean;
+
+  @ApiProperty({
+    required: false,
+    description: "Alcohol consumption context",
+  })
+  @IsOptional()
+  @IsBoolean()
+  alcohol?: boolean;
+
+  @ApiProperty({
+    required: false,
+    description: "Illness context",
+  })
+  @IsOptional()
+  @IsBoolean()
+  illness?: boolean;
+
+  @ApiProperty({
+    required: false,
+    description: "Stress context",
+  })
+  @IsOptional()
+  @IsBoolean()
+  stress?: boolean;
+
+  @ApiProperty({
+    required: false,
+    description: "Menstruation context",
+  })
+  @IsOptional()
+  @IsBoolean()
+  menstruation?: boolean;
+
+  @ApiProperty({
+    required: false,
+    description: "High fat meal context",
+  })
+  @IsOptional()
+  @IsBoolean()
+  highFatMeal?: boolean;
 }

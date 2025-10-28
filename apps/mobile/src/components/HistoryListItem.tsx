@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import {
   ChevronDown,
@@ -10,12 +10,19 @@ import {
   Clock,
   Activity,
   Edit3,
+  Wine,
+  Thermometer,
+  Frown,
+  Droplets,
+  CookingPot,
 } from "lucide-react-native";
 import { theme } from "../theme";
 import type { LogEntry, MealCategory, InsulinType } from "@glucosapp/types";
 
 interface HistoryListItemProps {
   entry: LogEntry;
+  isExpanded: boolean;
+  onToggle: () => void;
 }
 
 /**
@@ -74,9 +81,7 @@ const getGlucoseColor = (glucose: number): string => {
 /**
  * HistoryListItem component - Expandable card showing log entry details
  */
-export const HistoryListItem = ({ entry }: HistoryListItemProps) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-
+export const HistoryListItem = ({ entry, isExpanded, onToggle }: HistoryListItemProps) => {
   const glucose = entry.glucoseEntry?.mgdl;
   const insulinDose = entry.insulinDose;
   const mealType = entry.mealType;
@@ -94,18 +99,36 @@ export const HistoryListItem = ({ entry }: HistoryListItemProps) => {
     minute: "2-digit",
   });
 
-  const handleToggleExpand = () => {
-    setIsExpanded(!isExpanded);
-  };
+  // Check if entry has any context factors
+  const hasContext =
+    entry.recentExercise ||
+    entry.alcohol ||
+    entry.illness ||
+    entry.stress ||
+    entry.menstruation ||
+    entry.highFatMeal;
 
   return (
-    <TouchableOpacity style={styles.card} onPress={handleToggleExpand} activeOpacity={0.7}>
+    <TouchableOpacity style={styles.card} onPress={onToggle} activeOpacity={0.7}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.iconContainer}>{getMealTypeIcon(mealType)}</View>
           <View style={styles.headerInfo}>
-            <Text style={styles.mealType}>{getMealTypeLabel(mealType)}</Text>
+            <View style={styles.mealTypeRow}>
+              <Text style={styles.mealType}>{getMealTypeLabel(mealType)}</Text>
+              {/* Show context icons when collapsed */}
+              {!isExpanded && hasContext && (
+                <View style={styles.contextIconsCollapsed}>
+                  {entry.recentExercise && <Activity size={16} color={theme.colors.primary} />}
+                  {entry.alcohol && <Wine size={16} color={theme.colors.primary} />}
+                  {entry.illness && <Thermometer size={16} color={theme.colors.primary} />}
+                  {entry.stress && <Frown size={16} color={theme.colors.primary} />}
+                  {entry.menstruation && <Droplets size={16} color={theme.colors.primary} />}
+                  {entry.highFatMeal && <CookingPot size={16} color={theme.colors.primary} />}
+                </View>
+              )}
+            </View>
             <Text style={styles.dateTime}>
               {dateStr} - {timeStr}
             </Text>
@@ -186,7 +209,7 @@ export const HistoryListItem = ({ entry }: HistoryListItemProps) => {
           )}
 
           {/* Carbohydrates and Meal Details */}
-          {(carbs !== undefined || mealTemplate) && (
+          {((carbs !== undefined && carbs > 0) || mealTemplate) && (
             <View style={styles.detailSection}>
               <Text style={styles.detailSectionTitle}>Comida</Text>
               {carbs !== undefined && carbs > 0 && (
@@ -272,6 +295,72 @@ export const HistoryListItem = ({ entry }: HistoryListItemProps) => {
               )}
             </View>
           )}
+
+          {/* Context Information */}
+          {(entry.recentExercise ||
+            entry.alcohol ||
+            entry.illness ||
+            entry.stress ||
+            entry.menstruation ||
+            entry.highFatMeal) && (
+            <View style={styles.detailSection}>
+              <Text style={styles.detailSectionTitle}>Contexto Adicional</Text>
+              <View style={styles.contextBadgesContainer}>
+                {entry.recentExercise && (
+                  <View style={styles.contextBadge}>
+                    <Activity
+                      size={14}
+                      color={theme.colors.primary}
+                      style={styles.contextBadgeIcon}
+                    />
+                    <Text style={styles.contextBadgeText}>Ejercicio Reciente</Text>
+                  </View>
+                )}
+                {entry.alcohol && (
+                  <View style={styles.contextBadge}>
+                    <Wine size={14} color={theme.colors.primary} style={styles.contextBadgeIcon} />
+                    <Text style={styles.contextBadgeText}>Alcohol</Text>
+                  </View>
+                )}
+                {entry.illness && (
+                  <View style={styles.contextBadge}>
+                    <Thermometer
+                      size={14}
+                      color={theme.colors.primary}
+                      style={styles.contextBadgeIcon}
+                    />
+                    <Text style={styles.contextBadgeText}>Enfermedad</Text>
+                  </View>
+                )}
+                {entry.stress && (
+                  <View style={styles.contextBadge}>
+                    <Frown size={14} color={theme.colors.primary} style={styles.contextBadgeIcon} />
+                    <Text style={styles.contextBadgeText}>Estrés</Text>
+                  </View>
+                )}
+                {entry.menstruation && (
+                  <View style={styles.contextBadge}>
+                    <Droplets
+                      size={14}
+                      color={theme.colors.primary}
+                      style={styles.contextBadgeIcon}
+                    />
+                    <Text style={styles.contextBadgeText}>Periodo Menstrual</Text>
+                  </View>
+                )}
+                {entry.highFatMeal && (
+                  <View style={styles.contextBadge}>
+                    <CookingPot
+                      size={14}
+                      color={theme.colors.primary}
+                      style={styles.contextBadgeIcon}
+                    />
+                    <Text style={styles.contextBadgeText}>Comida Alta en Grasa</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
         </View>
       )}
     </TouchableOpacity>
@@ -322,11 +411,25 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.lg,
     fontWeight: "700",
     color: theme.colors.text,
+  },
+  mealTypeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.xs,
     marginBottom: theme.spacing.xs,
+    flexWrap: "wrap",
   },
   dateTime: {
     fontSize: theme.fontSize.sm,
     color: theme.colors.textSecondary,
+  },
+  contextIconsCollapsed: {
+    flexDirection: "row",
+    gap: 6,
+    alignItems: "center",
+    paddingLeft: theme.spacing.xs,
+    borderLeftWidth: 1,
+    borderLeftColor: theme.colors.border,
   },
   summary: {
     flexDirection: "row",
@@ -435,5 +538,28 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     marginTop: theme.spacing.xs,
     opacity: 0.8,
+  },
+  contextBadgesContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.xs,
+  },
+  contextBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: theme.colors.primary + "15",
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.primary + "40",
+  },
+  contextBadgeIcon: {
+    marginRight: theme.spacing.xs,
+  },
+  contextBadgeText: {
+    fontSize: theme.fontSize.xs,
+    color: theme.colors.primary,
+    fontWeight: "600",
   },
 });

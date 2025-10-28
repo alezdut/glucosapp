@@ -439,6 +439,31 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
   };
 
   /**
+   * Handle manual insulin input change
+   */
+  const handleInsulinChange = (text: string) => {
+    const numValue = parseFloat(text);
+    if (!isNaN(numValue) && numValue >= 0) {
+      setAppliedInsulin(numValue);
+      setWasManuallyEdited(true);
+    } else if (text === "") {
+      setAppliedInsulin(undefined);
+    }
+  };
+
+  /**
+   * Handle insulin input blur (finish editing)
+   */
+  const handleInsulinBlur = () => {
+    setIsEditingInsulin(false);
+    // If field is empty, reset to calculated value
+    if (appliedInsulin === undefined && calculatedInsulin > 0) {
+      setAppliedInsulin(parseFloat(calculatedInsulin.toFixed(1)));
+      setWasManuallyEdited(false);
+    }
+  };
+
+  /**
    * Mutation to create log entry
    */
   const createLogEntryMutation = useMutation({
@@ -457,6 +482,17 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
         carbohydrates: isFasting ? undefined : carbsNum > 0 ? carbsNum : undefined,
         mealType: isFasting ? MealCategory.CORRECTION : mealType,
         recordedAt: recordedAt.toISOString(),
+        // Calculation breakdown for transparency
+        carbInsulin: prandialInsulin > 0 ? prandialInsulin : undefined,
+        correctionInsulin: correctionInsulin > 0 ? correctionInsulin : undefined,
+        iobSubtracted: iobInsulin > 0 ? iobInsulin : undefined,
+        // Context factors
+        recentExercise,
+        alcohol,
+        illness,
+        stress,
+        menstruation,
+        highFatMeal,
       });
 
       if (response.error) {
@@ -466,8 +502,9 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
       return response.data;
     },
     onSuccess: () => {
-      // Invalidate statistics to refresh home screen
+      // Invalidate queries to refresh home screen and history
       queryClient.invalidateQueries({ queryKey: ["statistics"] });
+      queryClient.invalidateQueries({ queryKey: ["logEntries"] });
       Alert.alert("Éxito", "Registro creado exitosamente", [
         {
           text: "OK",
@@ -832,11 +869,24 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
                 </>
               )}
             </View>
-            {
-              <Text style={styles.calculatedValue}>
-                {(appliedInsulin || calculatedInsulin).toFixed(1)} U
+            {isEditingInsulin ? (
+              <RNTextInput
+                ref={insulinInputRef}
+                style={[styles.calculatedValue, wasManuallyEdited && styles.calculatedValueEdited]}
+                value={appliedInsulin !== undefined ? appliedInsulin.toString() : ""}
+                onChangeText={handleInsulinChange}
+                onBlur={handleInsulinBlur}
+                keyboardType="decimal-pad"
+                selectTextOnFocus
+                autoFocus
+              />
+            ) : (
+              <Text
+                style={[styles.calculatedValue, wasManuallyEdited && styles.calculatedValueEdited]}
+              >
+                {(appliedInsulin !== undefined ? appliedInsulin : calculatedInsulin).toFixed(1)} U
               </Text>
-            }
+            )}
           </TouchableOpacity>
 
           {/* Backend Warnings */}
@@ -1011,6 +1061,11 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.xxl,
     fontWeight: "bold",
     color: theme.colors.primary,
+    textAlign: "right",
+    minWidth: 80,
+  },
+  calculatedValueEdited: {
+    color: theme.colors.warning,
   },
   fastingSelectorContainer: {
     flexDirection: "row",

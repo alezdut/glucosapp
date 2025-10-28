@@ -92,6 +92,10 @@ export class LogEntriesService {
             type: data.insulinType,
             isCorrection: data.carbohydrates === undefined || data.carbohydrates === 0,
             recordedAt,
+            // Calculation breakdown
+            carbInsulin: data.carbInsulin,
+            correctionInsulin: data.correctionInsulin,
+            iobSubtracted: data.iobSubtracted,
           },
         });
       }
@@ -106,6 +110,13 @@ export class LogEntriesService {
           glucoseEntryId: glucoseEntry.id,
           insulinDoseId: insulinDose?.id,
           mealTemplateId: null, // Future: support template selection
+          // Context factors
+          recentExercise: data.recentExercise || false,
+          alcohol: data.alcohol || false,
+          illness: data.illness || false,
+          stress: data.stress || false,
+          menstruation: data.menstruation || false,
+          highFatMeal: data.highFatMeal || false,
         },
         include: {
           glucoseEntry: true,
