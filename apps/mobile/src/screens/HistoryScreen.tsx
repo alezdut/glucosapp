@@ -20,6 +20,7 @@ import { createApiClient } from "../lib/api";
 import type { LogEntry } from "@glucosapp/types";
 import { ScreenHeader, DateRangePicker, HistoryListItem } from "../components";
 import { convertLogEntriesToCsv, generateCsvFilename } from "../utils/csvExport";
+import { getUtcDateRangeIsoStrings } from "../utils/dateUtils";
 
 /**
  * Get default date range (last 7 days)
@@ -63,15 +64,20 @@ export default function HistoryScreen() {
     queryFn: async () => {
       const client = createApiClient();
 
-      // Build query string with date filters
+      // Convert local date range to UTC-aligned ISO strings
+      const { startDateIso, endDateIso } = getUtcDateRangeIsoStrings(startDate, endDate);
+
+      // Build query string with UTC-aligned date filters
       const queryParams = new URLSearchParams({
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
+        startDate: startDateIso,
+        endDate: endDateIso,
       });
 
       console.log("Fetching log entries with filters:", {
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
+        localStart: startDate.toLocaleDateString(),
+        localEnd: endDate.toLocaleDateString(),
+        utcStartDate: startDateIso,
+        utcEndDate: endDateIso,
         url: `/log-entries?${queryParams.toString()}`,
       });
 

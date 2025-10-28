@@ -1,4 +1,5 @@
 import type { LogEntry, MealCategory } from "@glucosapp/types";
+import { formatLocalDateAsYYYYMMDD } from "./dateUtils";
 
 /**
  * Escape CSV field to handle commas, quotes, and newlines
@@ -72,26 +73,25 @@ export const convertLogEntriesToCsv = (entries: LogEntry[]): string => {
       minute: "2-digit",
     });
 
-    const glucose = entry.glucoseEntry?.mgdl || "";
-    const carbs = entry.carbohydrates || "";
+    const glucose = entry.glucoseEntry?.mgdl ?? "";
+    const carbs = entry.carbohydrates ?? "";
 
     // Insulin data
-    const appliedDose = entry.insulinDose?.units || "";
-    const calculatedDose = entry.insulinDose?.calculatedUnits || "";
+    const appliedDose = entry.insulinDose?.units ?? "";
+    const calculatedDose = entry.insulinDose?.calculatedUnits ?? "";
     const wasManuallyEdited = entry.insulinDose?.wasManuallyEdited
       ? booleanToSpanish(entry.insulinDose.wasManuallyEdited)
       : "";
 
     // Insulin calculation breakdown
-    const carbInsulin = entry.insulinDose?.carbInsulin
-      ? entry.insulinDose.carbInsulin.toFixed(1)
-      : "";
-    const correctionInsulin = entry.insulinDose?.correctionInsulin
-      ? entry.insulinDose.correctionInsulin.toFixed(1)
-      : "";
-    const iobSubtracted = entry.insulinDose?.iobSubtracted
-      ? entry.insulinDose.iobSubtracted.toFixed(1)
-      : "";
+    const carbInsulin =
+      entry.insulinDose?.carbInsulin != null ? entry.insulinDose.carbInsulin.toFixed(1) : "";
+    const correctionInsulin =
+      entry.insulinDose?.correctionInsulin != null
+        ? entry.insulinDose.correctionInsulin.toFixed(1)
+        : "";
+    const iobSubtracted =
+      entry.insulinDose?.iobSubtracted != null ? entry.insulinDose.iobSubtracted.toFixed(1) : "";
 
     const mealType = getMealTypeLabel(entry.mealType);
 
@@ -143,11 +143,11 @@ export const convertLogEntriesToCsv = (entries: LogEntry[]): string => {
  */
 export const generateCsvFilename = (startDate?: Date, endDate?: Date): string => {
   const now = new Date();
-  const dateStr = now.toISOString().split("T")[0]; // YYYY-MM-DD
+  const dateStr = formatLocalDateAsYYYYMMDD(now);
 
   if (startDate && endDate) {
-    const start = startDate.toISOString().split("T")[0];
-    const end = endDate.toISOString().split("T")[0];
+    const start = formatLocalDateAsYYYYMMDD(startDate);
+    const end = formatLocalDateAsYYYYMMDD(endDate);
     return `glucosapp-historial-${start}-${end}.csv`;
   }
 

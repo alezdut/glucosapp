@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import { View, Text, StyleSheet, Modal, TouchableOpacity } from "react-native";
+import type { MarkedDates } from "react-native-calendars/src/types";
 import { Calendar, DateData } from "react-native-calendars";
 import { X, Check } from "lucide-react-native";
 import { theme } from "../theme";
+import { formatLocalDateAsYYYYMMDD } from "../utils/dateUtils";
 
 interface DateRangeCalendarProps {
   visible: boolean;
@@ -17,7 +19,7 @@ interface DateRangeCalendarProps {
 /**
  * DateRangeCalendar component - Full calendar for selecting date ranges
  */
-export const DateRangeCalendar = ({
+export const DateRangeCalendar: React.FC<DateRangeCalendarProps> = ({
   visible,
   startDate,
   endDate,
@@ -25,16 +27,17 @@ export const DateRangeCalendar = ({
   onCancel,
   minDate,
   maxDate,
-}: DateRangeCalendarProps) => {
+}) => {
   const [selectedStart, setSelectedStart] = useState<Date>(startDate);
   const [selectedEnd, setSelectedEnd] = useState<Date>(endDate);
   const [isSelectingEnd, setIsSelectingEnd] = useState(false);
 
   /**
    * Format date to YYYY-MM-DD for calendar library
+   * Uses shared utility to avoid timezone shifts
    */
   const formatDateString = (date: Date): string => {
-    return date.toISOString().split("T")[0];
+    return formatLocalDateAsYYYYMMDD(date);
   };
 
   /**
@@ -66,8 +69,8 @@ export const DateRangeCalendar = ({
   /**
    * Get marked dates for calendar
    */
-  const getMarkedDates = () => {
-    const marked: any = {};
+  const getMarkedDates = (): MarkedDates => {
+    const marked: MarkedDates = {};
     const start = formatDateString(selectedStart);
     const end = formatDateString(selectedEnd);
 
