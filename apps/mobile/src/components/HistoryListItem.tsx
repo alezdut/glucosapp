@@ -120,27 +120,49 @@ export const HistoryListItem = ({ entry }: HistoryListItemProps) => {
 
       {/* Collapsed View - Summary */}
       <View style={styles.summary}>
-        {glucose && (
+        {/* Glucosa - Siempre en primera posición */}
+        {glucose ? (
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Glucosa</Text>
-            <Text style={[styles.summaryValue, { color: getGlucoseColor(glucose) }]}>
+            <Text style={styles.summaryLabel} numberOfLines={1}>
+              Glucosa
+            </Text>
+            <Text
+              style={[styles.summaryValue, { color: getGlucoseColor(glucose) }]}
+              numberOfLines={1}
+            >
               {glucose} mg/dL
             </Text>
           </View>
+        ) : (
+          <View style={styles.summaryItem} />
         )}
 
-        {carbs !== undefined && carbs > 0 && (
+        {/* Carbohidratos - Siempre en segunda posición (puede estar vacío) */}
+        {carbs !== undefined && carbs > 0 ? (
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Carbohidratos</Text>
-            <Text style={styles.summaryValue}>{carbs}g</Text>
+            <Text style={styles.summaryLabel} numberOfLines={1}>
+              Carbs
+            </Text>
+            <Text style={styles.summaryValue} numberOfLines={1}>
+              {carbs}g
+            </Text>
           </View>
+        ) : (
+          <View style={styles.summaryItem} />
         )}
 
-        {insulinDose && insulinDose.units > 0 && (
+        {/* Insulina - Siempre en tercera posición */}
+        {insulinDose && insulinDose.units > 0 ? (
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>{getInsulinTypeLabel(insulinDose.type)}</Text>
-            <Text style={styles.summaryValue}>{insulinDose.units.toFixed(1)} U</Text>
+            <Text style={styles.summaryLabel} numberOfLines={1}>
+              Insulina
+            </Text>
+            <Text style={styles.summaryValue} numberOfLines={1}>
+              {insulinDose.units.toFixed(1)} U
+            </Text>
           </View>
+        ) : (
+          <View style={styles.summaryItem} />
         )}
       </View>
 
@@ -308,12 +330,12 @@ const styles = StyleSheet.create({
   },
   summary: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing.md,
+    flexWrap: "nowrap",
+    gap: theme.spacing.sm,
   },
   summaryItem: {
     flex: 1,
-    minWidth: "30%",
+    minWidth: 0,
   },
   summaryLabel: {
     fontSize: theme.fontSize.xs,
@@ -322,7 +344,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   summaryValue: {
-    fontSize: theme.fontSize.md,
+    fontSize: theme.fontSize.sm,
     fontWeight: "700",
     color: theme.colors.text,
   },
