@@ -10,6 +10,61 @@ export class LogEntriesService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
+   * Find all log entries for a user with optional date range filtering
+   */
+  async findAll(userId: string, startDate?: string, endDate?: string) {
+    const whereClause: any = {
+      userId,
+    };
+
+    // Add date range filtering if provided
+    if (startDate || endDate) {
+      whereClause.recordedAt = {};
+      if (startDate) {
+        whereClause.recordedAt.gte = new Date(startDate);
+      }
+      if (endDate) {
+        whereClause.recordedAt.lte = new Date(endDate);
+      }
+    }
+
+    console.log("LogEntriesService.findAll - Filters:", {
+      userId,
+      startDate,
+      endDate,
+      whereClause: JSON.stringify(whereClause, null, 2),
+    });
+
+    const results = await this.prisma.logEntry.findMany({
+      where: whereClause,
+      include: {
+        glucoseEntry: true,
+        insulinDose: true,
+        mealTemplate: {
+          include: {
+            foodItems: true,
+          },
+        },
+      },
+      orderBy: {
+        recordedAt: "desc",
+      },
+    });
+
+    console.log(`LogEntriesService.findAll - Returned ${results.length} entries`);
+    if (results.length > 0) {
+      console.log(
+        "First entry date:",
+        results[0].recordedAt,
+        "Last entry date:",
+        results[results.length - 1].recordedAt,
+      );
+    }
+
+    return results;
+  }
+
+  /**
    * Create log entry with related glucose, insulin, and optional meal
    */
   async create(userId: string, data: CreateLogEntryDto) {

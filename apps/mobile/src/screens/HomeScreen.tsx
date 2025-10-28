@@ -7,7 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
-import { Activity, Beaker, UtensilsCrossed } from "lucide-react-native";
+import { Activity, Beaker, UtensilsCrossed, Hexagon } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { CompositeNavigationProp } from "@react-navigation/native";
@@ -54,7 +54,7 @@ export default function HomeScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.logoContainer}>
-          <Text style={styles.logoIcon}>✱</Text>
+          <Hexagon size={36} color={theme.colors.primary} strokeWidth={2.5} />
         </View>
         <Text style={styles.appName}>GlucosApp</Text>
         <Text style={styles.tagline}>Tu control, más simple cada día</Text>
@@ -132,17 +132,12 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: theme.borderRadius.lg,
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.primary + "15",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: theme.spacing.md,
     borderWidth: 2,
-    borderColor: theme.colors.border,
-  },
-  logoIcon: {
-    fontSize: 36,
-    fontWeight: "bold",
-    color: theme.colors.text,
+    borderColor: theme.colors.primary + "30",
   },
   appName: {
     fontSize: theme.fontSize.xxl,

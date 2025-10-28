@@ -1,0 +1,417 @@
+import React, { useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import {
+  ChevronDown,
+  ChevronUp,
+  Coffee,
+  Sun,
+  Moon,
+  Apple,
+  Clock,
+  Activity,
+  Edit3,
+} from "lucide-react-native";
+import { theme } from "../theme";
+import type { LogEntry, MealCategory, InsulinType } from "@glucosapp/types";
+
+interface HistoryListItemProps {
+  entry: LogEntry;
+}
+
+/**
+ * Get icon component for meal type
+ */
+const getMealTypeIcon = (mealType?: MealCategory) => {
+  const iconProps = { size: 24, color: theme.colors.primary };
+  if (!mealType) return <Activity {...iconProps} />;
+
+  const icons: Record<MealCategory, React.ReactElement> = {
+    BREAKFAST: <Coffee {...iconProps} />,
+    LUNCH: <Sun {...iconProps} />,
+    DINNER: <Moon {...iconProps} />,
+    SNACK: <Apple {...iconProps} />,
+    CORRECTION: <Clock {...iconProps} />,
+  };
+  return icons[mealType] || <Activity {...iconProps} />;
+};
+
+/**
+ * Get label for meal type
+ */
+const getMealTypeLabel = (mealType?: MealCategory): string => {
+  if (!mealType) return "Registro";
+  const labels: Record<MealCategory, string> = {
+    BREAKFAST: "Desayuno",
+    LUNCH: "Almuerzo",
+    DINNER: "Cena",
+    SNACK: "Snack",
+    CORRECTION: "Corrección",
+  };
+  return labels[mealType] || "Registro";
+};
+
+/**
+ * Get label for insulin type
+ */
+const getInsulinTypeLabel = (insulinType?: InsulinType): string => {
+  if (!insulinType) return "";
+  const labels: Record<InsulinType, string> = {
+    BOLUS: "Rápida",
+    BASAL: "Lenta",
+  };
+  return labels[insulinType] || "";
+};
+
+/**
+ * Get glucose level color based on value
+ */
+const getGlucoseColor = (glucose: number): string => {
+  if (glucose < 70) return theme.colors.error; // Low
+  if (glucose > 180) return theme.colors.warning; // High
+  return theme.colors.success; // Normal
+};
+
+/**
+ * HistoryListItem component - Expandable card showing log entry details
+ */
+export const HistoryListItem = ({ entry }: HistoryListItemProps) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const glucose = entry.glucoseEntry?.mgdl;
+  const insulinDose = entry.insulinDose;
+  const mealType = entry.mealType;
+  const carbs = entry.carbohydrates;
+  const mealTemplate = entry.mealTemplate;
+
+  const recordedDate = new Date(entry.recordedAt);
+  const dateStr = recordedDate.toLocaleDateString("es-ES", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  const timeStr = recordedDate.toLocaleTimeString("es-ES", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const handleToggleExpand = () => {
+    setIsExpanded(!isExpanded);
+  };
+
+  return (
+    <TouchableOpacity style={styles.card} onPress={handleToggleExpand} activeOpacity={0.7}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <View style={styles.iconContainer}>{getMealTypeIcon(mealType)}</View>
+          <View style={styles.headerInfo}>
+            <Text style={styles.mealType}>{getMealTypeLabel(mealType)}</Text>
+            <Text style={styles.dateTime}>
+              {dateStr} - {timeStr}
+            </Text>
+          </View>
+        </View>
+        {isExpanded ? (
+          <ChevronUp size={20} color={theme.colors.textSecondary} />
+        ) : (
+          <ChevronDown size={20} color={theme.colors.textSecondary} />
+        )}
+      </View>
+
+      {/* Collapsed View - Summary */}
+      <View style={styles.summary}>
+        {glucose && (
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>Glucosa</Text>
+            <Text style={[styles.summaryValue, { color: getGlucoseColor(glucose) }]}>
+              {glucose} mg/dL
+            </Text>
+          </View>
+        )}
+
+        {carbs !== undefined && carbs > 0 && (
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>Carbohidratos</Text>
+            <Text style={styles.summaryValue}>{carbs}g</Text>
+          </View>
+        )}
+
+        {insulinDose && insulinDose.units > 0 && (
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>{getInsulinTypeLabel(insulinDose.type)}</Text>
+            <Text style={styles.summaryValue}>{insulinDose.units.toFixed(1)} U</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Expanded View - Details */}
+      {isExpanded && (
+        <View style={styles.details}>
+          {/* Divider */}
+          <View style={styles.divider} />
+
+          {/* Glucose Details */}
+          {glucose && (
+            <View style={styles.detailSection}>
+              <Text style={styles.detailSectionTitle}>Glucosa</Text>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Valor medido:</Text>
+                <Text style={[styles.detailValue, { color: getGlucoseColor(glucose) }]}>
+                  {glucose} mg/dL
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Carbohydrates and Meal Details */}
+          {(carbs !== undefined || mealTemplate) && (
+            <View style={styles.detailSection}>
+              <Text style={styles.detailSectionTitle}>Comida</Text>
+              {carbs !== undefined && carbs > 0 && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Carbohidratos totales:</Text>
+                  <Text style={styles.detailValue}>{carbs}g</Text>
+                </View>
+              )}
+              {mealTemplate && (
+                <>
+                  {mealTemplate.name && (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Comida guardada:</Text>
+                      <Text style={styles.detailValue}>{mealTemplate.name}</Text>
+                    </View>
+                  )}
+                  {mealTemplate.foodItems && mealTemplate.foodItems.length > 0 && (
+                    <View style={styles.foodItemsContainer}>
+                      <Text style={styles.detailLabel}>Alimentos:</Text>
+                      {mealTemplate.foodItems.map((item) => (
+                        <View key={item.id} style={styles.foodItem}>
+                          <Text style={styles.foodItemName}>• {item.name}</Text>
+                          <Text style={styles.foodItemDetails}>
+                            {item.quantity}g ({item.carbs}g carbs)
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </>
+              )}
+            </View>
+          )}
+
+          {/* Insulin Details */}
+          {insulinDose && insulinDose.units > 0 && (
+            <View style={styles.detailSection}>
+              <Text style={styles.detailSectionTitle}>Insulina</Text>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Tipo:</Text>
+                <Text style={styles.detailValue}>{getInsulinTypeLabel(insulinDose.type)}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Dosis aplicada:</Text>
+                <Text style={styles.detailValue}>{insulinDose.units.toFixed(1)} U</Text>
+              </View>
+              {insulinDose.calculatedUnits !== undefined && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Dosis calculada:</Text>
+                  <Text style={styles.detailValue}>{insulinDose.calculatedUnits.toFixed(1)} U</Text>
+                </View>
+              )}
+              {insulinDose.wasManuallyEdited && (
+                <View style={styles.warningBadge}>
+                  <Edit3 size={14} color={theme.colors.warning} style={styles.warningIcon} />
+                  <Text style={styles.warningText}>Editado manualmente</Text>
+                </View>
+              )}
+
+              {/* Calculation Breakdown */}
+              {(insulinDose.carbInsulin !== undefined ||
+                insulinDose.correctionInsulin !== undefined ||
+                insulinDose.iobSubtracted !== undefined) && (
+                <View style={styles.breakdownContainer}>
+                  <Text style={styles.breakdownTitle}>Desglose del cálculo:</Text>
+                  {insulinDose.carbInsulin !== undefined && insulinDose.carbInsulin > 0 && (
+                    <Text style={styles.breakdownItem}>
+                      • Dosis prandial: {insulinDose.carbInsulin.toFixed(1)} U
+                    </Text>
+                  )}
+                  {insulinDose.correctionInsulin !== undefined &&
+                    insulinDose.correctionInsulin > 0 && (
+                      <Text style={styles.breakdownItem}>
+                        • Corrección: {insulinDose.correctionInsulin.toFixed(1)} U
+                      </Text>
+                    )}
+                  {insulinDose.iobSubtracted !== undefined && insulinDose.iobSubtracted > 0 && (
+                    <Text style={styles.breakdownItem}>
+                      • IOB restado: -{insulinDose.iobSubtracted.toFixed(1)} U
+                    </Text>
+                  )}
+                </View>
+              )}
+            </View>
+          )}
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+};
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: theme.spacing.md,
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    gap: theme.spacing.sm,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.primary + "15",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerInfo: {
+    flex: 1,
+  },
+  mealType: {
+    fontSize: theme.fontSize.lg,
+    fontWeight: "700",
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
+  },
+  dateTime: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.textSecondary,
+  },
+  summary: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.md,
+  },
+  summaryItem: {
+    flex: 1,
+    minWidth: "30%",
+  },
+  summaryLabel: {
+    fontSize: theme.fontSize.xs,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.xs,
+    fontWeight: "500",
+  },
+  summaryValue: {
+    fontSize: theme.fontSize.md,
+    fontWeight: "700",
+    color: theme.colors.text,
+  },
+  details: {
+    marginTop: theme.spacing.sm,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: theme.colors.border,
+    marginVertical: theme.spacing.md,
+  },
+  detailSection: {
+    marginBottom: theme.spacing.md,
+  },
+  detailSectionTitle: {
+    fontSize: theme.fontSize.md,
+    fontWeight: "700",
+    color: theme.colors.primary,
+    marginBottom: theme.spacing.sm,
+  },
+  detailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: theme.spacing.xs,
+  },
+  detailLabel: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.textSecondary,
+    fontWeight: "500",
+  },
+  detailValue: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: "600",
+    color: theme.colors.text,
+  },
+  foodItemsContainer: {
+    marginTop: theme.spacing.sm,
+  },
+  foodItem: {
+    marginTop: theme.spacing.xs,
+    paddingLeft: theme.spacing.sm,
+  },
+  foodItemName: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.text,
+    fontWeight: "500",
+  },
+  foodItemDetails: {
+    fontSize: theme.fontSize.xs,
+    color: theme.colors.textSecondary,
+    marginTop: 2,
+  },
+  warningBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: theme.colors.warning + "20",
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
+    marginTop: theme.spacing.xs,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.warning,
+    gap: theme.spacing.xs,
+  },
+  warningIcon: {
+    marginRight: 2,
+  },
+  warningText: {
+    fontSize: theme.fontSize.xs,
+    color: theme.colors.warning,
+    fontWeight: "600",
+  },
+  breakdownContainer: {
+    backgroundColor: theme.colors.primary + "10",
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    marginTop: theme.spacing.sm,
+  },
+  breakdownTitle: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: "600",
+    color: theme.colors.primary,
+    marginBottom: theme.spacing.xs,
+  },
+  breakdownItem: {
+    fontSize: theme.fontSize.xs,
+    color: theme.colors.text,
+    marginTop: theme.spacing.xs,
+    opacity: 0.8,
+  },
+});

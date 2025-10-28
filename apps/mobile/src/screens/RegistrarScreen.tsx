@@ -11,7 +11,17 @@ import {
 } from "react-native";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useFocusEffect } from "@react-navigation/native";
-import { Calculator } from "lucide-react-native";
+import {
+  Calculator,
+  UtensilsCrossed,
+  Clock,
+  Activity,
+  Wine,
+  Thermometer,
+  Frown,
+  Droplets,
+  CookingPot,
+} from "lucide-react-native";
 import { theme } from "../theme";
 import { createApiClient } from "../lib/api";
 import type { RegistrarScreenProps } from "../navigation/types";
@@ -545,20 +555,25 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
             style={[styles.fastingSelectorButton, !isFasting && styles.fastingSelectorButtonActive]}
             onPress={() => setIsFasting(false)}
           >
+            <UtensilsCrossed
+              size={20}
+              color={!isFasting ? theme.colors.background : theme.colors.text}
+            />
             <Text
               style={[styles.fastingSelectorText, !isFasting && styles.fastingSelectorTextActive]}
             >
-              🍽️ Comida
+              Comida
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.fastingSelectorButton, isFasting && styles.fastingSelectorButtonActive]}
             onPress={() => setIsFasting(true)}
           >
+            <Clock size={20} color={isFasting ? theme.colors.background : theme.colors.text} />
             <Text
               style={[styles.fastingSelectorText, isFasting && styles.fastingSelectorTextActive]}
             >
-              ⏰ Ayuno
+              Ayuno
             </Text>
           </TouchableOpacity>
         </View>
@@ -635,6 +650,11 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
                     onPress={() => setRecentExercise(!recentExercise)}
                     activeOpacity={0.7}
                   >
+                    <Activity
+                      size={18}
+                      color={recentExercise ? theme.colors.background : theme.colors.text}
+                      style={styles.contextIcon}
+                    />
                     <Text
                       style={[
                         styles.contextCheckboxText,
@@ -642,7 +662,7 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
                       ]}
                       numberOfLines={2}
                     >
-                      🏃‍♂️ Ejercicio Reciente (~4hs)
+                      Ejercicio Reciente (~4hs)
                     </Text>
                   </TouchableOpacity>
 
@@ -651,6 +671,11 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
                     onPress={() => setAlcohol(!alcohol)}
                     activeOpacity={0.7}
                   >
+                    <Wine
+                      size={18}
+                      color={alcohol ? theme.colors.background : theme.colors.text}
+                      style={styles.contextIcon}
+                    />
                     <Text
                       style={[
                         styles.contextCheckboxText,
@@ -658,7 +683,7 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
                       ]}
                       numberOfLines={2}
                     >
-                      🍷 Alcohol
+                      Alcohol
                     </Text>
                   </TouchableOpacity>
 
@@ -667,6 +692,11 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
                     onPress={() => setIllness(!illness)}
                     activeOpacity={0.7}
                   >
+                    <Thermometer
+                      size={18}
+                      color={illness ? theme.colors.background : theme.colors.text}
+                      style={styles.contextIcon}
+                    />
                     <Text
                       style={[
                         styles.contextCheckboxText,
@@ -674,7 +704,7 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
                       ]}
                       numberOfLines={2}
                     >
-                      🤒 Enfermedad
+                      Enfermedad
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -686,6 +716,11 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
                     onPress={() => setStress(!stress)}
                     activeOpacity={0.7}
                   >
+                    <Frown
+                      size={18}
+                      color={stress ? theme.colors.background : theme.colors.text}
+                      style={styles.contextIcon}
+                    />
                     <Text
                       style={[
                         styles.contextCheckboxText,
@@ -693,7 +728,7 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
                       ]}
                       numberOfLines={2}
                     >
-                      😰 Estrés alto
+                      Estrés alto
                     </Text>
                   </TouchableOpacity>
 
@@ -702,6 +737,11 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
                     onPress={() => setMenstruation(!menstruation)}
                     activeOpacity={0.7}
                   >
+                    <Droplets
+                      size={18}
+                      color={menstruation ? theme.colors.background : theme.colors.text}
+                      style={styles.contextIcon}
+                    />
                     <Text
                       style={[
                         styles.contextCheckboxText,
@@ -709,7 +749,7 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
                       ]}
                       numberOfLines={2}
                     >
-                      🩸 Menstruación
+                      Menstruación
                     </Text>
                   </TouchableOpacity>
 
@@ -718,6 +758,11 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
                     onPress={() => setHighFatMeal(!highFatMeal)}
                     activeOpacity={0.7}
                   >
+                    <CookingPot
+                      size={18}
+                      color={highFatMeal ? theme.colors.background : theme.colors.text}
+                      style={styles.contextIcon}
+                    />
                     <Text
                       style={[
                         styles.contextCheckboxText,
@@ -725,7 +770,7 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
                       ]}
                       numberOfLines={2}
                     >
-                      🥓 Comida alta en grasa
+                      Comida alta en grasa
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -973,12 +1018,15 @@ const styles = StyleSheet.create({
   },
   fastingSelectorButton: {
     flex: 1,
+    flexDirection: "row",
     paddingVertical: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
     alignItems: "center",
+    justifyContent: "center",
     backgroundColor: theme.colors.background,
     borderWidth: 2,
     borderColor: theme.colors.border,
+    gap: theme.spacing.sm,
   },
   fastingSelectorButtonActive: {
     backgroundColor: theme.colors.primary,
@@ -1166,6 +1214,7 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
   },
   contextCheckbox: {
+    flexDirection: "row",
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
@@ -1178,11 +1227,14 @@ const styles = StyleSheet.create({
     maxWidth: "100%",
     minHeight: 50,
     flex: 1,
-    display: "flex",
+    gap: theme.spacing.xs,
   },
   contextCheckboxActive: {
     backgroundColor: theme.colors.primary,
     borderColor: theme.colors.primary,
+  },
+  contextIcon: {
+    flexShrink: 0,
   },
   contextCheckboxText: {
     fontSize: theme.fontSize.sm,
@@ -1192,8 +1244,7 @@ const styles = StyleSheet.create({
     textAlignVertical: "center",
     lineHeight: 16,
     flexWrap: "wrap",
-    width: "100%",
-    alignSelf: "center",
+    flex: 1,
   },
   contextCheckboxTextActive: {
     color: theme.colors.background,
