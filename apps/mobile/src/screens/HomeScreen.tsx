@@ -7,7 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
-import { Activity, Beaker, UtensilsCrossed, Hexagon } from "lucide-react-native";
+import { Activity, Beaker, UtensilsCrossed, Hexagon, Nfc } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { CompositeNavigationProp } from "@react-navigation/native";
@@ -101,6 +101,11 @@ export default function HomeScreen() {
           onPress={() => navigation.navigate("Calculator")}
         >
           <Text style={styles.primaryButtonText}>Calcular Carbohidratos</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.nfcButton} onPress={() => navigation.navigate("NFCScan")}>
+          <Nfc size={24} color={theme.colors.background} />
+          <Text style={styles.nfcButtonText}>Escanear Sensor</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -216,6 +221,28 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   primaryButtonText: {
+    color: theme.colors.background,
+    fontSize: theme.fontSize.lg,
+    fontWeight: "600",
+  },
+  nfcButton: {
+    backgroundColor: theme.colors.success || "#10B981",
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: theme.spacing.sm,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  nfcButtonText: {
     color: theme.colors.background,
     fontSize: theme.fontSize.lg,
     fontWeight: "600",

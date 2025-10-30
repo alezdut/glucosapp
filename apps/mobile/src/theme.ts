@@ -67,6 +67,12 @@ export const theme = {
   spacing: sharedSpacing,
   borderRadius: sharedBorderRadius,
   fontSize: sharedFontSize,
+  chartDimensions: {
+    defaultWidth: 320,
+    defaultHeight: 220,
+    compactHeight: 180,
+    expandedHeight: 280,
+  },
 } as const;
 
 // Platform-specific theme getter

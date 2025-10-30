@@ -60,6 +60,8 @@ export class ProfileService {
       weight: user.weight ?? undefined,
       diabetesType: user.diabetesType ?? undefined,
       targetGlucose: user.targetGlucose ?? undefined,
+      minTargetGlucose: user.minTargetGlucose,
+      maxTargetGlucose: user.maxTargetGlucose,
       createdAt: user.createdAt.toISOString(),
     };
   }
@@ -132,6 +134,8 @@ export class ProfileService {
       weight: user.weight ?? undefined,
       diabetesType: user.diabetesType ?? undefined,
       targetGlucose: user.targetGlucose ?? undefined,
+      minTargetGlucose: user.minTargetGlucose,
+      maxTargetGlucose: user.maxTargetGlucose,
       createdAt: user.createdAt.toISOString(),
     };
   }
