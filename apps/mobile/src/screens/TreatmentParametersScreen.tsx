@@ -10,7 +10,6 @@ import {
   Alert,
 } from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigation } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ArrowLeft, Clock, Target, Syringe, ChevronRight } from "lucide-react-native";
 import { theme } from "../theme";
