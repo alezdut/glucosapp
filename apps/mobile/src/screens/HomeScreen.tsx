@@ -10,6 +10,7 @@ import {
 import { Activity, Beaker, UtensilsCrossed, Hexagon, Nfc } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { CompositeNavigationProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
@@ -32,6 +33,7 @@ type HomeScreenNavigationProp = CompositeNavigationProp<
  */
 export default function HomeScreen() {
   const navigation = useNavigation<HomeScreenNavigationProp>();
+  const insets = useSafeAreaInsets();
   // Fetch statistics
   const {
     data: statistics,
@@ -51,6 +53,19 @@ export default function HomeScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      {/* Floating NFC Scan Button (top-right) */}
+      <TouchableOpacity
+        style={[
+          styles.floatingNfcButton,
+          { top: insets.top + theme.spacing.md, right: insets.right + theme.spacing.lg },
+        ]}
+        onPress={() => navigation.navigate("NFCScan")}
+        accessibilityRole="button"
+        accessibilityLabel="Escanear sensor por NFC"
+        activeOpacity={0.85}
+      >
+        <Nfc size={32} color={theme.colors.secondary} strokeWidth={2} />
+      </TouchableOpacity>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.logoContainer}>
@@ -101,11 +116,6 @@ export default function HomeScreen() {
           onPress={() => navigation.navigate("Calculator")}
         >
           <Text style={styles.primaryButtonText}>Calcular Carbohidratos</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.nfcButton} onPress={() => navigation.navigate("NFCScan")}>
-          <Nfc size={24} color={theme.colors.background} />
-          <Text style={styles.nfcButtonText}>Escanear Sensor</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -204,6 +214,15 @@ const styles = StyleSheet.create({
   },
   actionsContainer: {
     gap: theme.spacing.md,
+  },
+  floatingNfcButton: {
+    position: "absolute",
+    top: theme.spacing.md,
+    right: theme.spacing.lg,
+    zIndex: 10,
+    padding: theme.spacing.md,
+    borderRadius: 28,
+    backgroundColor: "transparent",
   },
   primaryButton: {
     backgroundColor: theme.colors.primary,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -8,9 +8,10 @@ import {
   Alert,
   Platform,
 } from "react-native";
+import { Animated, Easing } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Scan, Activity, Nfc } from "lucide-react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { theme } from "../theme";
 import {
   parseLibreNfcData,
@@ -44,6 +45,172 @@ const NFCScanScreen = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isNfcAvailable, setIsNfcAvailable] = useState(false);
   const [targetRange, setTargetRange] = useState<{ min: number; max: number } | null>(null);
+  const [chartReadings, setChartReadings] = useState<Array<{ timestamp: Date; glucose: number }>>(
+    [],
+  );
+  const [hasScanned, setHasScanned] = useState(false);
+  const simulationPulse = useRef(new Animated.Value(1)).current;
+  const rippleScales = [
+    useRef(new Animated.Value(0.6)).current,
+    useRef(new Animated.Value(0.6)).current,
+    useRef(new Animated.Value(0.6)).current,
+  ];
+  const rippleOpacities = [
+    useRef(new Animated.Value(0.2)).current,
+    useRef(new Animated.Value(0.2)).current,
+    useRef(new Animated.Value(0.2)).current,
+  ];
+
+  // Start/stop pulsing + ripple animations while scanning (real o simulado)
+  useEffect(() => {
+    if (isScanning) {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(simulationPulse, {
+            toValue: 1.15,
+            duration: 600,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(simulationPulse, {
+            toValue: 1,
+            duration: 600,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]),
+      );
+      loop.start();
+      // AirDrop-like staggered ripples
+      const startRipple = (scale: Animated.Value, opacity: Animated.Value, delay: number) => {
+        const animate = () => {
+          scale.setValue(0.5);
+          opacity.setValue(0.2);
+          const duration = 2200;
+          Animated.parallel([
+            Animated.timing(scale, {
+              toValue: 4.5,
+              duration,
+              easing: Easing.out(Easing.cubic),
+              delay,
+              useNativeDriver: true,
+            }),
+            Animated.sequence([
+              // Start: low opacity when small
+              Animated.timing(opacity, {
+                toValue: 0.2,
+                duration: 0,
+                delay,
+                useNativeDriver: true,
+              }),
+              // Rise to medium opacity in first third
+              Animated.timing(opacity, {
+                toValue: 0.6,
+                duration: duration / 3,
+                easing: Easing.in(Easing.ease),
+                useNativeDriver: true,
+              }),
+              // Hold medium opacity in middle third
+              Animated.timing(opacity, {
+                toValue: 0.6,
+                duration: duration / 3,
+                useNativeDriver: true,
+              }),
+              // Fade out in last third
+              Animated.timing(opacity, {
+                toValue: 0.0,
+                duration: duration / 3,
+                easing: Easing.out(Easing.ease),
+                useNativeDriver: true,
+              }),
+              // Reset for next loop
+              Animated.timing(opacity, {
+                toValue: 0.2,
+                duration: 0,
+                useNativeDriver: true,
+              }),
+            ]),
+          ]).start(() => animate());
+        };
+        animate();
+      };
+      startRipple(rippleScales[0], rippleOpacities[0], 0);
+      startRipple(rippleScales[1], rippleOpacities[1], 600);
+      startRipple(rippleScales[2], rippleOpacities[2], 1200);
+      return () => {
+        loop.stop();
+        simulationPulse.setValue(1);
+        rippleScales.forEach((s) => s.stopAnimation());
+        rippleOpacities.forEach((o) => o.stopAnimation());
+      };
+    }
+  }, [isScanning, simulationPulse]);
+
+  /**
+   * Build a uniform 5-min cadence time series across the last 8 hours.
+   * Uses last known glucose (carry-forward) after the first known point.
+   * The last point always uses endDate (now) to ensure correct positioning.
+   */
+  const getUniformSeries = (
+    source: Array<{ timestamp: Date; glucose: number }>,
+    startDate: Date,
+    endDate: Date,
+  ): Array<{ timestamp: Date; glucose: number }> => {
+    if (!source || source.length === 0) {
+      return [];
+    }
+
+    const sorted = [...source].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    const result: Array<{ timestamp: Date; glucose: number }> = [];
+
+    let cursorIdx = 0;
+    let lastKnown: number | null = null;
+    const endTimestamp = endDate.getTime();
+    const startTimestamp = startDate.getTime();
+
+    // Find the most recent glucose value (from the last reading in source)
+    const lastSourceReading = sorted[sorted.length - 1];
+    const mostRecentGlucose = lastSourceReading ? lastSourceReading.glucose : null;
+
+    // Generate uniform series: points every 5 minutes from startDate up to (but not including) endDate
+    // The last point will be exactly at endDate
+    const fiveMinInMs = 5 * 60 * 1000;
+    let currentTime = startTimestamp;
+
+    // Round currentTime down to nearest 5-minute slot
+    currentTime = Math.floor(currentTime / fiveMinInMs) * fiveMinInMs;
+
+    while (currentTime < endTimestamp - fiveMinInMs) {
+      // Advance cursor to find the most recent reading up to currentTime
+      while (cursorIdx < sorted.length && sorted[cursorIdx].timestamp.getTime() <= currentTime) {
+        lastKnown = sorted[cursorIdx].glucose;
+        cursorIdx++;
+      }
+
+      if (lastKnown !== null) {
+        result.push({ timestamp: new Date(currentTime), glucose: lastKnown });
+      }
+
+      currentTime += fiveMinInMs;
+    }
+
+    // ALWAYS add the final point at endDate (now) with the most recent glucose value
+    // This ensures the chart shows the current reading at the rightmost position
+    if (mostRecentGlucose !== null) {
+      result.push({
+        timestamp: endDate, // Always use endDate (now) for the last point
+        glucose: mostRecentGlucose,
+      });
+    } else if (lastKnown !== null) {
+      // Fallback: use last known value if no recent reading
+      result.push({
+        timestamp: endDate,
+        glucose: lastKnown,
+      });
+    }
+
+    return result;
+  };
 
   /**
    * Check if NFC is available on mount
@@ -51,7 +218,33 @@ const NFCScanScreen = () => {
   useEffect(() => {
     checkNfcAvailability();
     fetchUserProfile();
+    fetchLatestReadings();
   }, []);
+
+  // Refrescar lecturas desde DB al enfocar la pantalla
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchLatestReadings();
+    }, []),
+  );
+
+  // Auto-scan al entrar: simulado si NFC no disponible, real si disponible
+  useEffect(() => {
+    if (!hasScanned && !isScanning) {
+      if (!NfcManager || isNfcAvailable === false) {
+        const id = setTimeout(() => {
+          handleScanSensor();
+        }, 100);
+        return () => clearTimeout(id);
+      }
+      if (isNfcAvailable) {
+        const id = setTimeout(() => {
+          handleScanSensor();
+        }, 100);
+        return () => clearTimeout(id);
+      }
+    }
+  }, [isNfcAvailable, hasScanned, isScanning]);
 
   /**
    * Fetch user profile to get target glucose range
@@ -77,6 +270,46 @@ const NFCScanScreen = () => {
       console.error("Error fetching profile:", error);
       // Use default range if fetch fails
       setTargetRange({ min: 70, max: 180 });
+    }
+  };
+
+  /**
+   * Fetch latest readings from backend to always show up-to-date chart
+   */
+  const fetchLatestReadings = async () => {
+    try {
+      const client = createApiClient();
+      // Últimas 8 horas
+      const endDate = new Date();
+      const startDate = new Date(endDate.getTime() - 8 * 60 * 60 * 1000);
+      const eightHoursAgo = startDate.getTime();
+
+      const response = await client.GET("/sensor-readings/export", {
+        params: {
+          query: {
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+          },
+        },
+      });
+
+      if (response.error || !response.data) {
+        return;
+      }
+
+      const items = (response.data as any[])
+        .filter((it) => typeof it?.glucose === "number" && it?.recordedAt)
+        .map((it) => ({
+          glucose: it.glucose as number,
+          timestamp: new Date(it.recordedAt as string),
+        }))
+        // Seguridad adicional: limitar estrictamente a 8 horas por si el backend devuelve más
+        .filter((it) => it.timestamp.getTime() >= eightHoursAgo)
+        .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+      setChartReadings(items);
+    } catch (error) {
+      console.log("Error fetching latest readings", error);
     }
   };
 
@@ -117,16 +350,17 @@ const NFCScanScreen = () => {
    * Read FreeStyle Libre sensor via NFC (or use mock data)
    */
   const handleScanSensor = async () => {
+    if (isScanning) return;
     setIsScanning(true);
     setSensorData(null);
 
-    // Si NFC no está disponible (Expo Go), usar datos mock directamente
+    // Si NFC no está disponible (Expo Go), usar datos mock con animación y delay de 3s
     if (!isNfcAvailable || !NfcManager) {
-      // Simulamos un pequeño delay para que se vea realista
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await new Promise((resolve) => setTimeout(resolve, 3000));
 
       const mockData = generateMockLibreData();
       setSensorData(mockData);
+      setHasScanned(true);
       setIsScanning(false);
 
       // Guardar automáticamente los datos mock
@@ -187,6 +421,7 @@ const NFCScanScreen = () => {
       // Parse sensor data
       const parsedData = parseLibreNfcData(blocks);
       setSensorData(parsedData);
+      setHasScanned(true);
 
       // Guardar automáticamente
       await saveNewReadings(parsedData);
@@ -209,6 +444,7 @@ const NFCScanScreen = () => {
             onPress: async () => {
               const mockData = generateMockLibreData();
               setSensorData(mockData);
+              setHasScanned(true);
               // Guardar automáticamente
               await saveNewReadings(mockData);
             },
@@ -299,6 +535,11 @@ const NFCScanScreen = () => {
       const savedCount = result?.created || readingsToSave.length;
 
       console.log(`Successfully saved ${savedCount} readings`);
+      // Refrescar el gráfico con datos de la base
+      // Pequeño delay para asegurar que la DB haya actualizado
+      setTimeout(() => {
+        fetchLatestReadings();
+      }, 500);
     } catch (error) {
       console.error("Error saving readings:", error);
       // Silently fail - don't interrupt the user experience
@@ -309,6 +550,23 @@ const NFCScanScreen = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
+      {/* Global top ripples (AirDrop-style) */}
+      {isScanning && (
+        <View style={styles.globalRippleOverlay} pointerEvents="none">
+          {rippleScales.map((scale, i) => (
+            <Animated.View
+              key={i}
+              style={[
+                styles.rippleCircle,
+                {
+                  transform: [{ scale }],
+                  opacity: rippleOpacities[i],
+                },
+              ]}
+            />
+          ))}
+        </View>
+      )}
       <View style={styles.contentWrapper}>
         <ScreenHeader title="Escanear Sensor" onBack={() => navigation.goBack()} />
 
@@ -318,35 +576,30 @@ const NFCScanScreen = () => {
             style={[
               styles.scanSection,
               {
-                marginTop: theme.spacing.xl,
+                marginTop: theme.spacing.sm,
                 marginBottom: theme.spacing.lg,
                 flex: undefined,
                 justifyContent: "flex-start",
               },
             ]}
           >
-            <TouchableOpacity
-              style={[styles.scanButton, isScanning && styles.scanButtonActive]}
-              onPress={handleScanSensor}
-              disabled={isScanning}
-              accessibilityRole="button"
-              accessibilityLabel="Escanear sensor por NFC"
-              activeOpacity={0.85}
+            {/* Center NFC icon for focus indication */}
+            <Animated.View
+              style={{
+                transform: [{ scale: isScanning ? simulationPulse : (1 as unknown as number) }],
+                marginBottom: theme.spacing.xl,
+              }}
             >
-              {isScanning ? (
-                <ActivityIndicator size="large" color={theme.colors.background} />
-              ) : (
-                <Nfc size={48} color={theme.colors.background} strokeWidth={2} />
-              )}
-            </TouchableOpacity>
+              <Nfc size={64} color={theme.colors.primary} strokeWidth={2} />
+            </Animated.View>
             <Text style={styles.scanInstructions}>
               {isScanning
                 ? isNfcAvailable
                   ? "Acerca el sensor a la parte superior del teléfono..."
-                  : "Generando datos de prueba..."
+                  : "Simulando escaneo NFC..."
                 : isNfcAvailable
-                  ? "Toca el botón y acerca tu sensor FreeStyle Libre"
-                  : "Modo simulación: Toca para generar datos de prueba"}
+                  ? "Preparado para escanear automáticamente. Acerca tu sensor"
+                  : "Modo simulación: empezará automáticamente"}
             </Text>
           </View>
         )}
@@ -366,19 +619,62 @@ const NFCScanScreen = () => {
           </>
         )}
 
-        {/* Glucose Chart */}
-        {sensorData && sensorData.historicalReadings.length > 0 && (
-          <View style={styles.chartSection}>
-            <GlucoseChart
-              data={sensorData.historicalReadings}
-              targetRange={targetRange || undefined}
-              title="Historial (últimas 8 horas)"
-              showTargetRangeSubtitle
-              height={theme.chartDimensions.compactHeight}
-              inline
-            />
-          </View>
-        )}
+        {/* Glucose Chart (preferir lecturas desde DB) */}
+        {hasScanned &&
+          (chartReadings.length > 0 ||
+            (sensorData && sensorData.historicalReadings.length > 0)) && (
+            <View style={styles.chartSection}>
+              {(() => {
+                const now = new Date();
+                const start = new Date(now.getTime() - 8 * 60 * 60 * 1000);
+
+                // Construir fuente de datos: preferir DB, sino usar sensorData
+                let source: Array<{ timestamp: Date; glucose: number }> = [];
+
+                if (chartReadings.length > 0) {
+                  source = [...chartReadings];
+                } else if (sensorData) {
+                  source = [
+                    ...sensorData.historicalReadings.filter(
+                      (r) => r.timestamp.getTime() >= start.getTime(),
+                    ),
+                  ];
+                }
+
+                // SIEMPRE incluir/reemplazar con la lectura actual si está disponible
+                // Esta debe tener prioridad sobre cualquier lectura de la DB
+                if (sensorData && sensorData.currentGlucose !== undefined) {
+                  // Remover cualquier lectura muy reciente (dentro de los últimos 5 minutos) para evitar conflictos
+                  // Esto asegura que la lectura actual siempre sea la única lectura reciente
+                  const fiveMinutesAgo = now.getTime() - 5 * 60 * 1000;
+                  source = source.filter((r) => r.timestamp.getTime() < fiveMinutesAgo);
+
+                  // Agregar la lectura actual con timestamp exacto (tiempo actual)
+                  // Este será siempre el último punto del gráfico
+                  source.push({
+                    timestamp: new Date(now.getTime()), // Asegurar timestamp exacto
+                    glucose: sensorData.currentGlucose,
+                  });
+
+                  // Re-ordenar por timestamp
+                  source.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+                }
+
+                const uniform = getUniformSeries(source, start, now);
+
+                return (
+                  <GlucoseChart
+                    data={uniform}
+                    targetRange={targetRange || undefined}
+                    title="Historial (últimas 8 horas)"
+                    showTargetRangeSubtitle
+                    height={theme.chartDimensions.compactHeight}
+                    inline
+                  />
+                );
+              })()}
+            </View>
+          )}
 
         {/* Auto-save indicator */}
         {isSaving && (
@@ -396,6 +692,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+    position: "relative",
   },
   contentWrapper: {
     flex: 1,
@@ -462,6 +759,61 @@ const styles = StyleSheet.create({
   chartSection: {
     flex: 1,
     alignSelf: "stretch",
+  },
+  waveOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 260,
+    overflow: "hidden",
+    zIndex: 10,
+  },
+  globalWaveOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 260,
+    overflow: "hidden",
+    zIndex: 30,
+  },
+  globalRippleOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 260,
+    alignItems: "center",
+    justifyContent: "flex-start",
+    zIndex: 30,
+  },
+  rippleCircle: {
+    position: "absolute",
+    top: -60,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    borderWidth: 3,
+    borderColor: theme.colors.primary + "80",
+    backgroundColor: "transparent",
+  },
+  waveLine: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 20,
+    backgroundColor: theme.colors.primary + "99",
+    shadowColor: theme.colors.secondary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 4,
+    borderTopLeftRadius: 999,
+    borderTopRightRadius: 999,
+    borderBottomLeftRadius: 999,
+    borderBottomRightRadius: 999,
   },
   savingIndicator: {
     flexDirection: "row",
