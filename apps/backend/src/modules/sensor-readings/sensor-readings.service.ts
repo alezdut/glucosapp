@@ -199,8 +199,6 @@ export class SensorReadingsService {
       })
       .filter((r) => r !== null);
 
-    console.log(`[SensorReadings] Successfully decrypted ${decryptedReadings.length} readings`);
-
     const format = query.format || ExportFormat.JSON;
 
     if (format === ExportFormat.CSV) {
