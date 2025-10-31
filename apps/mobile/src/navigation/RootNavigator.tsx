@@ -2,6 +2,7 @@ import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import TabNavigator from "./TabNavigator";
 import CalculatorScreen from "../screens/CalculatorScreen";
+import TreatmentParametersScreen from "../screens/TreatmentParametersScreen";
 import type { RootStackParamList } from "./types";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -23,6 +24,14 @@ export default function RootNavigator() {
       <Stack.Screen
         name="Calculator"
         component={CalculatorScreen}
+        options={{
+          headerShown: false,
+          presentation: "card",
+        }}
+      />
+      <Stack.Screen
+        name="TreatmentParameters"
+        component={TreatmentParametersScreen}
         options={{
           headerShown: false,
           presentation: "card",
