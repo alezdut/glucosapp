@@ -70,7 +70,6 @@ export const GlucoseChart = ({
   targetRange,
   title = "Historial de Glucosa",
   height = theme.chartDimensions.defaultHeight,
-  width = theme.chartDimensions.defaultWidth,
   showTargetRangeSubtitle = true,
   inline = false,
   smoothing = true,
@@ -161,12 +160,6 @@ export const GlucoseChart = ({
 
     const startTimeMs = new Date(data[0].timestamp).getTime();
     const endTimeMs = new Date(data[data.length - 1].timestamp).getTime();
-    const totalDurationMs = Math.max(1, endTimeMs - startTimeMs);
-
-    // Calculate which point index corresponds to each hour
-    // Points are spaced every 5 minutes (300000 ms), so 12 points per hour
-    const pointsPerHour = 12; // 60 minutes / 5 minutes = 12 points
-    const fiveMinInMs = 5 * 60 * 1000;
 
     // Round start/end to full hours for label generation
     const start = new Date(startTimeMs);

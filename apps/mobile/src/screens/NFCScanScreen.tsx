@@ -1,16 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-  Platform,
-} from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, Alert } from "react-native";
 import { Animated, Easing } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Scan, Activity, Nfc } from "lucide-react-native";
+import { Activity, Nfc } from "lucide-react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { theme } from "../theme";
 import {
@@ -20,13 +12,29 @@ import {
 } from "../utils/libreNfcParser";
 import { createApiClient } from "../lib/api";
 import { ScreenHeader, GlucoseChart } from "../components";
+import type { UserProfile, DecryptedSensorReading, BatchReadingsResponse } from "@glucosapp/types";
+
+// Tipos para las respuestas del API
+type ProfileResponse = Pick<UserProfile, "minTargetGlucose" | "maxTargetGlucose">;
+
+type LatestReadingResponse = {
+  recordedAt: string;
+  [key: string]: unknown;
+};
+
+type NfcTag = {
+  id?: string;
+  techTypes?: string[];
+  [key: string]: unknown;
+};
 
 // Importación condicional de NFC Manager
 // En Expo Go esto no estará disponible, por lo que usaremos mocks
-let NfcManager: any = null;
-let NfcTech: any = null;
+let NfcManager = null;
+let NfcTech = null;
 
 try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const nfcModule = require("react-native-nfc-manager");
   NfcManager = nfcModule.default || nfcModule;
   NfcTech = nfcModule.NfcTech;
@@ -255,7 +263,7 @@ const NFCScanScreen = () => {
       const response = await client.GET("/profile", {});
 
       if (response.data && !response.error) {
-        const profile = response.data as any;
+        const profile = response.data as ProfileResponse;
         console.log("Profile data received:", {
           minTargetGlucose: profile.minTargetGlucose,
           maxTargetGlucose: profile.maxTargetGlucose,
@@ -297,11 +305,12 @@ const NFCScanScreen = () => {
         return;
       }
 
-      const items = (response.data as any[])
+      const readings = response.data as DecryptedSensorReading[];
+      const items = readings
         .filter((it) => typeof it?.glucose === "number" && it?.recordedAt)
         .map((it) => ({
-          glucose: it.glucose as number,
-          timestamp: new Date(it.recordedAt as string),
+          glucose: it.glucose,
+          timestamp: new Date(it.recordedAt),
         }))
         // Seguridad adicional: limitar estrictamente a 8 horas por si el backend devuelve más
         .filter((it) => it.timestamp.getTime() >= eightHoursAgo)
@@ -388,7 +397,7 @@ const NFCScanScreen = () => {
       await NfcManager.requestTechnology(NfcTech.Iso15693);
 
       // Read NFC tag
-      const tag: any = await NfcManager.getTag();
+      const tag = (await NfcManager.getTag()) as NfcTag | null;
 
       if (!tag) {
         throw new Error("No se detectó ningún sensor");
@@ -479,7 +488,7 @@ const NFCScanScreen = () => {
 
       let lastSavedTimestamp: Date | null = null;
       if (latestResponse.data && !latestResponse.error) {
-        const latest = latestResponse.data as any;
+        const latest = latestResponse.data as LatestReadingResponse;
         if (latest?.recordedAt) {
           lastSavedTimestamp = new Date(latest.recordedAt);
           console.log("Last saved reading:", lastSavedTimestamp.toISOString());
@@ -531,7 +540,7 @@ const NFCScanScreen = () => {
         throw new Error("Error al guardar lecturas");
       }
 
-      const result = response.data as any;
+      const result = response.data as BatchReadingsResponse;
       const savedCount = result?.created || readingsToSave.length;
 
       console.log(`Successfully saved ${savedCount} readings`);
@@ -586,7 +595,7 @@ const NFCScanScreen = () => {
             {/* Center NFC icon for focus indication */}
             <Animated.View
               style={{
-                transform: [{ scale: isScanning ? simulationPulse : (1 as unknown as number) }],
+                transform: [{ scale: isScanning ? simulationPulse : 1 }],
                 marginBottom: theme.spacing.xl,
               }}
             >

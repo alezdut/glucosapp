@@ -54,7 +54,7 @@ export const DateRangePicker = ({
 
     const now = new Date();
     let start: Date;
-    let end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
 
     switch (preset) {
       case "today":

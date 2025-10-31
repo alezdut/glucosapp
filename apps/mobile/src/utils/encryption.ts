@@ -9,7 +9,6 @@ import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 
 const ENCRYPTION_KEY_NAME = "glucosapp_encryption_key";
-const KEY_SIZE = 256; // AES-256
 
 /**
  * Generate a new encryption key and store it securely
@@ -54,7 +53,7 @@ export const deleteEncryptionKey = async (): Promise<void> => {
 /**
  * Convert hex string to Uint8Array
  */
-const hexToBytes = (hex: string): Uint8Array => {
+export const hexToBytes = (hex: string): Uint8Array => {
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
     bytes[i / 2] = parseInt(hex.substring(i, 2), 16);
@@ -65,7 +64,7 @@ const hexToBytes = (hex: string): Uint8Array => {
 /**
  * Convert Uint8Array to hex string
  */
-const bytesToHex = (bytes: Uint8Array): string => {
+export const bytesToHex = (bytes: Uint8Array): string => {
   return Array.from(bytes)
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");

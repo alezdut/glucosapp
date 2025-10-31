@@ -192,7 +192,7 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
       hasPrefilledCarbsRef.current = true;
       setCarbohydrates(carbsParam);
       // Clear the param after using it
-      navigation.setParams({ carbohydrates: undefined } as any);
+      navigation.setParams({ carbohydrates: undefined });
       // Reset the flag after a delay to allow normal resets later
       setTimeout(() => {
         hasPrefilledCarbsRef.current = false;
