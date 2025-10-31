@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, StyleSheet, Dimensions } from "react-native";
 import { LineChart } from "react-native-gifted-charts";
 import { theme } from "../theme";
@@ -73,24 +73,27 @@ export const GlucoseChart = ({
   showTargetRangeSubtitle = true,
   inline = false,
   smoothing = true,
-  smoothingWindow = 2,
+  smoothingWindow = 4,
 }: GlucoseChartProps) => {
   // Calculate optimal spacing to fit all data in screen width
-  const screenWidth = Dimensions.get("window").width;
+  const screenWidth = useMemo(() => Dimensions.get("window").width, []);
 
+  // Memoize availableWidth calculation to avoid recalculating on every render
   // Adjust padding based on inline mode
   // In inline mode: only parent container padding (contentWrapper)
   // In card mode: parent padding + card padding
-  const containerPadding = theme.spacing.lg * 2; // Parent container padding
-  const cardPadding = inline ? 0 : theme.spacing.lg * 2; // Card padding (only in card mode)
-  const yAxisWidth = 50; // Space for Y-axis labels
-  const availableWidth = screenWidth - containerPadding - cardPadding - yAxisWidth;
+  const availableWidth = useMemo(() => {
+    const containerPadding = theme.spacing.lg * 2; // Parent container padding
+    const cardPadding = inline ? 0 : theme.spacing.lg * 2; // Card padding (only in card mode)
+    const yAxisWidth = 50; // Space for Y-axis labels
+    return screenWidth - containerPadding - cardPadding - yAxisWidth;
+  }, [screenWidth, inline]);
 
   // Calculate spacing based on data points to fit exactly in available width
   // Note: react-native-gifted-charts uses uniform spacing, so we calculate based on point count
   // The last point should always be at endDate (now) to ensure it appears at the rightmost position
   const dataPointsCount = data.length > 0 ? data.length : 1;
-  const endSpacing = 10; // Small margin at the end
+  const endSpacing = 0; // Small margin at the end
   const spacing = Math.max(2, (availableWidth - endSpacing) / dataPointsCount);
 
   /**
@@ -124,7 +127,9 @@ export const GlucoseChart = ({
     const smoothedValues = smoothing ? applyMovingAverage(values, smoothingWindow) : values;
 
     return data.map((reading, index) => {
-      const value = smoothedValues[index];
+      // Use unsmoothed value for the last point, smoothed for the rest
+      const isLast = index === data.length - 1;
+      const value = isLast ? values[index] : smoothedValues[index];
       if (!targetRange) {
         return {
           value,
@@ -145,68 +150,72 @@ export const GlucoseChart = ({
   };
 
   /**
-   * Get hourly time labels positioned based on point indices (not time ratios)
-   * Since the chart uses uniform spacing, labels must align with point positions
+   * Get hourly time labels positioned based on point indices (uniform spacing).
+   * Returns array of { position: number (0..1), time: string }.
    */
   const getTimeLabels = () => {
-    if (!data || data.length === 0) {
-      return [];
-    }
+    if (!data || data.length === 0) return [];
 
-    const formatTime = (timestamp: Date) => {
-      const hours = timestamp.getHours();
-      return `${hours}hs`;
+    const formatTime = (ts: number) => {
+      const d = new Date(ts);
+      return `${d.getHours()}hs`;
     };
 
     const startTimeMs = new Date(data[0].timestamp).getTime();
     const endTimeMs = new Date(data[data.length - 1].timestamp).getTime();
 
-    // Round start/end to full hours for label generation
+    // Round start up to the next full hour if start is not on the hour
     const start = new Date(startTimeMs);
     start.setMinutes(0, 0, 0);
-    const firstHour =
-      start.getTime() < startTimeMs ? start.getTime() + 60 * 60 * 1000 : start.getTime();
+    let firstHour = start.getTime();
+    if (firstHour <= startTimeMs) firstHour += 60 * 60 * 1000;
 
+    // Round end down to the hour (we want labels strictly inside the range)
     const end = new Date(endTimeMs);
     end.setMinutes(0, 0, 0);
     const lastHour = end.getTime();
 
     const labels: Array<{ position: number; time: string }> = [];
 
+    // If only one point, place single label at 0 (or 1) — aquí lo ponemos en 0
+    if (data.length === 1) {
+      const pos = 0;
+      const t = formatTime(startTimeMs);
+      labels.push({ position: pos, time: t });
+      return labels;
+    }
+
+    // Precompute point times for faster search
+    const pointTimes = data.map((p) => new Date(p.timestamp).getTime());
+
     for (let hourTime = firstHour; hourTime <= lastHour; hourTime += 60 * 60 * 1000) {
-      // Skip if this hour is at or before start or at or after end
-      if (hourTime <= startTimeMs || hourTime >= endTimeMs) {
-        continue;
-      }
+      // Only consider hours strictly inside the data interval
+      if (hourTime <= startTimeMs || hourTime >= endTimeMs) continue;
 
-      // Find the point in the data array closest to this hour
-      // Since chart uses uniform spacing, we need to find the actual point index
-      let closestIndex = -1;
-      let minDistance = Infinity;
+      // Find closest index to this hourTime (binary search could be used if data sorted)
+      let closestIndex = 0;
+      let minDistance = Math.abs(pointTimes[0] - hourTime);
 
-      for (let i = 0; i < data.length; i++) {
-        const pointTime = new Date(data[i].timestamp).getTime();
-        const distance = Math.abs(pointTime - hourTime);
-        if (distance < minDistance) {
-          minDistance = distance;
+      for (let i = 1; i < pointTimes.length; i++) {
+        const dist = Math.abs(pointTimes[i] - hourTime);
+        if (dist < minDistance) {
+          minDistance = dist;
           closestIndex = i;
         }
       }
 
-      // If we found a point close enough (within 30 minutes), use it
-      if (closestIndex >= 0 && minDistance < 30 * 60 * 1000) {
-        // Calculate position based on point index and uniform spacing
-        // The chart positions points starting at initialSpacing (0), so:
-        // pixelPosition = index * spacing
-        // But we need percentage relative to the referenceLinesContainer width (availableWidth)
-        const pixelPosition = closestIndex * spacing;
-        const position = pixelPosition / availableWidth;
+      // threshold: solo si el punto está razonablemente cercano (ej. 20 minutos)
+      const THRESHOLD_MS = 5 * 60 * 1000;
+      if (minDistance <= THRESHOLD_MS) {
+        const position = (closestIndex - 4) / data.length;
 
-        // Only add label if position is within bounds (0 to 1)
+        // Asegurarnos que queda en rango
         if (position >= 0 && position <= 1) {
+          // Usamos el timestamp real del punto para la hora (evita desajustes)
+          const labelTime = pointTimes[closestIndex];
           labels.push({
             position,
-            time: formatTime(new Date(hourTime)),
+            time: formatTime(labelTime),
           });
         }
       }
