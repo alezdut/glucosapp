@@ -155,16 +155,12 @@ export class SensorReadingsService {
       }
     }
 
-    console.log("[SensorReadings] Query where clause:", JSON.stringify(where, null, 2));
-
     const results = await this.prisma.glucoseReading.findMany({
       where,
       orderBy: {
         recordedAt: "asc",
       },
     });
-
-    console.log(`[SensorReadings] DB query returned ${results.length} readings`);
 
     return results;
   }
@@ -180,14 +176,7 @@ export class SensorReadingsService {
     const startDate = query.startDate ? new Date(query.startDate) : undefined;
     const endDate = query.endDate ? new Date(query.endDate) : undefined;
 
-    console.log("[SensorReadings] Export request:", {
-      userId,
-      startDate: startDate?.toISOString(),
-      endDate: endDate?.toISOString(),
-    });
-
     const readings = await this.getReadingsByDateRange(userId, startDate, endDate);
-    console.log(`[SensorReadings] Found ${readings.length} raw readings from DB`);
 
     // Decrypt glucose values for export - return array of DecryptedSensorReading
     const decryptedReadings = readings
