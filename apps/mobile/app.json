@@ -12,7 +12,7 @@
     "scheme": "glucosapp",
     "platforms": ["ios", "android", "web"],
     "orientation": "portrait",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "plugins": [
       "expo-secure-store",
       [
@@ -47,7 +47,11 @@
           {
             "CFBundleURLSchemes": ["glucosapp"]
           }
-        ]
+        ],
+        "NFCReaderUsageDescription": "Glucosapp necesita acceso a NFC para leer datos de tu sensor FreeStyle Libre."
+      },
+      "entitlements": {
+        "com.apple.developer.nfc.readersession.formats": ["TAG"]
       }
     },
     "android": {

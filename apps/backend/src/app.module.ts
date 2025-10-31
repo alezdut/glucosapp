@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { PrismaService } from "./prisma/prisma.service";
+import { CommonModule } from "./common/common.module";
 import { HealthModule } from "./modules/health/health.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { ProfileModule } from "./modules/profile/profile.module";
@@ -11,10 +12,12 @@ import { MealsModule } from "./modules/meals/meals.module";
 import { LogEntriesModule } from "./modules/log-entries/log-entries.module";
 import { FoodSearchModule } from "./modules/food-search/food-search.module";
 import { InsulinCalculationModule } from "./modules/insulin-calculation/insulin-calculation.module";
+import { SensorReadingsModule } from "./modules/sensor-readings/sensor-readings.module";
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    CommonModule,
     HealthModule,
     AuthModule,
     ProfileModule,
@@ -25,6 +28,7 @@ import { InsulinCalculationModule } from "./modules/insulin-calculation/insulin-
     LogEntriesModule,
     FoodSearchModule,
     InsulinCalculationModule,
+    SensorReadingsModule,
   ],
   providers: [PrismaService],
 })

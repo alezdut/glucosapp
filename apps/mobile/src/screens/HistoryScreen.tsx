@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -17,9 +17,9 @@ import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { theme } from "../theme";
 import { createApiClient } from "../lib/api";
-import type { LogEntry } from "@glucosapp/types";
+import type { LogEntry, DecryptedSensorReading } from "@glucosapp/types";
 import { ScreenHeader, DateRangePicker, HistoryListItem } from "../components";
-import { convertLogEntriesToCsv, generateCsvFilename } from "../utils/csvExport";
+import { convertCombinedDataToCsv, generateCsvFilename } from "../utils/csvExport";
 import { getUtcDateRangeIsoStrings } from "../utils/dateUtils";
 
 /**
@@ -55,10 +55,10 @@ export default function HistoryScreen() {
    */
   const {
     data: logEntries,
-    isLoading,
-    error,
-    refetch,
-    isRefetching,
+    isLoading: isLoadingLogs,
+    error: logEntriesError,
+    refetch: refetchLogs,
+    isRefetching: isRefetchingLogs,
   } = useQuery<LogEntry[]>({
     queryKey: ["logEntries", startDate.toISOString(), endDate.toISOString()],
     queryFn: async () => {
@@ -97,6 +97,63 @@ export default function HistoryScreen() {
   });
 
   /**
+   * Fetch sensor readings with date range filter
+   */
+  const {
+    data: sensorReadings,
+    isLoading: isLoadingSensors,
+    error: sensorReadingsError,
+    refetch: refetchSensors,
+    isRefetching: isRefetchingSensors,
+  } = useQuery<DecryptedSensorReading[]>({
+    queryKey: ["sensorReadings", startDate.toISOString(), endDate.toISOString()],
+    queryFn: async () => {
+      const client = createApiClient();
+
+      // Convert local date range to UTC-aligned ISO strings
+      const { startDateIso, endDateIso } = getUtcDateRangeIsoStrings(startDate, endDate);
+
+      // Build query string with UTC-aligned date filters
+      const queryParams = new URLSearchParams({
+        startDate: startDateIso,
+        endDate: endDateIso,
+      });
+
+      console.log("Fetching sensor readings with filters:", {
+        localStart: startDate.toLocaleDateString(),
+        localEnd: endDate.toLocaleDateString(),
+        utcStartDate: startDateIso,
+        utcEndDate: endDateIso,
+      });
+
+      const response = await client.GET(`/sensor-readings/export?${queryParams.toString()}`, {});
+
+      if (response.error) {
+        console.log("Failed to fetch sensor readings:", response.error);
+        return []; // Return empty array if no sensor readings
+      }
+
+      const readings = (response.data as DecryptedSensorReading[]) || [];
+      console.log(`Received ${readings.length} sensor readings`);
+
+      return readings;
+    },
+    staleTime: 0, // Always consider data stale
+    gcTime: 0, // Don't keep unused data in cache
+  });
+
+  // Combined loading and error states
+  const isLoading = isLoadingLogs || isLoadingSensors;
+  const isRefetching = isRefetchingLogs || isRefetchingSensors;
+  const error = logEntriesError || sensorReadingsError;
+
+  // Combined refetch function
+  const refetch = () => {
+    refetchLogs();
+    refetchSensors();
+  };
+
+  /**
    * Reset filters when screen gains focus
    */
   useFocusEffect(
@@ -122,7 +179,10 @@ export default function HistoryScreen() {
    * Export CSV to device
    */
   const handleExport = async () => {
-    if (!logEntries || logEntries.length === 0) {
+    const hasLogEntries = logEntries && logEntries.length > 0;
+    const hasSensorReadings = sensorReadings && sensorReadings.length > 0;
+
+    if (!hasLogEntries && !hasSensorReadings) {
       Alert.alert("Sin datos", "No hay registros para exportar", [{ text: "OK" }]);
       return;
     }
@@ -130,8 +190,8 @@ export default function HistoryScreen() {
     try {
       setIsExporting(true);
 
-      // Convert entries to CSV
-      const csvContent = convertLogEntriesToCsv(logEntries);
+      // Convert both types of data to CSV
+      const csvContent = convertCombinedDataToCsv(logEntries || [], sensorReadings || []);
       const filename = generateCsvFilename(startDate, endDate);
       const fileUri = `${FileSystem.documentDirectory}${filename}`;
 
@@ -140,7 +200,12 @@ export default function HistoryScreen() {
         encoding: FileSystem.EncodingType.UTF8,
       });
 
-      Alert.alert("Éxito", `Archivo exportado exitosamente:\n${filename}`, [{ text: "OK" }]);
+      const totalEntries = (logEntries?.length || 0) + (sensorReadings?.length || 0);
+      Alert.alert(
+        "Éxito",
+        `Archivo exportado exitosamente:\n${filename}\n\n${totalEntries} registros totales`,
+        [{ text: "OK" }],
+      );
     } catch (error) {
       console.error("Export error:", error);
       Alert.alert("Error", "No se pudo exportar el archivo", [{ text: "OK" }]);
@@ -153,7 +218,10 @@ export default function HistoryScreen() {
    * Share CSV file
    */
   const handleShare = async () => {
-    if (!logEntries || logEntries.length === 0) {
+    const hasLogEntries = logEntries && logEntries.length > 0;
+    const hasSensorReadings = sensorReadings && sensorReadings.length > 0;
+
+    if (!hasLogEntries && !hasSensorReadings) {
       Alert.alert("Sin datos", "No hay registros para compartir", [{ text: "OK" }]);
       return;
     }
@@ -173,8 +241,8 @@ export default function HistoryScreen() {
         return;
       }
 
-      // Convert entries to CSV
-      const csvContent = convertLogEntriesToCsv(logEntries);
+      // Convert both types of data to CSV
+      const csvContent = convertCombinedDataToCsv(logEntries || [], sensorReadings || []);
       const filename = generateCsvFilename(startDate, endDate);
       const fileUri = `${FileSystem.cacheDirectory}${filename}`;
 

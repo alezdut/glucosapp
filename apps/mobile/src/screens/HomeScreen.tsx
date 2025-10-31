@@ -7,9 +7,10 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
-import { Activity, Beaker, UtensilsCrossed, Hexagon } from "lucide-react-native";
+import { Activity, Beaker, UtensilsCrossed, Hexagon, Nfc } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { CompositeNavigationProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
@@ -32,6 +33,7 @@ type HomeScreenNavigationProp = CompositeNavigationProp<
  */
 export default function HomeScreen() {
   const navigation = useNavigation<HomeScreenNavigationProp>();
+  const insets = useSafeAreaInsets();
   // Fetch statistics
   const {
     data: statistics,
@@ -51,6 +53,19 @@ export default function HomeScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      {/* Floating NFC Scan Button (top-right) */}
+      <TouchableOpacity
+        style={[
+          styles.floatingNfcButton,
+          { top: insets.top + theme.spacing.md, right: insets.right + theme.spacing.lg },
+        ]}
+        onPress={() => navigation.navigate("NFCScan")}
+        accessibilityRole="button"
+        accessibilityLabel="Escanear sensor por NFC"
+        activeOpacity={0.85}
+      >
+        <Nfc size={32} color={theme.colors.secondary} strokeWidth={2} />
+      </TouchableOpacity>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.logoContainer}>
@@ -200,6 +215,15 @@ const styles = StyleSheet.create({
   actionsContainer: {
     gap: theme.spacing.md,
   },
+  floatingNfcButton: {
+    position: "absolute",
+    top: theme.spacing.md,
+    right: theme.spacing.lg,
+    zIndex: 10,
+    padding: theme.spacing.md,
+    borderRadius: 28,
+    backgroundColor: "transparent",
+  },
   primaryButton: {
     backgroundColor: theme.colors.primary,
     paddingVertical: theme.spacing.md,
@@ -216,6 +240,28 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   primaryButtonText: {
+    color: theme.colors.background,
+    fontSize: theme.fontSize.lg,
+    fontWeight: "600",
+  },
+  nfcButton: {
+    backgroundColor: theme.colors.success || "#10B981",
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: theme.spacing.sm,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  nfcButtonText: {
     color: theme.colors.background,
     fontSize: theme.fontSize.lg,
     fontWeight: "600",

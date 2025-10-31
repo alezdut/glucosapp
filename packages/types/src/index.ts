@@ -163,3 +163,6 @@ export * from "./insulin-profile";
 
 // Export insulin calculation utilities
 export * from "./insulin-calculations";
+
+// Export sensor readings types
+export * from "./sensor-readings";

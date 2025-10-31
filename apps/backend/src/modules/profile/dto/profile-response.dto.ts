@@ -46,6 +46,28 @@ export class ProfileResponseDto {
   @ApiProperty({ required: false })
   targetGlucose?: number;
 
+  @ApiProperty()
+  minTargetGlucose!: number;
+
+  @ApiProperty()
+  maxTargetGlucose!: number;
+
+  // Insulin profile
+  @ApiProperty()
+  icRatioBreakfast!: number;
+
+  @ApiProperty()
+  icRatioLunch!: number;
+
+  @ApiProperty()
+  icRatioDinner!: number;
+
+  @ApiProperty()
+  insulinSensitivityFactor!: number;
+
+  @ApiProperty()
+  diaHours!: number;
+
   // Meal time ranges (in minutes from midnight, 0-1439)
   @ApiProperty({ required: false })
   mealTimeBreakfastStart?: number;

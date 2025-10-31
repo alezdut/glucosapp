@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
+import { EncryptionService } from "../../common/services/encryption.service";
 import { StatisticsResponseDto } from "./dto/statistics-response.dto";
 
 /**
@@ -7,7 +8,10 @@ import { StatisticsResponseDto } from "./dto/statistics-response.dto";
  */
 @Injectable()
 export class StatisticsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly encryptionService: EncryptionService,
+  ) {}
 
   /**
    * Get summary statistics for home screen
@@ -17,7 +21,7 @@ export class StatisticsService {
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    // Calculate average glucose (last 7 days)
+    // Calculate average glucose (last 7 days) - combine manual entries and sensor readings
     const glucoseEntries = await this.prisma.glucoseEntry.findMany({
       where: {
         userId,
@@ -30,10 +34,40 @@ export class StatisticsService {
       },
     });
 
+    // Get sensor readings from last 7 days
+    const sensorReadings = await this.prisma.glucoseReading.findMany({
+      where: {
+        userId,
+        recordedAt: {
+          gte: sevenDaysAgo,
+        },
+      },
+      select: {
+        glucoseEncrypted: true,
+      },
+    });
+
+    // Decrypt sensor readings and collect all glucose values
+    const allGlucoseValues: number[] = [
+      // Manual entries (already in mg/dL)
+      ...glucoseEntries.map((entry) => entry.mgdl),
+      // Sensor readings (need to decrypt)
+      ...sensorReadings
+        .map((reading) => {
+          try {
+            return this.encryptionService.decryptGlucoseValue(reading.glucoseEncrypted);
+          } catch (error) {
+            console.error("[Statistics] Failed to decrypt sensor reading:", error);
+            return null;
+          }
+        })
+        .filter((value): value is number => value !== null),
+    ];
+
     const averageGlucose =
-      glucoseEntries.length > 0
+      allGlucoseValues.length > 0
         ? Math.round(
-            glucoseEntries.reduce((sum, entry) => sum + entry.mgdl, 0) / glucoseEntries.length,
+            allGlucoseValues.reduce((sum, value) => sum + value, 0) / allGlucoseValues.length,
           )
         : 0;
 
