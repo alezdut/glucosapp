@@ -7,6 +7,7 @@ import type { HomeStackParamList } from "./HomeStackNavigator";
 export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<RootTabParamList> | undefined;
   Calculator: undefined;
+  TreatmentParameters: undefined;
 };
 
 // Define the parameter list for the bottom tab navigator
@@ -30,3 +31,7 @@ export type HistoryScreenProps = RootTabScreenProps<"Historial">;
 export type RegistrarScreenProps = RootTabScreenProps<"Registrar">;
 export type DoctorScreenProps = RootTabScreenProps<"Médico">;
 export type ProfileScreenProps = RootTabScreenProps<"Perfil">;
+export type TreatmentParametersScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  "TreatmentParameters"
+>;

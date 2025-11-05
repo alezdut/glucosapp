@@ -1,6 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import * as WebBrowser from "expo-web-browser";
-import { createApiClient, storeTokens, getAccessToken, clearTokens } from "../lib/api";
+import {
+  createApiClient,
+  storeTokens,
+  getAccessToken,
+  getRefreshToken,
+  clearTokens,
+} from "../lib/api";
 import * as Linking from "expo-linking";
 
 // Enable web browser to properly dismiss after auth
@@ -51,6 +57,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (response.data) {
         return response.data as User;
       }
+
+      // If we got an error response, check if it's an auth error
+      if (response.error) {
+        // If it's a 401, tokens were already cleared by the API client
+        if (response.error.status === 401) {
+          console.log("Authentication failed, clearing user state");
+          setUser(null);
+        }
+      }
+
       return null;
     } catch (error) {
       console.error("Failed to fetch user:", error);
@@ -215,9 +231,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
 
-      // Call logout endpoint
-      const client = createApiClient();
-      await client.POST("/auth/logout", {});
+      // Get refresh token before clearing
+      const refreshToken = await getRefreshToken();
+
+      // Call logout endpoint with refresh token
+      if (refreshToken) {
+        try {
+          const client = createApiClient();
+          await client.POST("/auth/logout", {
+            body: { refreshToken },
+          });
+        } catch (error) {
+          console.error("Logout API call failed:", error);
+          // Continue to clear local state even if API call fails
+        }
+      }
     } catch (error) {
       console.error("Sign out failed:", error);
     } finally {

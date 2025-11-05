@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -25,11 +25,14 @@ import {
   ChevronRight,
 } from "lucide-react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { theme } from "../theme";
 import { createApiClient } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { type UserProfile, DiabetesType, GlucoseUnit, Theme, Language } from "@glucosapp/types";
 import { CustomDateTimePicker } from "../components";
+import type { RootStackParamList } from "../navigation/types";
 
 /**
  * Translate enum values to Spanish for display
@@ -66,9 +69,12 @@ function calculateAge(birthDate: Date): number {
   return age;
 }
 
+type ProfileScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
   const queryClient = useQueryClient();
+  const navigation = useNavigation<ProfileScreenNavigationProp>();
 
   const [birthDate, setBirthDate] = useState<Date | null>(null);
   const [weight, setWeight] = useState("");
@@ -93,6 +99,32 @@ export default function ProfileScreen() {
       return data;
     },
   });
+
+  // Check if there are pending changes
+  const hasChanges = useMemo(() => {
+    if (!profile) return false;
+
+    // Check birthDate changes
+    const hasBirthDateChange = !profile.birthDate && birthDate !== null;
+
+    // Check weight changes
+    const normalizedWeight = weight ? weight.trim().replace(",", ".") : "";
+    const parsedWeight = normalizedWeight ? parseFloat(normalizedWeight) : NaN;
+    const currentWeight = !isNaN(parsedWeight) ? parsedWeight : undefined;
+    // Only consider it a change if:
+    // 1. There's a saved weight and current weight is different and valid
+    // 2. There's no saved weight but current weight is valid
+    const hasWeightChange =
+      (profile.weight !== undefined &&
+        currentWeight !== undefined &&
+        currentWeight !== profile.weight) ||
+      (profile.weight === undefined && currentWeight !== undefined && normalizedWeight.length > 0);
+
+    // Check diabetesType changes
+    const hasDiabetesTypeChange = !profile.diabetesType && diabetesType !== null;
+
+    return hasBirthDateChange || hasWeightChange || hasDiabetesTypeChange;
+  }, [profile, birthDate, weight, diabetesType]);
 
   // Update profile mutation
   const updateProfile = useMutation({
@@ -333,18 +365,20 @@ export default function ProfileScreen() {
           </View>
         )}
 
-        {/* Save Button */}
-        <TouchableOpacity
-          style={[styles.saveButton, updateProfile.isPending && styles.saveButtonDisabled]}
-          onPress={handleSaveProfile}
-          disabled={updateProfile.isPending}
-        >
-          {updateProfile.isPending ? (
-            <ActivityIndicator color={theme.colors.background} />
-          ) : (
-            <Text style={styles.saveButtonText}>Guardar cambios</Text>
-          )}
-        </TouchableOpacity>
+        {/* Save Button - Only show if there are changes */}
+        {hasChanges && (
+          <TouchableOpacity
+            style={[styles.saveButton, updateProfile.isPending && styles.saveButtonDisabled]}
+            onPress={handleSaveProfile}
+            disabled={updateProfile.isPending}
+          >
+            {updateProfile.isPending ? (
+              <ActivityIndicator color={theme.colors.background} />
+            ) : (
+              <Text style={styles.saveButtonText}>Guardar cambios</Text>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Preferencias */}
@@ -387,6 +421,20 @@ export default function ProfileScreen() {
           </View>
           <ChevronRight size={20} color={theme.colors.textTertiary} />
         </View>
+
+        <TouchableOpacity
+          style={styles.fieldRow}
+          onPress={() => navigation.navigate("TreatmentParameters")}
+        >
+          <View style={styles.fieldIconContainer}>
+            <Syringe size={20} color={theme.colors.textSecondary} />
+          </View>
+          <View style={styles.fieldContent}>
+            <Text style={styles.fieldLabel}>Parámetros de tratamiento</Text>
+            <Text style={styles.fieldValue}>Configurar insulina y objetivos</Text>
+          </View>
+          <ChevronRight size={20} color={theme.colors.textTertiary} />
+        </TouchableOpacity>
       </View>
 
       {/* Soporte y Políticas */}
