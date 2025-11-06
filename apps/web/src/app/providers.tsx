@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import { AuthProvider } from "@/contexts/auth-context";
+import { SearchProvider } from "@/contexts/search-context";
 import { borderRadius, colors } from "@glucosapp/theme";
 
 // Create custom MUI theme with shared colors
@@ -64,7 +65,9 @@ export default function Providers({ children }: { children: ReactNode }) {
     <ThemeProvider theme={muiTheme}>
       <CssBaseline />
       <QueryClientProvider client={client}>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <SearchProvider>{children}</SearchProvider>
+        </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>
   );

@@ -1,0 +1,110 @@
+import { Controller, Get, Post, Delete, Param, Body, UseGuards, Query } from "@nestjs/common";
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
+import { DoctorPatientService } from "./doctor-patient.service";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { AuthUser } from "../auth/decorators/auth-user.decorator";
+import { UserResponseDto } from "../auth/dto/auth-response.dto";
+import { CreateDoctorPatientDto } from "./dto/create-doctor-patient.dto";
+import { DoctorPatientResponseDto } from "./dto/doctor-patient-response.dto";
+import { PatientListItemDto } from "./dto/patient-list-item.dto";
+import { GetPatientsQueryDto } from "./dto/get-patients-query.dto";
+import { SearchPatientsDto } from "./dto/search-patients.dto";
+import { PatientDetailsDto } from "./dto/patient-details.dto";
+
+/**
+ * Controller handling doctor-patient relationships
+ */
+@ApiTags("doctor-patients")
+@Controller({ path: "doctor-patients", version: "1" })
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
+export class DoctorPatientController {
+  constructor(private readonly doctorPatientService: DoctorPatientService) {}
+
+  /**
+   * Get all patients for the authenticated doctor with filters
+   */
+  @Get()
+  @ApiOperation({ summary: "Get all patients for doctor with filters" })
+  @ApiResponse({
+    status: 200,
+    description: "Patients retrieved successfully",
+    type: [PatientListItemDto],
+  })
+  @ApiResponse({ status: 403, description: "Forbidden - Only doctors can access" })
+  async getPatients(
+    @AuthUser() user: UserResponseDto,
+    @Query() query: GetPatientsQueryDto,
+  ): Promise<PatientListItemDto[]> {
+    return this.doctorPatientService.getPatients(user.id, query);
+  }
+
+  /**
+   * Search for patients globally (all patients, not just assigned)
+   * Returns only patients not yet assigned to the doctor
+   */
+  @Get("search")
+  @ApiOperation({ summary: "Search for patients globally (name, last name, or email)" })
+  @ApiResponse({ status: 200, description: "Search results", type: [PatientListItemDto] })
+  @ApiResponse({ status: 403, description: "Forbidden - Only doctors can access" })
+  async searchGlobalPatients(
+    @AuthUser() user: UserResponseDto,
+    @Query() query: SearchPatientsDto,
+  ): Promise<PatientListItemDto[]> {
+    return this.doctorPatientService.searchGlobalPatients(user.id, query);
+  }
+
+  /**
+   * Assign a patient to the authenticated doctor
+   */
+  @Post()
+  @ApiOperation({ summary: "Assign patient to doctor" })
+  @ApiResponse({
+    status: 201,
+    description: "Patient assigned successfully",
+    type: DoctorPatientResponseDto,
+  })
+  @ApiResponse({ status: 403, description: "Forbidden - Only doctors can access" })
+  @ApiResponse({ status: 404, description: "Patient not found" })
+  @ApiResponse({ status: 409, description: "Patient already assigned" })
+  async assignPatient(
+    @AuthUser() user: UserResponseDto,
+    @Body() createDto: CreateDoctorPatientDto,
+  ): Promise<DoctorPatientResponseDto> {
+    return this.doctorPatientService.assignPatient(user.id, createDto);
+  }
+
+  /**
+   * Get detailed information about a specific patient
+   */
+  @Get(":patientId")
+  @ApiOperation({ summary: "Get patient details" })
+  @ApiResponse({
+    status: 200,
+    description: "Patient details retrieved successfully",
+    type: PatientDetailsDto,
+  })
+  @ApiResponse({ status: 403, description: "Forbidden - Patient not assigned to doctor" })
+  @ApiResponse({ status: 404, description: "Patient not found" })
+  async getPatientDetails(
+    @AuthUser() user: UserResponseDto,
+    @Param("patientId") patientId: string,
+  ): Promise<PatientDetailsDto> {
+    return this.doctorPatientService.getPatientDetails(user.id, patientId);
+  }
+
+  /**
+   * Remove a patient from the authenticated doctor
+   */
+  @Delete(":patientId")
+  @ApiOperation({ summary: "Remove patient from doctor" })
+  @ApiResponse({ status: 200, description: "Patient removed successfully" })
+  @ApiResponse({ status: 403, description: "Forbidden - Only doctors can access" })
+  @ApiResponse({ status: 404, description: "Patient relationship not found" })
+  async removePatient(
+    @AuthUser() user: UserResponseDto,
+    @Param("patientId") patientId: string,
+  ): Promise<{ message: string }> {
+    return this.doctorPatientService.removePatient(user.id, patientId);
+  }
+}

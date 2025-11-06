@@ -48,6 +48,7 @@ export class AuthService {
         password: hashedPassword,
         firstName: registerDto.firstName,
         lastName: registerDto.lastName,
+        role: registerDto.role || "PATIENT", // Default to PATIENT if not specified (web sends DOCTOR)
         verificationToken,
         verificationTokenExpiry,
       },
