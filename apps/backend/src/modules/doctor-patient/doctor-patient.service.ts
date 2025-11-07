@@ -177,7 +177,7 @@ export class DoctorPatientService {
       }
 
       // Calculate status
-      const status = this.calculatePatientStatus(patient.id, lastGlucoseReading);
+      const status = await this.calculatePatientStatus(patient.id, lastGlucoseReading);
 
       result.push({
         id: patient.id,
@@ -525,5 +525,111 @@ export class DoctorPatientService {
     });
 
     return { message: "Patient removed successfully" };
+  }
+
+  /**
+   * Get meals for a specific patient with optional date range
+   */
+  async getPatientMeals(doctorId: string, patientId: string, startDate?: string, endDate?: string) {
+    await this.doctorUtils.verifyDoctor(doctorId);
+
+    // Verify patient is assigned to doctor
+    const assignedPatientIds = await this.doctorUtils.getDoctorPatientIds(doctorId);
+    if (!assignedPatientIds.includes(patientId)) {
+      throw new ForbiddenException("Patient is not assigned to this doctor");
+    }
+
+    const whereClause: any = {
+      userId: patientId,
+      OR: [
+        { mealTemplateId: { not: null } }, // Entries with meal templates
+        { carbohydrates: { not: null, gt: 0 } }, // Entries with carbohydrates recorded
+      ],
+    };
+
+    // Add date range filtering if provided
+    if (startDate || endDate) {
+      whereClause.recordedAt = {};
+      if (startDate) {
+        whereClause.recordedAt.gte = new Date(startDate);
+      }
+      if (endDate) {
+        whereClause.recordedAt.lte = new Date(endDate);
+      }
+    }
+
+    const logEntries = await this.prisma.logEntry.findMany({
+      where: whereClause,
+      include: {
+        mealTemplate: {
+          include: {
+            foodItems: true,
+          },
+        },
+      },
+      orderBy: {
+        recordedAt: "desc",
+      },
+    });
+
+    return logEntries;
+  }
+
+  /**
+   * Get patient profile/parameters
+   */
+  async getPatientProfile(doctorId: string, patientId: string) {
+    await this.doctorUtils.verifyDoctor(doctorId);
+
+    // Verify patient is assigned to doctor
+    const assignedPatientIds = await this.doctorUtils.getDoctorPatientIds(doctorId);
+    if (!assignedPatientIds.includes(patientId)) {
+      throw new ForbiddenException("Patient is not assigned to this doctor");
+    }
+
+    const patient = await this.prisma.user.findUnique({
+      where: { id: patientId, role: UserRole.PATIENT },
+      select: {
+        id: true,
+        email: true,
+        icRatioBreakfast: true,
+        icRatioLunch: true,
+        icRatioDinner: true,
+        insulinSensitivityFactor: true,
+        diaHours: true,
+        targetGlucose: true,
+        minTargetGlucose: true,
+        maxTargetGlucose: true,
+        mealTimeBreakfastStart: true,
+        mealTimeBreakfastEnd: true,
+        mealTimeLunchStart: true,
+        mealTimeLunchEnd: true,
+        mealTimeDinnerStart: true,
+        mealTimeDinnerEnd: true,
+      },
+    });
+
+    if (!patient) {
+      throw new NotFoundException("Patient not found");
+    }
+
+    return {
+      id: patient.id,
+      email: patient.email,
+      icRatioBreakfast: patient.icRatioBreakfast,
+      icRatioLunch: patient.icRatioLunch,
+      icRatioDinner: patient.icRatioDinner,
+      insulinSensitivityFactor: patient.insulinSensitivityFactor,
+      diaHours: patient.diaHours,
+      targetGlucose: patient.targetGlucose || undefined,
+      minTargetGlucose: patient.minTargetGlucose,
+      maxTargetGlucose: patient.maxTargetGlucose,
+      mealTimeBreakfastStart: patient.mealTimeBreakfastStart || undefined,
+      mealTimeBreakfastEnd: patient.mealTimeBreakfastEnd || undefined,
+      mealTimeLunchStart: patient.mealTimeLunchStart || undefined,
+      mealTimeLunchEnd: patient.mealTimeLunchEnd || undefined,
+      mealTimeDinnerStart: patient.mealTimeDinnerStart || undefined,
+      mealTimeDinnerEnd: patient.mealTimeDinnerEnd || undefined,
+    };
   }
 }

@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, ForbiddenException } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { DoctorUtilsService } from "../../common/services/doctor-utils.service";
 import { EncryptionService } from "../../common/services/encryption.service";
@@ -6,6 +6,14 @@ import { DashboardSummaryDto } from "./dto/dashboard-summary.dto";
 import { GlucoseEvolutionDto, GlucoseEvolutionPointDto } from "./dto/glucose-evolution.dto";
 import { InsulinStatsDto } from "./dto/insulin-stats.dto";
 import { MealStatsDto } from "./dto/meal-stats.dto";
+import {
+  PatientGlucoseEvolutionDto,
+  PatientGlucoseEvolutionPointDto,
+} from "./dto/patient-glucose-evolution.dto";
+import {
+  PatientInsulinStatsDto,
+  PatientInsulinStatsPointDto,
+} from "./dto/patient-insulin-stats.dto";
 
 @Injectable()
 export class DashboardService {
@@ -283,5 +291,221 @@ export class DashboardService {
       unit: "comidas",
       description: `Sus pacientes registraron ${totalMeals} comidas ${periodText}.`,
     };
+  }
+
+  /**
+   * Get glucose evolution data for a specific patient (aggregated by month)
+   * Shows monthly average, min, max for the last N months
+   */
+  async getPatientGlucoseEvolution(
+    doctorId: string,
+    patientId: string,
+    months: number = 12,
+  ): Promise<PatientGlucoseEvolutionDto> {
+    await this.doctorUtils.verifyDoctor(doctorId);
+
+    // Verify patient is assigned to doctor
+    const assignedPatientIds = await this.doctorUtils.getDoctorPatientIds(doctorId);
+    if (!assignedPatientIds.includes(patientId)) {
+      throw new ForbiddenException("Patient is not assigned to this doctor");
+    }
+
+    // Calculate date range - get all available data, not limited to months parameter
+    // This ensures we show all data even if patient has less than requested months
+    const endDate = new Date();
+    endDate.setHours(23, 59, 59, 999);
+    // Don't limit start date - get all available data
+    // We'll limit to last N months only if there's too much data
+
+    // Get all glucose entries from patient
+    const glucoseEntries = await this.prisma.glucoseEntry.findMany({
+      where: {
+        userId: patientId,
+        recordedAt: { lte: endDate },
+      },
+      select: {
+        mgdl: true,
+        recordedAt: true,
+      },
+      orderBy: {
+        recordedAt: "asc",
+      },
+    });
+
+    // Get all glucose readings (encrypted) from patient
+    const glucoseReadings = await this.prisma.glucoseReading.findMany({
+      where: {
+        userId: patientId,
+        recordedAt: { lte: endDate },
+      },
+      select: {
+        glucoseEncrypted: true,
+        recordedAt: true,
+      },
+      orderBy: {
+        recordedAt: "asc",
+      },
+    });
+
+    // Decrypt glucose readings and combine with entries
+    const allReadings: { value: number; recordedAt: Date }[] = [
+      ...glucoseEntries.map((entry) => ({
+        value: entry.mgdl,
+        recordedAt: entry.recordedAt,
+      })),
+      ...glucoseReadings
+        .map((reading) => {
+          try {
+            const glucoseValue = this.encryptionService.decryptGlucoseValue(
+              reading.glucoseEncrypted,
+            );
+            return {
+              value: glucoseValue,
+              recordedAt: reading.recordedAt,
+            };
+          } catch (error) {
+            console.error("[Dashboard] Failed to decrypt glucose reading:", error);
+            return null;
+          }
+        })
+        .filter((reading): reading is { value: number; recordedAt: Date } => reading !== null),
+    ];
+
+    // Group by month (YYYY-MM format)
+    const groupedByMonth = new Map<string, number[]>();
+
+    allReadings.forEach((reading) => {
+      const monthKey = `${reading.recordedAt.getFullYear()}-${String(reading.recordedAt.getMonth() + 1).padStart(2, "0")}`;
+      if (!groupedByMonth.has(monthKey)) {
+        groupedByMonth.set(monthKey, []);
+      }
+      groupedByMonth.get(monthKey)!.push(reading.value);
+    });
+
+    // Generate data points for the last N months (always show all months, even if no data)
+    const data: PatientGlucoseEvolutionPointDto[] = [];
+    const today = new Date();
+
+    // Generate all months from (today - months) to today
+    for (let i = months - 1; i >= 0; i--) {
+      const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+
+      const values = groupedByMonth.get(monthKey) || [];
+      if (values.length > 0) {
+        // Calculate average, min, max for the month (even if partial)
+        data.push({
+          month: monthKey,
+          averageGlucose: Math.round(values.reduce((a, b) => a + b, 0) / values.length),
+          minGlucose: Math.min(...values),
+          maxGlucose: Math.max(...values),
+        });
+      } else {
+        // Include month even if no data (bar will be at 0)
+        data.push({
+          month: monthKey,
+          averageGlucose: 0,
+          minGlucose: 0,
+          maxGlucose: 0,
+        });
+      }
+    }
+
+    return { data };
+  }
+
+  /**
+   * Get insulin statistics for a specific patient (aggregated by month)
+   * Shows monthly average of basal and bolus doses for the last N months
+   */
+  async getPatientInsulinStats(
+    doctorId: string,
+    patientId: string,
+    months: number = 12,
+  ): Promise<PatientInsulinStatsDto> {
+    await this.doctorUtils.verifyDoctor(doctorId);
+
+    // Verify patient is assigned to doctor
+    const assignedPatientIds = await this.doctorUtils.getDoctorPatientIds(doctorId);
+    if (!assignedPatientIds.includes(patientId)) {
+      throw new ForbiddenException("Patient is not assigned to this doctor");
+    }
+
+    // Calculate date range - get all available data, not limited to months parameter
+    const endDate = new Date();
+    endDate.setHours(23, 59, 59, 999);
+    // Don't limit start date - get all available data
+
+    // Get all insulin doses from patient
+    const doses = await this.prisma.insulinDose.findMany({
+      where: {
+        userId: patientId,
+        recordedAt: { lte: endDate },
+      },
+      select: {
+        units: true,
+        type: true,
+        recordedAt: true,
+      },
+      orderBy: {
+        recordedAt: "asc",
+      },
+    });
+
+    // Group by month and type
+    const groupedByMonth = new Map<string, { basal: number[]; bolus: number[] }>();
+
+    doses.forEach((dose) => {
+      const monthKey = `${dose.recordedAt.getFullYear()}-${String(dose.recordedAt.getMonth() + 1).padStart(2, "0")}`;
+      if (!groupedByMonth.has(monthKey)) {
+        groupedByMonth.set(monthKey, { basal: [], bolus: [] });
+      }
+      const monthData = groupedByMonth.get(monthKey)!;
+      if (dose.type === "BASAL") {
+        monthData.basal.push(dose.units);
+      } else if (dose.type === "BOLUS") {
+        monthData.bolus.push(dose.units);
+      }
+    });
+
+    // Generate data points only for months with actual data
+    // This allows showing partial months (e.g., if user registered recently)
+    const data: PatientInsulinStatsPointDto[] = [];
+
+    // Sort months chronologically
+    const sortedMonths = Array.from(groupedByMonth.keys()).sort();
+
+    // Limit to last N months if we have more data than requested
+    const monthsToShow = Math.min(months, sortedMonths.length);
+    const recentMonths = sortedMonths.slice(-monthsToShow);
+
+    for (const monthKey of recentMonths) {
+      const monthData = groupedByMonth.get(monthKey) || { basal: [], bolus: [] };
+
+      // Only include month if it has at least some data (basal or bolus)
+      if (monthData.basal.length > 0 || monthData.bolus.length > 0) {
+        const averageBasal =
+          monthData.basal.length > 0
+            ? Math.round(
+                (monthData.basal.reduce((a, b) => a + b, 0) / monthData.basal.length) * 10,
+              ) / 10
+            : 0;
+
+        const averageBolus =
+          monthData.bolus.length > 0
+            ? Math.round(
+                (monthData.bolus.reduce((a, b) => a + b, 0) / monthData.bolus.length) * 10,
+              ) / 10
+            : 0;
+
+        data.push({
+          month: monthKey,
+          averageBasal,
+          averageBolus,
+        });
+      }
+    }
+
+    return { data };
   }
 }

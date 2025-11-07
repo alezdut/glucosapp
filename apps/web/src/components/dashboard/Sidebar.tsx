@@ -22,7 +22,7 @@ export const Sidebar = () => {
 
   return (
     <div className="fixed left-0 top-0 h-full w-64 bg-white border-r border-gray-200 flex flex-col">
-      <div className="p-6 border-b border-gray-200">
+      <div className="h-16 p-6 border-b border-gray-200 flex items-center">
         <div className="flex items-center gap-2">
           <Stethoscope className="w-6 h-6 text-blue-500" />
           <h1 className="text-xl font-bold text-gray-900">GlucosApp</h1>

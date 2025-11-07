@@ -31,18 +31,11 @@ export const PatientFilters = ({ filters, onFiltersChange, onAddPatient }: Patie
     });
   };
 
-  const handleRegistrationDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onFiltersChange({
-      ...filters,
-      registrationDate: e.target.value || undefined,
-    });
-  };
-
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Search input */}
-        <div className="relative">
+      <div className="flex items-center gap-4">
+        {/* Search input - 1/3 del espacio */}
+        <div className="relative flex-[3]">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
@@ -53,45 +46,47 @@ export const PatientFilters = ({ filters, onFiltersChange, onAddPatient }: Patie
           />
         </div>
 
-        {/* Diabetes type dropdown */}
+        {/* Diabetes type dropdown - 2/9 del espacio */}
         <select
           value={filters.diabetesType || ""}
           onChange={handleDiabetesTypeChange}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+          className="flex-[2] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
         >
           <option value="">Todos los tipos</option>
           <option value="TYPE_1">Tipo 1</option>
           <option value="TYPE_2">Tipo 2</option>
         </select>
 
-        {/* Registration date */}
-        <input
-          type="date"
-          value={filters.registrationDate || ""}
-          onChange={handleRegistrationDateChange}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        />
-
-        {/* Active only toggle and Add Patient button */}
-        <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={filters.activeOnly || false}
-              onChange={handleActiveOnlyChange}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <span className="text-sm text-gray-700">Solo control activo</span>
-          </label>
-
-          <button
-            onClick={onAddPatient}
-            className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
+        {/* Active only toggle - 2/9 del espacio */}
+        <label className="flex-[2] flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={filters.activeOnly || false}
+            onChange={handleActiveOnlyChange}
+            className="sr-only"
+          />
+          <div
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              filters.activeOnly ? "bg-blue-600" : "bg-gray-300"
+            }`}
           >
-            <UserPlus className="w-4 h-4" />
-            Añadir Paciente
-          </button>
-        </div>
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                filters.activeOnly ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </div>
+          <span className="text-sm text-gray-700">Solo control activo</span>
+        </label>
+
+        {/* Add Patient button - 2/9 del espacio */}
+        <button
+          onClick={onAddPatient}
+          className="flex-[2] px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center gap-2"
+        >
+          <UserPlus className="w-4 h-4" />
+          Añadir Paciente
+        </button>
       </div>
     </div>
   );

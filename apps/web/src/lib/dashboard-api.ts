@@ -269,3 +269,157 @@ export async function getPatientDetails(
   }
   return response.data!;
 }
+
+export interface PatientGlucoseEvolutionPoint {
+  month: string;
+  averageGlucose: number;
+  minGlucose: number;
+  maxGlucose: number;
+}
+
+export interface PatientGlucoseEvolution {
+  data: PatientGlucoseEvolutionPoint[];
+}
+
+export interface PatientInsulinStatsPoint {
+  month: string;
+  averageBasal: number;
+  averageBolus: number;
+}
+
+export interface PatientInsulinStats {
+  data: PatientInsulinStatsPoint[];
+}
+
+export interface PatientMeal {
+  id: string;
+  recordedAt: string;
+  mealType?: string;
+  carbohydrates?: number;
+  mealTemplate?: {
+    id: string;
+    name: string;
+    carbohydrates: number;
+    foodItems: Array<{
+      id: string;
+      name: string;
+      quantity: number;
+      carbs: number;
+    }>;
+  };
+}
+
+export interface PatientProfile {
+  id: string;
+  email: string;
+  icRatioBreakfast: number;
+  icRatioLunch: number;
+  icRatioDinner: number;
+  insulinSensitivityFactor: number;
+  diaHours: number;
+  targetGlucose?: number;
+  minTargetGlucose: number;
+  maxTargetGlucose: number;
+  mealTimeBreakfastStart?: number;
+  mealTimeBreakfastEnd?: number;
+  mealTimeLunchStart?: number;
+  mealTimeLunchEnd?: number;
+  mealTimeDinnerStart?: number;
+  mealTimeDinnerEnd?: number;
+}
+
+/**
+ * Get patient glucose evolution data for last N months
+ */
+export async function getPatientGlucoseEvolution(
+  accessToken: string,
+  patientId: string,
+  months?: number,
+): Promise<PatientGlucoseEvolution> {
+  const queryParams = months ? `?months=${months}` : "";
+  const response = await client.GET<PatientGlucoseEvolution>(
+    `/dashboard/patients/${patientId}/glucose-evolution${queryParams}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  );
+  if (response.error) {
+    throw new Error(response.error.message || "Failed to fetch patient glucose evolution");
+  }
+  if (!response.data) {
+    throw new Error("No data returned from patient glucose evolution endpoint");
+  }
+  return response.data;
+}
+
+/**
+ * Get patient insulin statistics for last N months
+ */
+export async function getPatientInsulinStats(
+  accessToken: string,
+  patientId: string,
+  months?: number,
+): Promise<PatientInsulinStats> {
+  const queryParams = months ? `?months=${months}` : "";
+  const response = await client.GET<PatientInsulinStats>(
+    `/dashboard/patients/${patientId}/insulin-stats${queryParams}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  );
+  if (response.error) {
+    throw new Error(response.error.message || "Failed to fetch patient insulin stats");
+  }
+  if (!response.data) {
+    throw new Error("No data returned from patient insulin stats endpoint");
+  }
+  return response.data;
+}
+
+/**
+ * Get patient meals with optional date range
+ */
+export async function getPatientMeals(
+  accessToken: string,
+  patientId: string,
+  startDate?: string,
+  endDate?: string,
+): Promise<PatientMeal[]> {
+  const queryParams = new URLSearchParams();
+  if (startDate) queryParams.append("startDate", startDate);
+  if (endDate) queryParams.append("endDate", endDate);
+  const queryString = queryParams.toString();
+  const url = `/doctor-patients/${patientId}/meals${queryString ? `?${queryString}` : ""}`;
+
+  const response = await client.GET<PatientMeal[]>(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  if (response.error) {
+    throw new Error(response.error.message || "Failed to fetch patient meals");
+  }
+  return response.data!;
+}
+
+/**
+ * Get patient profile/parameters
+ */
+export async function getPatientProfile(
+  accessToken: string,
+  patientId: string,
+): Promise<PatientProfile> {
+  const response = await client.GET<PatientProfile>(`/doctor-patients/${patientId}/profile`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  if (response.error) {
+    throw new Error(response.error.message || "Failed to fetch patient profile");
+  }
+  return response.data!;
+}

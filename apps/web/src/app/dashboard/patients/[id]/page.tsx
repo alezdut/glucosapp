@@ -1,19 +1,25 @@
 "use client";
 
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ProtectedRoute } from "@/components/protected-route";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { Header } from "@/components/dashboard/Header";
 import { usePatientDetails } from "@/hooks/usePatients";
 import {
-  ArrowLeft,
-  Loader2,
-  Calendar,
-  Activity,
-  Syringe,
-  UtensilsCrossed,
-  AlertTriangle,
-} from "lucide-react";
+  usePatientGlucoseEvolution,
+  usePatientInsulinStats,
+  usePatientMeals,
+  usePatientProfile,
+} from "@/hooks/usePatientData";
+import type { PatientGlucoseEvolution, PatientInsulinStats } from "@/lib/dashboard-api";
+import { Tabs } from "@/components/dashboard/Tabs";
+import { PatientGlucoseChart } from "@/components/dashboard/PatientGlucoseChart";
+import { PatientInsulinChart } from "@/components/dashboard/PatientInsulinChart";
+import { PatientMealsList } from "@/components/dashboard/PatientMealsList";
+import { PatientParameters } from "@/components/dashboard/PatientParameters";
+import { PatientNotesMessages } from "@/components/dashboard/PatientNotesMessages";
+import { ArrowLeft, Loader2, User, MessageSquare } from "lucide-react";
 
 function formatTimeAgoUtil(dateString: string) {
   const date = new Date(dateString);
@@ -75,6 +81,33 @@ const formatDate = (dateString: string) => {
   });
 };
 
+const formatDateTime = (dateString: string) => {
+  const date = new Date(dateString);
+  return {
+    date: date.toLocaleDateString("es-ES", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }),
+    time: date.toLocaleTimeString("es-ES", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+  };
+};
+
+const calculateAge = (birthDateString?: string): number | null => {
+  if (!birthDateString) return null;
+  const birthDate = new Date(birthDateString);
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+};
+
 /**
  * Patient details page
  */
@@ -82,12 +115,47 @@ export default function PatientDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const patientId = params.id as string;
+  const [activeTab, setActiveTab] = useState("glucose-insulin");
 
   const { data: patient, isLoading, error } = usePatientDetails(patientId);
+  const {
+    data: glucoseEvolution,
+    isLoading: isLoadingGlucose,
+    error: errorGlucose,
+  } = usePatientGlucoseEvolution(patientId, 12);
+  const {
+    data: insulinStats,
+    isLoading: isLoadingInsulin,
+    error: errorInsulin,
+  } = usePatientInsulinStats(patientId, 12);
+  const { data: meals } = usePatientMeals(patientId);
+  const { data: profile } = usePatientProfile(patientId);
+
+  // Extract chart data
+  // glucoseEvolution is the result of useQuery, which has {data?: PatientGlucoseEvolution, ...}
+  // glucoseEvolution.data is PatientGlucoseEvolution which has {data: PatientGlucoseEvolutionPoint[]}
+  const glucoseData = Array.isArray(glucoseEvolution?.data)
+    ? glucoseEvolution.data
+    : (glucoseEvolution?.data as PatientGlucoseEvolution | undefined)?.data || [];
+  const insulinData = Array.isArray(insulinStats?.data)
+    ? insulinStats.data
+    : (insulinStats?.data as PatientInsulinStats | undefined)?.data || [];
 
   const patientName = patient
     ? `${patient.firstName || ""} ${patient.lastName || ""}`.trim() || patient.email
     : "Paciente";
+
+  const age = calculateAge(patient?.birthDate);
+  const lastUpdate = patient?.lastGlucoseReading
+    ? formatDateTime(patient.lastGlucoseReading.recordedAt)
+    : null;
+
+  const tabs = [
+    { id: "glucose-insulin", label: "Glucosa e Insulina" },
+    { id: "meals", label: "Registros de Comidas" },
+    { id: "notes", label: "Notas y Mensajes" },
+    { id: "parameters", label: "Parámetros" },
+  ];
 
   if (isLoading) {
     return (
@@ -137,16 +205,10 @@ export default function PatientDetailsPage() {
         <Header />
 
         <main className="ml-64 mt-16 p-6">
-          {/* Back button */}
-          <button
-            onClick={() => router.push("/dashboard/patients")}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span>Volver a la lista de pacientes</span>
-          </button>
+          {/* Page Title */}
+          <h1 className="text-2xl font-bold text-gray-900 mb-6">Detalle de Paciente</h1>
 
-          {/* Patient Header */}
+          {/* Patient Header Card */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
             <div className="flex items-start gap-6">
               {/* Avatar */}
@@ -177,121 +239,110 @@ export default function PatientDetailsPage() {
               {/* Patient Info */}
               <div className="flex-1">
                 <div className="flex items-center gap-4 mb-2">
-                  <h1 className="text-3xl font-bold text-gray-900">{patientName}</h1>
+                  <h2 className="text-3xl font-bold text-gray-900">{patientName}</h2>
                   <span
-                    className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(
+                    className={`px-3 py-1 rounded text-sm font-medium border ${getStatusColor(
                       patient.status,
                     )}`}
                   >
                     {patient.status}
                   </span>
                 </div>
-                <p className="text-gray-600 mb-4">{patient.email}</p>
+                <p className="text-sm text-gray-600 mb-1">ID Paciente: {patient.id}</p>
+                {lastUpdate && (
+                  <p className="text-sm text-gray-600 mb-4">
+                    Última actualización: {lastUpdate.date}, {lastUpdate.time}
+                  </p>
+                )}
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  {age !== null && (
+                    <div>
+                      <p className="text-sm text-gray-500">Edad</p>
+                      <p className="font-medium text-gray-900">{age} años</p>
+                    </div>
+                  )}
                   <div>
                     <p className="text-sm text-gray-500">Tipo de Diabetes</p>
                     <p className="font-medium text-gray-900">
                       {getDiabetesTypeLabel(patient.diabetesType)}
                     </p>
                   </div>
-                  {patient.birthDate && (
-                    <div>
-                      <p className="text-sm text-gray-500">Fecha de Nacimiento</p>
-                      <p className="font-medium text-gray-900">{formatDate(patient.birthDate)}</p>
-                    </div>
-                  )}
-                  {patient.weight && (
-                    <div>
-                      <p className="text-sm text-gray-500">Peso</p>
-                      <p className="font-medium text-gray-900">{patient.weight} kg</p>
-                    </div>
-                  )}
+                  <div>
+                    <p className="text-sm text-gray-500">Última Visita</p>
+                    <p className="font-medium text-gray-900">
+                      {formatDate(patient.registrationDate)}
+                    </p>
+                  </div>
                 </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col gap-3">
+                <button className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors font-medium flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  Editar Perfil
+                </button>
+                <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4" />
+                  Contactar
+                </button>
               </div>
             </div>
           </div>
 
-          {/* Last Glucose Reading */}
-          {patient.lastGlucoseReading && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Última Lectura de Glucosa
-              </h2>
-              <div className="flex items-center gap-4">
-                <div className="text-4xl font-bold text-blue-600">
-                  {patient.lastGlucoseReading.value}
+          {/* Tabs */}
+          <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+
+          {/* Tab Content */}
+          {activeTab === "glucose-insulin" && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {isLoadingGlucose ? (
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 flex items-center justify-center min-h-[400px]">
+                  <div className="flex flex-col items-center gap-3">
+                    <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                    <span className="text-sm text-gray-600">Cargando datos de glucosa...</span>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-500">mg/dL</p>
-                  <p className="text-sm text-gray-600">
-                    {formatTimeAgoUtil(patient.lastGlucoseReading.recordedAt)}
-                  </p>
+              ) : errorGlucose ? (
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 flex items-center justify-center min-h-[400px]">
+                  <div className="text-center">
+                    <p className="text-sm text-red-600 mb-2">Error al cargar datos de glucosa</p>
+                    <p className="text-xs text-gray-500">
+                      {errorGlucose instanceof Error ? errorGlucose.message : "Error desconocido"}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <PatientGlucoseChart data={glucoseData} />
+              )}
+              {isLoadingInsulin ? (
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 flex items-center justify-center min-h-[400px]">
+                  <div className="flex flex-col items-center gap-3">
+                    <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                    <span className="text-sm text-gray-600">Cargando datos de insulina...</span>
+                  </div>
+                </div>
+              ) : errorInsulin ? (
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 flex items-center justify-center min-h-[400px]">
+                  <div className="text-center">
+                    <p className="text-sm text-red-600 mb-2">Error al cargar datos de insulina</p>
+                    <p className="text-xs text-gray-500">
+                      {errorInsulin instanceof Error ? errorInsulin.message : "Error desconocido"}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <PatientInsulinChart data={insulinData} />
+              )}
             </div>
           )}
 
-          {/* Statistics Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-            {/* Glucose Readings */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center gap-3 mb-2">
-                <Activity className="w-6 h-6 text-blue-600" />
-                <h3 className="text-sm font-medium text-gray-500">Lecturas de Glucosa</h3>
-              </div>
-              <p className="text-3xl font-bold text-gray-900">{patient.totalGlucoseReadings}</p>
-              <p className="text-sm text-gray-500 mt-1">Total registradas</p>
-            </div>
+          {activeTab === "meals" && meals && <PatientMealsList meals={meals} />}
 
-            {/* Insulin Doses */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center gap-3 mb-2">
-                <Syringe className="w-6 h-6 text-purple-600" />
-                <h3 className="text-sm font-medium text-gray-500">Dosis de Insulina</h3>
-              </div>
-              <p className="text-3xl font-bold text-gray-900">{patient.totalInsulinDoses}</p>
-              <p className="text-sm text-gray-500 mt-1">Total registradas</p>
-            </div>
+          {activeTab === "notes" && <PatientNotesMessages />}
 
-            {/* Meals */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center gap-3 mb-2">
-                <UtensilsCrossed className="w-6 h-6 text-green-600" />
-                <h3 className="text-sm font-medium text-gray-500">Comidas</h3>
-              </div>
-              <p className="text-3xl font-bold text-gray-900">{patient.totalMeals}</p>
-              <p className="text-sm text-gray-500 mt-1">Total registradas</p>
-            </div>
-
-            {/* Alerts */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center gap-3 mb-2">
-                <AlertTriangle className="w-6 h-6 text-red-600" />
-                <h3 className="text-sm font-medium text-gray-500">Alertas</h3>
-              </div>
-              <div className="flex items-baseline gap-2">
-                <p className="text-3xl font-bold text-gray-900">{patient.totalAlerts}</p>
-                {patient.unacknowledgedAlerts > 0 && (
-                  <span className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-medium">
-                    {patient.unacknowledgedAlerts} sin revisar
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-gray-500 mt-1">Total registradas</p>
-            </div>
-          </div>
-
-          {/* Registration Date */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center gap-3">
-              <Calendar className="w-5 h-5 text-gray-400" />
-              <div>
-                <p className="text-sm text-gray-500">Fecha de Registro</p>
-                <p className="font-medium text-gray-900">{formatDate(patient.registrationDate)}</p>
-              </div>
-            </div>
-          </div>
+          {activeTab === "parameters" && profile && <PatientParameters profile={profile} />}
         </main>
       </div>
     </ProtectedRoute>

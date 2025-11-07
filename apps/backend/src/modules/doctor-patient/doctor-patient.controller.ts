@@ -75,6 +75,37 @@ export class DoctorPatientController {
   }
 
   /**
+   * Get meals for a specific patient with optional date range
+   */
+  @Get(":patientId/meals")
+  @ApiOperation({ summary: "Get patient meals with optional date range" })
+  @ApiResponse({ status: 200, description: "Patient meals retrieved successfully" })
+  @ApiResponse({ status: 403, description: "Forbidden - Patient not assigned to doctor" })
+  async getPatientMeals(
+    @AuthUser() user: UserResponseDto,
+    @Param("patientId") patientId: string,
+    @Query("startDate") startDate?: string,
+    @Query("endDate") endDate?: string,
+  ) {
+    return this.doctorPatientService.getPatientMeals(user.id, patientId, startDate, endDate);
+  }
+
+  /**
+   * Get patient profile/parameters
+   */
+  @Get(":patientId/profile")
+  @ApiOperation({ summary: "Get patient profile/parameters" })
+  @ApiResponse({ status: 200, description: "Patient profile retrieved successfully" })
+  @ApiResponse({ status: 403, description: "Forbidden - Patient not assigned to doctor" })
+  @ApiResponse({ status: 404, description: "Patient not found" })
+  async getPatientProfile(
+    @AuthUser() user: UserResponseDto,
+    @Param("patientId") patientId: string,
+  ) {
+    return this.doctorPatientService.getPatientProfile(user.id, patientId);
+  }
+
+  /**
    * Get detailed information about a specific patient
    */
   @Get(":patientId")
