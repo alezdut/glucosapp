@@ -121,7 +121,7 @@ export class DashboardService {
         recordedAt: { gte: fifteenDaysAgo },
       },
       select: {
-        mgdl: true,
+        mgdlEncrypted: true,
         recordedAt: true,
       },
       orderBy: {
@@ -144,14 +144,24 @@ export class DashboardService {
       },
     });
 
-    // Decrypt glucose readings and combine with entries
+    // Decrypt glucose entries and readings
     const allReadings: { value: number; recordedAt: Date }[] = [
-      // Manual entries (already in mg/dL)
-      ...glucoseEntries.map((entry) => ({
-        value: entry.mgdl,
-        recordedAt: entry.recordedAt,
-      })),
-      // Sensor readings (need to decrypt)
+      // Decrypt glucose entries
+      ...glucoseEntries
+        .map((entry) => {
+          try {
+            const glucoseValue = this.encryptionService.decryptGlucoseValue(entry.mgdlEncrypted);
+            return {
+              value: glucoseValue,
+              recordedAt: entry.recordedAt,
+            };
+          } catch (error) {
+            console.error("[Dashboard] Failed to decrypt glucose entry:", error);
+            return null;
+          }
+        })
+        .filter((entry): entry is { value: number; recordedAt: Date } => entry !== null),
+      // Decrypt sensor readings
       ...glucoseReadings
         .map((reading) => {
           try {
@@ -324,7 +334,7 @@ export class DashboardService {
         recordedAt: { lte: endDate },
       },
       select: {
-        mgdl: true,
+        mgdlEncrypted: true,
         recordedAt: true,
       },
       orderBy: {
@@ -347,12 +357,24 @@ export class DashboardService {
       },
     });
 
-    // Decrypt glucose readings and combine with entries
+    // Decrypt glucose entries and readings
     const allReadings: { value: number; recordedAt: Date }[] = [
-      ...glucoseEntries.map((entry) => ({
-        value: entry.mgdl,
-        recordedAt: entry.recordedAt,
-      })),
+      // Decrypt glucose entries
+      ...glucoseEntries
+        .map((entry) => {
+          try {
+            const glucoseValue = this.encryptionService.decryptGlucoseValue(entry.mgdlEncrypted);
+            return {
+              value: glucoseValue,
+              recordedAt: entry.recordedAt,
+            };
+          } catch (error) {
+            console.error("[Dashboard] Failed to decrypt glucose entry:", error);
+            return null;
+          }
+        })
+        .filter((entry): entry is { value: number; recordedAt: Date } => entry !== null),
+      // Decrypt sensor readings
       ...glucoseReadings
         .map((reading) => {
           try {

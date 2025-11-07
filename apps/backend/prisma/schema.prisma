@@ -119,10 +119,10 @@ model User {
   glucoseReadings          GlucoseReading[]
   // Doctor-Patient relationships
   doctorRelations          DoctorPatient[]  @relation("Doctor")
-  patientRelations         DoctorPatient[] @relation("Patient")
+  patientRelations         DoctorPatient[]  @relation("Patient")
   // Appointments
   appointmentsAsDoctor     Appointment[]    @relation("Doctor")
-  appointmentsAsPatient     Appointment[]    @relation("Patient")
+  appointmentsAsPatient    Appointment[]    @relation("Patient")
   // Alerts
   alerts                   Alert[]
 }
@@ -154,13 +154,13 @@ model RefreshToken {
 }
 
 model GlucoseEntry {
-  id         String    @id @default(cuid())
-  mgdl       Int
-  recordedAt DateTime  @default(now())
-  note       String?
-  user       User      @relation(fields: [userId], references: [id])
-  userId     String
-  logEntry   LogEntry?
+  id            String    @id @default(cuid())
+  mgdlEncrypted String
+  recordedAt    DateTime  @default(now())
+  note          String?
+  user          User      @relation(fields: [userId], references: [id])
+  userId        String
+  logEntry      LogEntry?
 }
 
 model InsulinDose {
@@ -260,16 +260,16 @@ model DoctorPatient {
 }
 
 model Appointment {
-  id          String             @id @default(cuid())
+  id          String            @id @default(cuid())
   doctorId    String
   patientId   String
   scheduledAt DateTime
   notes       String?
-  status      AppointmentStatus  @default(SCHEDULED)
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-  doctor      User               @relation("Doctor", fields: [doctorId], references: [id], onDelete: Cascade)
-  patient     User               @relation("Patient", fields: [patientId], references: [id], onDelete: Cascade)
+  status      AppointmentStatus @default(SCHEDULED)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  doctor      User              @relation("Doctor", fields: [doctorId], references: [id], onDelete: Cascade)
+  patient     User              @relation("Patient", fields: [patientId], references: [id], onDelete: Cascade)
 
   @@index([doctorId])
   @@index([patientId])

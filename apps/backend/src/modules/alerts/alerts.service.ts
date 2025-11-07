@@ -2,6 +2,7 @@ import { Injectable, ForbiddenException } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AlertType, AlertSeverity } from "@prisma/client";
 import { DoctorUtilsService } from "../../common/services/doctor-utils.service";
+import { EncryptionService } from "../../common/services/encryption.service";
 import { AlertResponseDto } from "./dto/alert-response.dto";
 
 @Injectable()
@@ -9,6 +10,7 @@ export class AlertsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly doctorUtils: DoctorUtilsService,
+    private readonly encryptionService: EncryptionService,
   ) {}
 
   /**
@@ -36,13 +38,28 @@ export class AlertsService {
     else if (glucoseMgdl > 250) {
       // Check for persistent hyperglycemia (need to check last 4 hours)
       const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
-      const recentHighReadings = await this.prisma.glucoseEntry.count({
+      const recentEntries = await this.prisma.glucoseEntry.findMany({
         where: {
           userId,
           recordedAt: { gte: fourHoursAgo },
-          mgdl: { gt: 250 },
+        },
+        select: {
+          mgdlEncrypted: true,
         },
       });
+
+      // Decrypt and count high readings
+      let recentHighReadings = 0;
+      for (const entry of recentEntries) {
+        try {
+          const decryptedValue = this.encryptionService.decryptGlucoseValue(entry.mgdlEncrypted);
+          if (decryptedValue > 250) {
+            recentHighReadings++;
+          }
+        } catch (error) {
+          console.error("[Alerts] Failed to decrypt glucose entry:", error);
+        }
+      }
 
       if (recentHighReadings >= 2) {
         // Persistent hyperglycemia

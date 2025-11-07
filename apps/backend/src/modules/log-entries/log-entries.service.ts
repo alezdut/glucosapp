@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+import { EncryptionService } from "../../common/services/encryption.service";
 import { CreateLogEntryDto } from "./dto/create-log-entry.dto";
 
 /**
@@ -8,7 +9,10 @@ import { CreateLogEntryDto } from "./dto/create-log-entry.dto";
  */
 @Injectable()
 export class LogEntriesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly encryptionService: EncryptionService,
+  ) {}
 
   /**
    * Find all log entries for a user with optional date range filtering
@@ -45,7 +49,33 @@ export class LogEntriesService {
       },
     });
 
-    return results;
+    // Decrypt glucose values in the results
+    const decryptedResults = results.map((entry) => {
+      if (entry.glucoseEntry) {
+        try {
+          const decryptedMgdl = this.encryptionService.decryptGlucoseValue(
+            entry.glucoseEntry.mgdlEncrypted,
+          );
+          return {
+            ...entry,
+            glucoseEntry: {
+              ...entry.glucoseEntry,
+              mgdl: decryptedMgdl, // Add decrypted value for client compatibility
+            } as any,
+          };
+        } catch (error) {
+          console.error(
+            `[LogEntries] Failed to decrypt glucose entry ${entry.glucoseEntry.id}:`,
+            error,
+          );
+          // Return entry without decrypted value if decryption fails
+          return entry;
+        }
+      }
+      return entry;
+    });
+
+    return decryptedResults;
   }
 
   /**
@@ -55,11 +85,12 @@ export class LogEntriesService {
     const recordedAt = data.recordedAt ? new Date(data.recordedAt) : new Date();
 
     return this.prisma.$transaction(async (tx) => {
-      // Create glucose entry
+      // Create glucose entry with encryption
+      const mgdlEncrypted = this.encryptionService.encryptGlucoseValue(data.glucoseMgdl);
       const glucoseEntry = await tx.glucoseEntry.create({
         data: {
           userId,
-          mgdl: data.glucoseMgdl,
+          mgdlEncrypted,
           recordedAt,
         },
       });

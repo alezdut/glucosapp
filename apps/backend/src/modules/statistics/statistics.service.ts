@@ -30,7 +30,7 @@ export class StatisticsService {
         },
       },
       select: {
-        mgdl: true,
+        mgdlEncrypted: true,
       },
     });
 
@@ -47,11 +47,20 @@ export class StatisticsService {
       },
     });
 
-    // Decrypt sensor readings and collect all glucose values
+    // Decrypt glucose entries and sensor readings to collect all glucose values
     const allGlucoseValues: number[] = [
-      // Manual entries (already in mg/dL)
-      ...glucoseEntries.map((entry) => entry.mgdl),
-      // Sensor readings (need to decrypt)
+      // Decrypt glucose entries
+      ...glucoseEntries
+        .map((entry) => {
+          try {
+            return this.encryptionService.decryptGlucoseValue(entry.mgdlEncrypted);
+          } catch (error) {
+            console.error("[Statistics] Failed to decrypt glucose entry:", error);
+            return null;
+          }
+        })
+        .filter((value): value is number => value !== null),
+      // Decrypt sensor readings
       ...sensorReadings
         .map((reading) => {
           try {

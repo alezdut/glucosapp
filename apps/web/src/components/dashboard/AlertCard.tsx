@@ -5,6 +5,7 @@ import { acknowledgeAlert } from "@/lib/dashboard-api";
 import { useAuth } from "@/contexts/auth-context";
 import { useState } from "react";
 import { AlertTriangle } from "lucide-react";
+import { formatTimeAgo } from "@/utils/date-utils";
 
 interface AlertCardProps {
   alert: Alert;
@@ -35,20 +36,6 @@ const getSeverityIconColor = (severity: string) => {
     default:
       return "text-gray-600";
   }
-};
-
-const formatTimeAgo = (dateString: string) => {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-
-  if (diffMins < 1) return "Hace un momento";
-  if (diffMins < 60) return `Hace ${diffMins} min`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `Hace ${diffHours} h`;
-  const diffDays = Math.floor(diffHours / 24);
-  return `Hace ${diffDays} días`;
 };
 
 export const AlertCard = ({ alert, onAcknowledge }: AlertCardProps) => {

@@ -140,16 +140,26 @@ export class DoctorPatientService {
       const lastGlucoseEntry = await this.prisma.glucoseEntry.findFirst({
         where: { userId: patient.id },
         orderBy: { recordedAt: "desc" },
-        select: { mgdl: true, recordedAt: true },
+        select: { mgdlEncrypted: true, recordedAt: true },
       });
 
       let lastGlucoseReading: { value: number; recordedAt: Date } | null = null;
 
       if (lastGlucoseEntry) {
-        lastGlucoseReading = {
-          value: lastGlucoseEntry.mgdl,
-          recordedAt: lastGlucoseEntry.recordedAt,
-        };
+        try {
+          const decryptedValue = this.encryptionService.decryptGlucoseValue(
+            lastGlucoseEntry.mgdlEncrypted,
+          );
+          lastGlucoseReading = {
+            value: decryptedValue,
+            recordedAt: lastGlucoseEntry.recordedAt,
+          };
+        } catch (error) {
+          console.error(
+            `[DoctorPatient] Failed to decrypt glucose entry for patient ${patient.id}:`,
+            error,
+          );
+        }
       } else {
         // Fallback to GlucoseReading if no GlucoseEntry
         const lastGlucoseReadingRecord = await this.prisma.glucoseReading.findFirst({
@@ -294,7 +304,7 @@ export class DoctorPatientService {
           userId: patientId,
           recordedAt: { gte: fourteenDaysAgo },
         },
-        select: { mgdl: true },
+        select: { mgdlEncrypted: true },
       }),
       this.prisma.glucoseReading.findMany({
         where: {
@@ -304,6 +314,18 @@ export class DoctorPatientService {
         select: { glucoseEncrypted: true },
       }),
     ]);
+
+    // Decrypt glucose entries
+    const decryptedEntries = glucoseEntries
+      .map((entry) => {
+        try {
+          return this.encryptionService.decryptGlucoseValue(entry.mgdlEncrypted);
+        } catch (error) {
+          console.error(`Failed to decrypt glucose entry for patient ${patientId}:`, error);
+          return null;
+        }
+      })
+      .filter((entry) => entry !== null) as number[];
 
     // Decrypt glucose readings
     const decryptedReadings = glucoseReadings
@@ -318,7 +340,7 @@ export class DoctorPatientService {
       .filter((reading) => reading !== null) as number[];
 
     // Combine all glucose values
-    const allGlucoseValues = [...glucoseEntries.map((entry) => entry.mgdl), ...decryptedReadings];
+    const allGlucoseValues = [...decryptedEntries, ...decryptedReadings];
 
     // If no glucose data in last 14 days, assume stable (no evidence of risk)
     if (allGlucoseValues.length === 0) {
@@ -525,16 +547,26 @@ export class DoctorPatientService {
     const lastGlucoseEntry = await this.prisma.glucoseEntry.findFirst({
       where: { userId: patientId },
       orderBy: { recordedAt: "desc" },
-      select: { mgdl: true, recordedAt: true },
+      select: { mgdlEncrypted: true, recordedAt: true },
     });
 
     let lastGlucoseReading: { value: number; recordedAt: Date } | null = null;
 
     if (lastGlucoseEntry) {
-      lastGlucoseReading = {
-        value: lastGlucoseEntry.mgdl,
-        recordedAt: lastGlucoseEntry.recordedAt,
-      };
+      try {
+        const decryptedValue = this.encryptionService.decryptGlucoseValue(
+          lastGlucoseEntry.mgdlEncrypted,
+        );
+        lastGlucoseReading = {
+          value: decryptedValue,
+          recordedAt: lastGlucoseEntry.recordedAt,
+        };
+      } catch (error) {
+        console.error(
+          `[DoctorPatient] Failed to decrypt glucose entry for patient ${patientId}:`,
+          error,
+        );
+      }
     } else {
       const lastGlucoseReadingRecord = await this.prisma.glucoseReading.findFirst({
         where: { userId: patientId },
@@ -739,7 +771,33 @@ export class DoctorPatientService {
       },
     });
 
-    return results;
+    // Decrypt glucose values in the results
+    const decryptedResults = results.map((entry) => {
+      if (entry.glucoseEntry) {
+        try {
+          const decryptedMgdl = this.encryptionService.decryptGlucoseValue(
+            entry.glucoseEntry.mgdlEncrypted,
+          );
+          return {
+            ...entry,
+            glucoseEntry: {
+              ...entry.glucoseEntry,
+              mgdl: decryptedMgdl, // Add decrypted value for client compatibility
+            } as any,
+          };
+        } catch (error) {
+          console.error(
+            `[DoctorPatient] Failed to decrypt glucose entry ${entry.glucoseEntry.id}:`,
+            error,
+          );
+          // Return entry without decrypted value if decryption fails
+          return entry;
+        }
+      }
+      return entry;
+    });
+
+    return decryptedResults;
   }
 
   /**

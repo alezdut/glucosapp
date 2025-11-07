@@ -21,22 +21,7 @@ import { PatientLogs } from "@/components/dashboard/PatientLogs";
 import { PatientParameters } from "@/components/dashboard/PatientParameters";
 import { PatientNotesMessages } from "@/components/dashboard/PatientNotesMessages";
 import { ArrowLeft, Loader2, User, MessageSquare } from "lucide-react";
-
-function formatTimeAgoUtil(dateString: string) {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-
-  if (diffMins < 1) return "Hace un momento";
-  if (diffMins < 60) return `Hace ${diffMins} min`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `Hace ${diffHours} h`;
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 30) return `Hace ${diffDays} días`;
-  const diffMonths = Math.floor(diffDays / 30);
-  return `Hace ${diffMonths} mes${diffMonths > 1 ? "es" : ""}`;
-}
+import { formatTimeAgo } from "@/utils/date-utils";
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -264,8 +249,7 @@ export default function PatientDetailsPage() {
                         {patient.lastGlucoseReading.value} mg/dL
                       </p>
                       <p className="text-xs text-gray-500 mt-1">
-                        {formatDateTime(patient.lastGlucoseReading.recordedAt).date},{" "}
-                        {formatDateTime(patient.lastGlucoseReading.recordedAt).time}
+                        {formatTimeAgo(patient.lastGlucoseReading.recordedAt)}
                       </p>
                     </div>
                   ) : (
