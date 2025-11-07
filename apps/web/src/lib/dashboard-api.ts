@@ -2,6 +2,7 @@ import { makeApiClient } from "@glucosapp/api-client";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
 const { client } = makeApiClient(`${apiBaseUrl}/v1`);
+import type { LogEntry } from "@glucosapp/types";
 
 export interface DashboardSummary {
   activePatients: number;
@@ -155,7 +156,8 @@ export interface PatientListItem {
     value: number;
     recordedAt: string;
   };
-  status: "Riesgo" | "Estable" | "Activo" | "Inactivo";
+  status: "Riesgo" | "Estable";
+  activityStatus: "Activo" | "Inactivo";
   registrationDate: string;
 }
 
@@ -243,7 +245,8 @@ export interface PatientDetails {
     value: number;
     recordedAt: string;
   };
-  status: "Riesgo" | "Estable" | "Activo" | "Inactivo";
+  status: "Riesgo" | "Estable";
+  activityStatus: "Activo" | "Inactivo";
   registrationDate: string;
   totalGlucoseReadings: number;
   totalInsulinDoses: number;
@@ -422,4 +425,30 @@ export async function getPatientProfile(
     throw new Error(response.error.message || "Failed to fetch patient profile");
   }
   return response.data!;
+}
+
+/**
+ * Get patient unified log entries (historial) with optional date range
+ */
+export async function getPatientLogEntries(
+  accessToken: string,
+  patientId: string,
+  startDate?: string,
+  endDate?: string,
+): Promise<LogEntry[]> {
+  const queryParams = new URLSearchParams();
+  if (startDate) queryParams.append("startDate", startDate);
+  if (endDate) queryParams.append("endDate", endDate);
+  const queryString = queryParams.toString();
+  const url = `/doctor-patients/${patientId}/log-entries${queryString ? `?${queryString}` : ""}`;
+
+  const response = await client.GET<LogEntry[]>(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  if (response.error) {
+    throw new Error(response.error.message || "Failed to fetch patient log entries");
+  }
+  return response.data || [];
 }

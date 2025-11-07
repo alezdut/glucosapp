@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { PatientGlucoseEvolutionPoint } from "@/lib/dashboard-api";
+import { Tooltip } from "@mui/material";
 
 interface PatientGlucoseChartProps {
   data: PatientGlucoseEvolutionPoint[];
@@ -62,11 +63,18 @@ export const PatientGlucoseChart = ({ data }: PatientGlucoseChartProps) => {
     return date.toLocaleDateString("es-ES", { month: "short" });
   };
 
+  // Tooltip content generator
+  const getTooltipContent = (point: PatientGlucoseEvolutionPoint) => {
+    const monthName = formatMonth(point.month);
+    const value = point.averageGlucose > 0 ? `${point.averageGlucose} mg/dL` : "Sin datos";
+    return `${monthName}: ${value}`;
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 h-full flex flex-col">
       <h2 className="text-lg font-semibold text-gray-900 mb-2">Niveles de Glucosa</h2>
       <p className="text-sm text-gray-500 mb-4">Promedio mensual (últimos 12 meses)</p>
-      <div ref={containerRef} className="flex-1 w-full">
+      <div ref={containerRef} className="flex-1 w-full relative">
         <svg
           width="100%"
           height={chartHeight}
@@ -153,6 +161,30 @@ export const PatientGlucoseChart = ({ data }: PatientGlucoseChartProps) => {
             );
           })}
         </svg>
+
+        {/* Tooltips positioned over bars */}
+        {data.map((point, index) => {
+          const x = leftPadding + index * (barWidth + barSpacing) + barSpacing / 2;
+          const barY = scaleY(point.averageGlucose);
+          const minBarHeight = 2;
+          const barHeight = point.averageGlucose > 0 ? chartHeight - padding - barY : minBarHeight;
+          const actualBarY = point.averageGlucose > 0 ? barY : chartHeight - padding - minBarHeight;
+
+          return (
+            <Tooltip key={index} title={getTooltipContent(point)} placement="top" arrow>
+              <div
+                style={{
+                  position: "absolute",
+                  left: `${(x / chartWidth) * 100}%`,
+                  top: `${(actualBarY / chartHeight) * 100}%`,
+                  width: `${(barWidth / chartWidth) * 100}%`,
+                  height: `${(barHeight / chartHeight) * 100}%`,
+                  cursor: "pointer",
+                }}
+              />
+            </Tooltip>
+          );
+        })}
       </div>
     </div>
   );

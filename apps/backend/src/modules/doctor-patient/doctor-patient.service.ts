@@ -176,8 +176,11 @@ export class DoctorPatientService {
         }
       }
 
-      // Calculate status
-      const status = await this.calculatePatientStatus(patient.id, lastGlucoseReading);
+      // Calculate clinical status (Riesgo/Estable) and activity status (Activo/Inactivo)
+      const [clinicalStatus, activityStatus] = await Promise.all([
+        this.calculatePatientClinicalStatus(patient.id),
+        this.calculatePatientActivityStatus(patient.id),
+      ]);
 
       result.push({
         id: patient.id,
@@ -192,7 +195,8 @@ export class DoctorPatientService {
               recordedAt: lastGlucoseReading.recordedAt.toISOString(),
             }
           : undefined,
-        status,
+        status: clinicalStatus,
+        activityStatus,
         registrationDate: patient.createdAt.toISOString(),
       });
     }
@@ -254,67 +258,162 @@ export class DoctorPatientService {
       avatarUrl: patient.avatarUrl || undefined,
       diabetesType: patient.diabetesType || undefined,
       lastGlucoseReading: undefined, // Not needed for search results
-      status: "Activo" as const, // Default status for search
+      status: "Estable" as const, // Default clinical status for search
+      activityStatus: "Inactivo" as const, // Default activity status for search
       registrationDate: patient.createdAt.toISOString(),
     }));
   }
 
   /**
-   * Calculate patient status based on last glucose reading and activity
+   * Calculate patient clinical status based on glucose metrics from last 14 days
+   * Risk criteria: severe hypoglycemia events, high variability, low time in range
+   * If no data in 14 days, assumes stable (no evidence of risk)
    */
-  private async calculatePatientStatus(
-    patientId: string,
-    lastGlucoseReading: { value: number; recordedAt: Date } | null,
-  ): Promise<"Riesgo" | "Estable" | "Activo" | "Inactivo"> {
-    // If we have a glucose reading, check for risk/stable
-    if (lastGlucoseReading) {
-      const glucoseValue = lastGlucoseReading.value;
+  private async calculatePatientClinicalStatus(patientId: string): Promise<"Riesgo" | "Estable"> {
+    // Get glucose readings from the last 14 days for risk assessment
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
 
-      // Riesgo: < 70 or > 250 mg/dL
-      if (glucoseValue < 70 || glucoseValue > 250) {
-        return "Riesgo";
-      }
+    // Get patient profile for target range configuration
+    const patientProfile = await this.prisma.user.findUnique({
+      where: { id: patientId },
+      select: {
+        minTargetGlucose: true,
+        maxTargetGlucose: true,
+      },
+    });
 
-      // Estable: between 80-140 mg/dL
-      if (glucoseValue >= 80 && glucoseValue <= 140) {
-        return "Estable";
-      }
+    // Default target range if not configured
+    const minTarget = patientProfile?.minTargetGlucose || 70;
+    const maxTarget = patientProfile?.maxTargetGlucose || 180;
+
+    // Get all glucose readings from the last 14 days
+    const [glucoseEntries, glucoseReadings] = await Promise.all([
+      this.prisma.glucoseEntry.findMany({
+        where: {
+          userId: patientId,
+          recordedAt: { gte: fourteenDaysAgo },
+        },
+        select: { mgdl: true },
+      }),
+      this.prisma.glucoseReading.findMany({
+        where: {
+          userId: patientId,
+          recordedAt: { gte: fourteenDaysAgo },
+        },
+        select: { glucoseEncrypted: true },
+      }),
+    ]);
+
+    // Decrypt glucose readings
+    const decryptedReadings = glucoseReadings
+      .map((reading) => {
+        try {
+          return this.encryptionService.decryptGlucoseValue(reading.glucoseEncrypted);
+        } catch (error) {
+          console.error(`Failed to decrypt glucose reading for patient ${patientId}:`, error);
+          return null;
+        }
+      })
+      .filter((reading) => reading !== null) as number[];
+
+    // Combine all glucose values
+    const allGlucoseValues = [...glucoseEntries.map((entry) => entry.mgdl), ...decryptedReadings];
+
+    // If no glucose data in last 14 days, assume stable (no evidence of risk)
+    if (allGlucoseValues.length === 0) {
+      return "Estable";
     }
 
-    // Check for activity in last 30 days
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // Calculate risk criteria based on last 14 days data
+    const totalReadings = allGlucoseValues.length;
 
-    const [hasGlucoseEntry, hasInsulinDose, hasMeal] = await Promise.all([
+    // 1. Hay al menos un evento con glucosa <54 mg/dL
+    const hasSevereHypoglycemia = allGlucoseValues.some((glucose) => glucose < 54);
+
+    // 2. El porcentaje de lecturas <54 mg/dL es ≥1%
+    const severeHypoCount = allGlucoseValues.filter((glucose) => glucose < 54).length;
+    const severeHypoPercentage = (severeHypoCount / totalReadings) * 100;
+
+    // 3. El porcentaje de lecturas <70 mg/dL es ≥4%
+    const hypoCount = allGlucoseValues.filter((glucose) => glucose < 70).length;
+    const hypoPercentage = (hypoCount / totalReadings) * 100;
+
+    // 4. El coeficiente de variación (CV) es mayor al 36%
+    const mean = allGlucoseValues.reduce((sum, value) => sum + value, 0) / totalReadings;
+    const variance =
+      allGlucoseValues.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) / totalReadings;
+    const standardDeviation = Math.sqrt(variance);
+    const coefficientOfVariation = mean > 0 ? (standardDeviation / mean) * 100 : 0;
+
+    // 5. El porcentaje de lecturas en rango (70–180 mg/dL según configuración) es menor al 50%
+    const inRangeCount = allGlucoseValues.filter(
+      (glucose) => glucose >= minTarget && glucose <= maxTarget,
+    ).length;
+    const inRangePercentage = (inRangeCount / totalReadings) * 100;
+
+    // Check if any risk criteria are met
+    const isAtRisk =
+      hasSevereHypoglycemia ||
+      severeHypoPercentage >= 1 ||
+      hypoPercentage >= 4 ||
+      coefficientOfVariation > 36 ||
+      inRangePercentage < 50;
+
+    if (isAtRisk) {
+      return "Riesgo";
+    }
+
+    // If no risk criteria are met, patient is stable
+    return "Estable";
+  }
+
+  /**
+   * Calculate patient activity status based on activity in last 24 hours
+   */
+  private async calculatePatientActivityStatus(patientId: string): Promise<"Activo" | "Inactivo"> {
+    // Check for activity in last 24 hours
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const [hasGlucoseEntry, hasSensorReading, hasInsulinDose, hasMeal] = await Promise.all([
+      // Manual glucose entries
       this.prisma.glucoseEntry.findFirst({
         where: {
           userId: patientId,
-          recordedAt: { gte: thirtyDaysAgo },
+          recordedAt: { gte: twentyFourHoursAgo },
+        },
+        select: { id: true },
+      }),
+      // Sensor readings (encrypted glucose readings from CGM)
+      this.prisma.glucoseReading.findFirst({
+        where: {
+          userId: patientId,
+          recordedAt: { gte: twentyFourHoursAgo },
         },
         select: { id: true },
       }),
       this.prisma.insulinDose.findFirst({
         where: {
           userId: patientId,
-          recordedAt: { gte: thirtyDaysAgo },
+          recordedAt: { gte: twentyFourHoursAgo },
         },
         select: { id: true },
       }),
       this.prisma.meal.findFirst({
         where: {
           userId: patientId,
-          createdAt: { gte: thirtyDaysAgo },
+          createdAt: { gte: twentyFourHoursAgo },
         },
         select: { id: true },
       }),
     ]);
 
-    // Activo: has activity in last 30 days
-    if (hasGlucoseEntry || hasInsulinDose || hasMeal) {
+    // Activo: has activity in last 24 hours (manual glucose entries, sensor readings, insulin doses, or meals)
+    if (hasGlucoseEntry || hasSensorReading || hasInsulinDose || hasMeal) {
       return "Activo";
     }
 
-    // Inactivo: no activity in last 30 days
+    // Inactivo: no activity in last 24 hours
     return "Inactivo";
   }
 
@@ -461,8 +560,11 @@ export class DoctorPatientService {
       }
     }
 
-    // Calculate status
-    const status = await this.calculatePatientStatus(patientId, lastGlucoseReading);
+    // Calculate clinical status (Riesgo/Estable) and activity status (Activo/Inactivo)
+    const [status, activityStatus] = await Promise.all([
+      this.calculatePatientClinicalStatus(patientId),
+      this.calculatePatientActivityStatus(patientId),
+    ]);
 
     // Get statistics
     const [totalGlucoseReadings, totalInsulinDoses, totalMeals, totalAlerts, unacknowledgedAlerts] =
@@ -490,6 +592,7 @@ export class DoctorPatientService {
           }
         : undefined,
       status,
+      activityStatus,
       registrationDate: patient.createdAt.toISOString(),
       totalGlucoseReadings,
       totalInsulinDoses,
@@ -576,6 +679,70 @@ export class DoctorPatientService {
   }
 
   /**
+   * Get unified log entries (historial) for a specific patient with optional date range
+   * Includes glucoseEntry, insulinDose and mealTemplate with foodItems
+   * Defaults to last 7 days if no date filters are provided
+   */
+  async getPatientLogEntries(
+    doctorId: string,
+    patientId: string,
+    startDate?: string,
+    endDate?: string,
+  ) {
+    await this.doctorUtils.verifyDoctor(doctorId);
+
+    // Verify patient is assigned to doctor
+    const assignedPatientIds = await this.doctorUtils.getDoctorPatientIds(doctorId);
+    if (!assignedPatientIds.includes(patientId)) {
+      throw new ForbiddenException("Patient is not assigned to this doctor");
+    }
+
+    const whereClause: any = {
+      userId: patientId,
+    };
+
+    // Default to last 7 days if no filters provided
+    let start = startDate ? new Date(startDate) : undefined;
+    let end = endDate ? new Date(endDate) : undefined;
+    if (!start && !end) {
+      const now = new Date();
+      const sevenDaysAgo = new Date(now);
+      sevenDaysAgo.setDate(now.getDate() - 7);
+      sevenDaysAgo.setHours(0, 0, 0, 0);
+      start = sevenDaysAgo;
+      end = now;
+    }
+
+    if (start || end) {
+      whereClause.recordedAt = {};
+      if (start) {
+        whereClause.recordedAt.gte = start;
+      }
+      if (end) {
+        whereClause.recordedAt.lte = end;
+      }
+    }
+
+    const results = await this.prisma.logEntry.findMany({
+      where: whereClause,
+      include: {
+        glucoseEntry: true,
+        insulinDose: true,
+        mealTemplate: {
+          include: {
+            foodItems: true,
+          },
+        },
+      },
+      orderBy: {
+        recordedAt: "desc",
+      },
+    });
+
+    return results;
+  }
+
+  /**
    * Get patient profile/parameters
    */
   async getPatientProfile(doctorId: string, patientId: string) {
@@ -631,5 +798,57 @@ export class DoctorPatientService {
       mealTimeDinnerStart: patient.mealTimeDinnerStart || undefined,
       mealTimeDinnerEnd: patient.mealTimeDinnerEnd || undefined,
     };
+  }
+
+  /**
+   * Update patient profile/parameters
+   */
+  async updatePatientProfile(
+    doctorId: string,
+    patientId: string,
+    updateData: any, // Using any for now, will be properly typed with DTO
+  ) {
+    await this.doctorUtils.verifyDoctor(doctorId);
+
+    // Verify patient is assigned to doctor
+    const assignedPatientIds = await this.doctorUtils.getDoctorPatientIds(doctorId);
+    if (!assignedPatientIds.includes(patientId)) {
+      throw new ForbiddenException("Patient is not assigned to this doctor");
+    }
+
+    const patient = await this.prisma.user.findUnique({
+      where: { id: patientId, role: "PATIENT" },
+      select: { id: true },
+    });
+
+    if (!patient) {
+      throw new NotFoundException("Patient not found");
+    }
+
+    // Update patient profile
+    const updatedPatient = await this.prisma.user.update({
+      where: { id: patientId },
+      data: updateData,
+      select: {
+        id: true,
+        email: true,
+        icRatioBreakfast: true,
+        icRatioLunch: true,
+        icRatioDinner: true,
+        insulinSensitivityFactor: true,
+        diaHours: true,
+        targetGlucose: true,
+        minTargetGlucose: true,
+        maxTargetGlucose: true,
+        mealTimeBreakfastStart: true,
+        mealTimeBreakfastEnd: true,
+        mealTimeLunchStart: true,
+        mealTimeLunchEnd: true,
+        mealTimeDinnerStart: true,
+        mealTimeDinnerEnd: true,
+      },
+    });
+
+    return updatedPatient;
   }
 }

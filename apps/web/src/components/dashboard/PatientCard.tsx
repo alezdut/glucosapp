@@ -8,14 +8,10 @@ interface PatientCardProps {
   patient: PatientListItem;
 }
 
-const getStatusColor = (status: PatientListItem["status"]) => {
-  switch (status) {
-    case "Riesgo":
-      return "bg-red-500";
-    case "Estable":
-      return "bg-green-500";
+const getStatusColor = (activityStatus: PatientListItem["activityStatus"]) => {
+  switch (activityStatus) {
     case "Activo":
-      return "bg-blue-500";
+      return "bg-green-500";
     case "Inactivo":
       return "bg-gray-400";
     default:
@@ -29,12 +25,8 @@ const getStatusBadgeColor = (status: PatientListItem["status"]) => {
       return "bg-red-100 text-red-800";
     case "Estable":
       return "bg-green-100 text-green-800";
-    case "Activo":
-      return "bg-blue-100 text-blue-800";
-    case "Inactivo":
-      return "bg-gray-100 text-gray-800";
     default:
-      return "bg-gray-100 text-gray-800";
+      return "bg-green-100 text-green-800";
   }
 };
 
@@ -72,7 +64,7 @@ export const PatientCard = ({ patient }: PatientCardProps) => {
     return null;
   }
 
-  const statusColor = getStatusColor(patient.status);
+  const statusColor = getStatusColor(patient.activityStatus);
   const statusBadgeColor = getStatusBadgeColor(patient.status);
   const patientName = getPatientName(patient);
   const diabetesTypeLabel = getDiabetesTypeLabel(patient.diabetesType);

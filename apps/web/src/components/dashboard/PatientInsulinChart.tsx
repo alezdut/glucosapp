@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { PatientInsulinStatsPoint } from "@/lib/dashboard-api";
+import { Tooltip } from "@mui/material";
 
 interface PatientInsulinChartProps {
   data: PatientInsulinStatsPoint[];
@@ -53,7 +54,7 @@ export const PatientInsulinChart = ({ data }: PatientInsulinChartProps) => {
   // Calculate bar width and spacing
   const availableWidth = chartWidth - leftPadding - padding;
   const barGroupWidth = availableWidth / data.length;
-  const barWidth = barGroupWidth * 0.3; // Each bar is 30% of group width
+  const barWidth = barGroupWidth * 0.25; // Each bar is 25% of group width (total 50% for both bars + 10% spacing = 60% like glucose chart)
   const barSpacing = barGroupWidth * 0.1; // 10% spacing between bars
 
   // Format month for x-axis
@@ -61,6 +62,19 @@ export const PatientInsulinChart = ({ data }: PatientInsulinChartProps) => {
     const [year, month] = monthString.split("-");
     const date = new Date(parseInt(year), parseInt(month) - 1, 1);
     return date.toLocaleDateString("es-ES", { month: "short" });
+  };
+
+  // Tooltip content generator
+  const getBasalTooltipContent = (point: PatientInsulinStatsPoint) => {
+    const monthName = formatMonth(point.month);
+    const value = point.averageBasal > 0 ? `${point.averageBasal} U` : "Sin datos";
+    return `${monthName} - Basal: ${value}`;
+  };
+
+  const getBolusTooltipContent = (point: PatientInsulinStatsPoint) => {
+    const monthName = formatMonth(point.month);
+    const value = point.averageBolus > 0 ? `${point.averageBolus} U` : "Sin datos";
+    return `${monthName} - Bolus: ${value}`;
   };
 
   // Find max value for scaling
@@ -73,7 +87,7 @@ export const PatientInsulinChart = ({ data }: PatientInsulinChartProps) => {
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 h-full flex flex-col">
       <h2 className="text-lg font-semibold text-gray-900 mb-2">Dosis de Insulina</h2>
       <p className="text-sm text-gray-500 mb-4">Dosis promedio mensual</p>
-      <div ref={containerRef} className="flex-1 w-full">
+      <div ref={containerRef} className="flex-1 w-full relative">
         <svg
           width="100%"
           height={chartHeight}
@@ -146,43 +160,103 @@ export const PatientInsulinChart = ({ data }: PatientInsulinChartProps) => {
             const groupX = leftPadding + index * barGroupWidth;
             const centerX = groupX + barGroupWidth / 2;
 
-            // Basal bar (light green)
-            const basalHeight = point.averageBasal > 0 ? scaleY(0) - scaleY(point.averageBasal) : 0;
-            const basalY = scaleY(point.averageBasal);
+            // Minimum bar height for visibility when no data
+            const minBarHeight = 2;
 
-            // Bolus bar (blue)
-            const bolusHeight = point.averageBolus > 0 ? scaleY(0) - scaleY(point.averageBolus) : 0;
-            const bolusY = scaleY(point.averageBolus);
+            // Basal bar (light green or light gray if no data)
+            const basalHeight =
+              point.averageBasal > 0 ? scaleY(0) - scaleY(point.averageBasal) : minBarHeight;
+            const basalY =
+              point.averageBasal > 0 ? scaleY(point.averageBasal) : scaleY(0) - minBarHeight;
+            const basalFill = point.averageBasal > 0 ? "#86efac" : "#e5e7eb";
+
+            // Bolus bar (blue or light gray if no data)
+            const bolusHeight =
+              point.averageBolus > 0 ? scaleY(0) - scaleY(point.averageBolus) : minBarHeight;
+            const bolusY =
+              point.averageBolus > 0 ? scaleY(point.averageBolus) : scaleY(0) - minBarHeight;
+            const bolusFill = point.averageBolus > 0 ? "#3b82f6" : "#e5e7eb";
 
             return (
               <g key={index}>
                 {/* Basal bar */}
-                {point.averageBasal > 0 && (
-                  <rect
-                    x={centerX - barWidth - barSpacing / 2}
-                    y={basalY}
-                    width={barWidth}
-                    height={basalHeight}
-                    fill="#86efac"
-                    rx="2"
-                  />
-                )}
+                <rect
+                  x={centerX - barWidth - barSpacing / 2}
+                  y={basalY}
+                  width={barWidth}
+                  height={basalHeight}
+                  fill={basalFill}
+                  rx="2"
+                />
 
                 {/* Bolus bar */}
-                {point.averageBolus > 0 && (
-                  <rect
-                    x={centerX + barSpacing / 2}
-                    y={bolusY}
-                    width={barWidth}
-                    height={bolusHeight}
-                    fill="#3b82f6"
-                    rx="2"
-                  />
-                )}
+                <rect
+                  x={centerX + barSpacing / 2}
+                  y={bolusY}
+                  width={barWidth}
+                  height={bolusHeight}
+                  fill={bolusFill}
+                  rx="2"
+                />
               </g>
             );
           })}
         </svg>
+
+        {/* Tooltips positioned over bars */}
+        {data.map((point, index) => {
+          const groupX = leftPadding + index * barGroupWidth;
+          const centerX = groupX + barGroupWidth / 2;
+
+          // Minimum bar height for visibility when no data
+          const minBarHeight = 2;
+
+          // Basal bar positioning
+          const basalHeight =
+            point.averageBasal > 0 ? scaleY(0) - scaleY(point.averageBasal) : minBarHeight;
+          const basalY =
+            point.averageBasal > 0 ? scaleY(point.averageBasal) : scaleY(0) - minBarHeight;
+          const basalX = centerX - barWidth - barSpacing / 2;
+
+          // Bolus bar positioning
+          const bolusHeight =
+            point.averageBolus > 0 ? scaleY(0) - scaleY(point.averageBolus) : minBarHeight;
+          const bolusY =
+            point.averageBolus > 0 ? scaleY(point.averageBolus) : scaleY(0) - minBarHeight;
+          const bolusX = centerX + barSpacing / 2;
+
+          return (
+            <div key={index}>
+              {/* Basal bar tooltip */}
+              <Tooltip title={getBasalTooltipContent(point)} placement="top" arrow>
+                <div
+                  style={{
+                    position: "absolute",
+                    left: `${(basalX / chartWidth) * 100}%`,
+                    top: `${(basalY / chartHeight) * 100}%`,
+                    width: `${(barWidth / chartWidth) * 100}%`,
+                    height: `${(basalHeight / chartHeight) * 100}%`,
+                    cursor: "pointer",
+                  }}
+                />
+              </Tooltip>
+
+              {/* Bolus bar tooltip */}
+              <Tooltip title={getBolusTooltipContent(point)} placement="top" arrow>
+                <div
+                  style={{
+                    position: "absolute",
+                    left: `${(bolusX / chartWidth) * 100}%`,
+                    top: `${(bolusY / chartHeight) * 100}%`,
+                    width: `${(barWidth / chartWidth) * 100}%`,
+                    height: `${(bolusHeight / chartHeight) * 100}%`,
+                    cursor: "pointer",
+                  }}
+                />
+              </Tooltip>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

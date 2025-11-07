@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Delete, Param, Body, UseGuards, Query } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  UseGuards,
+  Query,
+} from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
 import { DoctorPatientService } from "./doctor-patient.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -10,6 +20,7 @@ import { PatientListItemDto } from "./dto/patient-list-item.dto";
 import { GetPatientsQueryDto } from "./dto/get-patients-query.dto";
 import { SearchPatientsDto } from "./dto/search-patients.dto";
 import { PatientDetailsDto } from "./dto/patient-details.dto";
+import { UpdatePatientProfileDto } from "./dto/update-patient-profile.dto";
 
 /**
  * Controller handling doctor-patient relationships
@@ -91,6 +102,22 @@ export class DoctorPatientController {
   }
 
   /**
+   * Get unified log entries (historial) for a patient with optional date range
+   */
+  @Get(":patientId/log-entries")
+  @ApiOperation({ summary: "Get patient log entries (historial) with optional date range" })
+  @ApiResponse({ status: 200, description: "Patient log entries retrieved successfully" })
+  @ApiResponse({ status: 403, description: "Forbidden - Patient not assigned to doctor" })
+  async getPatientLogEntries(
+    @AuthUser() user: UserResponseDto,
+    @Param("patientId") patientId: string,
+    @Query("startDate") startDate?: string,
+    @Query("endDate") endDate?: string,
+  ) {
+    return this.doctorPatientService.getPatientLogEntries(user.id, patientId, startDate, endDate);
+  }
+
+  /**
    * Get patient profile/parameters
    */
   @Get(":patientId/profile")
@@ -103,6 +130,23 @@ export class DoctorPatientController {
     @Param("patientId") patientId: string,
   ) {
     return this.doctorPatientService.getPatientProfile(user.id, patientId);
+  }
+
+  /**
+   * Update patient profile/parameters
+   */
+  @Patch(":patientId/profile")
+  @ApiOperation({ summary: "Update patient profile/parameters" })
+  @ApiResponse({ status: 200, description: "Patient profile updated successfully" })
+  @ApiResponse({ status: 403, description: "Forbidden - Patient not assigned to doctor" })
+  @ApiResponse({ status: 404, description: "Patient not found" })
+  @ApiResponse({ status: 400, description: "Invalid input data" })
+  async updatePatientProfile(
+    @AuthUser() user: UserResponseDto,
+    @Param("patientId") patientId: string,
+    @Body() updateData: UpdatePatientProfileDto,
+  ) {
+    return this.doctorPatientService.updatePatientProfile(user.id, patientId, updateData);
   }
 
   /**

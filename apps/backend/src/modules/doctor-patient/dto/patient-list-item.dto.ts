@@ -31,8 +31,11 @@ export class PatientListItemDto {
   @ApiProperty({ type: LastGlucoseReadingDto, required: false })
   lastGlucoseReading?: LastGlucoseReadingDto;
 
-  @ApiProperty({ enum: ["Riesgo", "Estable", "Activo", "Inactivo"] })
-  status!: "Riesgo" | "Estable" | "Activo" | "Inactivo";
+  @ApiProperty({ enum: ["Riesgo", "Estable"] })
+  status!: "Riesgo" | "Estable";
+
+  @ApiProperty({ enum: ["Activo", "Inactivo"] })
+  activityStatus!: "Activo" | "Inactivo";
 
   @ApiProperty()
   registrationDate!: string;

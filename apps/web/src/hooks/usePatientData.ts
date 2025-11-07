@@ -5,11 +5,13 @@ import {
   getPatientInsulinStats,
   getPatientMeals,
   getPatientProfile,
+  getPatientLogEntries,
   PatientGlucoseEvolution,
   PatientInsulinStats,
   PatientMeal,
   PatientProfile,
 } from "@/lib/dashboard-api";
+import type { LogEntry } from "@glucosapp/types";
 
 const getToken = () => {
   if (typeof window !== "undefined") {
@@ -81,6 +83,24 @@ export const usePatientProfile = (patientId: string) => {
       const token = getToken();
       if (!token) throw new Error("Not authenticated");
       return getPatientProfile(token, patientId);
+    },
+    enabled: !!user && !!patientId,
+  });
+};
+
+/**
+ * Hook to fetch patient unified log entries (historial)
+ * Defaults to last 7 days if no range provided
+ */
+export const usePatientLogEntries = (patientId: string, startDate?: string, endDate?: string) => {
+  const { user } = useAuth();
+
+  return useQuery<LogEntry[]>({
+    queryKey: ["patientLogEntries", patientId, startDate, endDate],
+    queryFn: async () => {
+      const token = getToken();
+      if (!token) throw new Error("Not authenticated");
+      return getPatientLogEntries(token, patientId, startDate, endDate);
     },
     enabled: !!user && !!patientId,
   });

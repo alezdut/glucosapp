@@ -17,6 +17,7 @@ import { Tabs } from "@/components/dashboard/Tabs";
 import { PatientGlucoseChart } from "@/components/dashboard/PatientGlucoseChart";
 import { PatientInsulinChart } from "@/components/dashboard/PatientInsulinChart";
 import { PatientMealsList } from "@/components/dashboard/PatientMealsList";
+import { PatientLogs } from "@/components/dashboard/PatientLogs";
 import { PatientParameters } from "@/components/dashboard/PatientParameters";
 import { PatientNotesMessages } from "@/components/dashboard/PatientNotesMessages";
 import { ArrowLeft, Loader2, User, MessageSquare } from "lucide-react";
@@ -52,14 +53,10 @@ const getStatusColor = (status: string) => {
   }
 };
 
-const getStatusDotColor = (status: string) => {
-  switch (status) {
-    case "Riesgo":
-      return "bg-red-500";
-    case "Estable":
-      return "bg-green-500";
+const getActivityDotColor = (activityStatus: string) => {
+  switch (activityStatus) {
     case "Activo":
-      return "bg-blue-500";
+      return "bg-green-500";
     case "Inactivo":
       return "bg-gray-400";
     default:
@@ -146,13 +143,10 @@ export default function PatientDetailsPage() {
     : "Paciente";
 
   const age = calculateAge(patient?.birthDate);
-  const lastUpdate = patient?.lastGlucoseReading
-    ? formatDateTime(patient.lastGlucoseReading.recordedAt)
-    : null;
 
   const tabs = [
     { id: "glucose-insulin", label: "Glucosa e Insulina" },
-    { id: "meals", label: "Registros de Comidas" },
+    { id: "meals", label: "Registros" },
     { id: "notes", label: "Notas y Mensajes" },
     { id: "parameters", label: "Parámetros" },
   ];
@@ -230,8 +224,8 @@ export default function PatientDetailsPage() {
                 )}
                 {/* Status indicator */}
                 <div
-                  className={`absolute bottom-0 right-0 w-6 h-6 ${getStatusDotColor(
-                    patient.status,
+                  className={`absolute bottom-0 right-0 w-6 h-6 ${getActivityDotColor(
+                    patient.activityStatus,
                   )} rounded-full border-4 border-white`}
                 />
               </div>
@@ -249,13 +243,8 @@ export default function PatientDetailsPage() {
                   </span>
                 </div>
                 <p className="text-sm text-gray-600 mb-1">ID Paciente: {patient.id}</p>
-                {lastUpdate && (
-                  <p className="text-sm text-gray-600 mb-4">
-                    Última actualización: {lastUpdate.date}, {lastUpdate.time}
-                  </p>
-                )}
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                   {age !== null && (
                     <div>
                       <p className="text-sm text-gray-500">Edad</p>
@@ -268,8 +257,25 @@ export default function PatientDetailsPage() {
                       {getDiabetesTypeLabel(patient.diabetesType)}
                     </p>
                   </div>
+                  {patient.lastGlucoseReading ? (
+                    <div>
+                      <p className="text-sm text-gray-500">Última Lectura de Glucosa</p>
+                      <p className="font-medium text-gray-900">
+                        {patient.lastGlucoseReading.value} mg/dL
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {formatDateTime(patient.lastGlucoseReading.recordedAt).date},{" "}
+                        {formatDateTime(patient.lastGlucoseReading.recordedAt).time}
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-sm text-gray-500">Última Lectura de Glucosa</p>
+                      <p className="font-medium text-gray-500">Sin registros</p>
+                    </div>
+                  )}
                   <div>
-                    <p className="text-sm text-gray-500">Última Visita</p>
+                    <p className="text-sm text-gray-500">Fecha de Registro</p>
                     <p className="font-medium text-gray-900">
                       {formatDate(patient.registrationDate)}
                     </p>
@@ -338,11 +344,13 @@ export default function PatientDetailsPage() {
             </div>
           )}
 
-          {activeTab === "meals" && meals && <PatientMealsList meals={meals} />}
+          {activeTab === "meals" && <PatientLogs patientId={patientId} />}
 
           {activeTab === "notes" && <PatientNotesMessages />}
 
-          {activeTab === "parameters" && profile && <PatientParameters profile={profile} />}
+          {activeTab === "parameters" && profile && (
+            <PatientParameters profile={profile} patientId={patientId} />
+          )}
         </main>
       </div>
     </ProtectedRoute>

@@ -468,22 +468,19 @@ export class DashboardService {
       }
     });
 
-    // Generate data points only for months with actual data
-    // This allows showing partial months (e.g., if user registered recently)
+    // Generate data points for the last N months (always show all months, even if no data)
     const data: PatientInsulinStatsPointDto[] = [];
+    const today = new Date();
 
-    // Sort months chronologically
-    const sortedMonths = Array.from(groupedByMonth.keys()).sort();
+    // Generate all months from (today - months) to today
+    for (let i = months - 1; i >= 0; i--) {
+      const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 
-    // Limit to last N months if we have more data than requested
-    const monthsToShow = Math.min(months, sortedMonths.length);
-    const recentMonths = sortedMonths.slice(-monthsToShow);
-
-    for (const monthKey of recentMonths) {
       const monthData = groupedByMonth.get(monthKey) || { basal: [], bolus: [] };
 
-      // Only include month if it has at least some data (basal or bolus)
       if (monthData.basal.length > 0 || monthData.bolus.length > 0) {
+        // Calculate averages for months with data
         const averageBasal =
           monthData.basal.length > 0
             ? Math.round(
@@ -502,6 +499,13 @@ export class DashboardService {
           month: monthKey,
           averageBasal,
           averageBolus,
+        });
+      } else {
+        // Include month even if no data (bars will be at 0)
+        data.push({
+          month: monthKey,
+          averageBasal: 0,
+          averageBolus: 0,
         });
       }
     }
