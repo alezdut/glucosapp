@@ -41,13 +41,30 @@ export const PatientInsulinChart = ({ data }: PatientInsulinChartProps) => {
   const padding = 40;
   const leftPadding = 60;
 
-  const minValue = 0;
-  const maxValue = 20;
-  const valueRange = maxValue - minValue;
+  // Find max value for scaling
+  const maxBarValue = Math.max(
+    ...data.map((point) => Math.max(point.averageBasal, point.averageBolus)),
+  );
+  const effectiveMax = maxBarValue > 0 ? Math.ceil(maxBarValue / 5) * 5 : 20;
+  const effectiveMin = 0;
+  const valueRange = effectiveMax - effectiveMin;
+
+  // Guard against zero range
+  if (valueRange === 0) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 h-full flex flex-col">
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">Dosis de Insulina</h2>
+        <p className="text-sm text-gray-500 mb-4">Dosis promedio mensual</p>
+        <div className="flex-1 flex items-center justify-center text-gray-500">
+          No hay datos disponibles
+        </div>
+      </div>
+    );
+  }
 
   const scaleY = (value: number) => {
-    if (value === 0) return chartHeight - padding;
-    const normalized = (value - minValue) / valueRange;
+    if (value === effectiveMin) return chartHeight - padding;
+    const normalized = (value - effectiveMin) / valueRange;
     return chartHeight - padding - normalized * (chartHeight - 2 * padding);
   };
 
@@ -77,11 +94,18 @@ export const PatientInsulinChart = ({ data }: PatientInsulinChartProps) => {
     return `${monthName} - Bolus: ${value}`;
   };
 
-  // Find max value for scaling
-  const maxBarValue = Math.max(
-    ...data.map((point) => Math.max(point.averageBasal, point.averageBolus)),
-  );
-  const effectiveMax = maxBarValue > 0 ? Math.ceil(maxBarValue / 5) * 5 : 20;
+  // Generate Y-axis tick labels based on effectiveMax
+  const generateYTicks = () => {
+    const tickCount = 5;
+    const tickStep = effectiveMax / tickCount;
+    const ticks: number[] = [];
+    for (let i = 0; i <= tickCount; i++) {
+      ticks.push(i * tickStep);
+    }
+    return ticks;
+  };
+
+  const yTicks = generateYTicks();
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 h-full flex flex-col">
@@ -115,7 +139,7 @@ export const PatientInsulinChart = ({ data }: PatientInsulinChartProps) => {
           />
 
           {/* Y-axis labels and reference lines */}
-          {[0, 5, 10, 15, 20].map((value) => {
+          {yTicks.map((value) => {
             const y = scaleY(value);
             return (
               <g key={value}>
@@ -133,7 +157,7 @@ export const PatientInsulinChart = ({ data }: PatientInsulinChartProps) => {
                   textAnchor="end"
                   className="text-xs fill-gray-600"
                 >
-                  {value}
+                  {value % 1 === 0 ? value.toString() : value.toFixed(1)}
                 </text>
               </g>
             );
@@ -165,16 +189,24 @@ export const PatientInsulinChart = ({ data }: PatientInsulinChartProps) => {
 
             // Basal bar (light green or light gray if no data)
             const basalHeight =
-              point.averageBasal > 0 ? scaleY(0) - scaleY(point.averageBasal) : minBarHeight;
+              point.averageBasal > 0
+                ? scaleY(effectiveMin) - scaleY(point.averageBasal)
+                : minBarHeight;
             const basalY =
-              point.averageBasal > 0 ? scaleY(point.averageBasal) : scaleY(0) - minBarHeight;
+              point.averageBasal > 0
+                ? scaleY(point.averageBasal)
+                : scaleY(effectiveMin) - minBarHeight;
             const basalFill = point.averageBasal > 0 ? "#86efac" : "#e5e7eb";
 
             // Bolus bar (blue or light gray if no data)
             const bolusHeight =
-              point.averageBolus > 0 ? scaleY(0) - scaleY(point.averageBolus) : minBarHeight;
+              point.averageBolus > 0
+                ? scaleY(effectiveMin) - scaleY(point.averageBolus)
+                : minBarHeight;
             const bolusY =
-              point.averageBolus > 0 ? scaleY(point.averageBolus) : scaleY(0) - minBarHeight;
+              point.averageBolus > 0
+                ? scaleY(point.averageBolus)
+                : scaleY(effectiveMin) - minBarHeight;
             const bolusFill = point.averageBolus > 0 ? "#3b82f6" : "#e5e7eb";
 
             return (
@@ -213,16 +245,24 @@ export const PatientInsulinChart = ({ data }: PatientInsulinChartProps) => {
 
           // Basal bar positioning
           const basalHeight =
-            point.averageBasal > 0 ? scaleY(0) - scaleY(point.averageBasal) : minBarHeight;
+            point.averageBasal > 0
+              ? scaleY(effectiveMin) - scaleY(point.averageBasal)
+              : minBarHeight;
           const basalY =
-            point.averageBasal > 0 ? scaleY(point.averageBasal) : scaleY(0) - minBarHeight;
+            point.averageBasal > 0
+              ? scaleY(point.averageBasal)
+              : scaleY(effectiveMin) - minBarHeight;
           const basalX = centerX - barWidth - barSpacing / 2;
 
           // Bolus bar positioning
           const bolusHeight =
-            point.averageBolus > 0 ? scaleY(0) - scaleY(point.averageBolus) : minBarHeight;
+            point.averageBolus > 0
+              ? scaleY(effectiveMin) - scaleY(point.averageBolus)
+              : minBarHeight;
           const bolusY =
-            point.averageBolus > 0 ? scaleY(point.averageBolus) : scaleY(0) - minBarHeight;
+            point.averageBolus > 0
+              ? scaleY(point.averageBolus)
+              : scaleY(effectiveMin) - minBarHeight;
           const bolusX = centerX + barSpacing / 2;
 
           return (

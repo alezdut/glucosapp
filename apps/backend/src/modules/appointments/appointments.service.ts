@@ -1,4 +1,5 @@
 import { Injectable, ForbiddenException, NotFoundException } from "@nestjs/common";
+import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { DoctorUtilsService } from "../../common/services/doctor-utils.service";
 import { CreateAppointmentDto } from "./dto/create-appointment.dto";
@@ -18,7 +19,7 @@ export class AppointmentsService {
   async findAll(doctorId: string, includePast: boolean = false): Promise<AppointmentResponseDto[]> {
     await this.doctorUtils.verifyDoctor(doctorId);
 
-    const where: any = { doctorId };
+    let where: Prisma.AppointmentWhereInput = { doctorId };
 
     if (!includePast) {
       where.scheduledAt = { gte: new Date() };

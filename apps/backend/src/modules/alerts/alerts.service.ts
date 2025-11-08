@@ -1,9 +1,14 @@
 import { Injectable, ForbiddenException } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AlertType, AlertSeverity } from "@prisma/client";
+import type { Alert, User } from "@prisma/client";
 import { DoctorUtilsService } from "../../common/services/doctor-utils.service";
 import { EncryptionService } from "../../common/services/encryption.service";
 import { AlertResponseDto } from "./dto/alert-response.dto";
+
+type AlertWithUser = Alert & {
+  user: Pick<User, "id" | "email" | "firstName" | "lastName">;
+};
 
 @Injectable()
 export class AlertsService {
@@ -12,6 +17,29 @@ export class AlertsService {
     private readonly doctorUtils: DoctorUtilsService,
     private readonly encryptionService: EncryptionService,
   ) {}
+
+  /**
+   * Map Alert entity with user to AlertResponseDto
+   */
+  private mapAlertToDto(alert: AlertWithUser): AlertResponseDto {
+    return {
+      id: alert.id,
+      userId: alert.userId,
+      type: alert.type,
+      severity: alert.severity,
+      message: alert.message,
+      glucoseReadingId: alert.glucoseReadingId || undefined,
+      acknowledged: alert.acknowledged,
+      acknowledgedAt: alert.acknowledgedAt?.toISOString(),
+      createdAt: alert.createdAt.toISOString(),
+      patient: {
+        id: alert.user.id,
+        email: alert.user.email,
+        firstName: alert.user.firstName || undefined,
+        lastName: alert.user.lastName || undefined,
+      },
+    };
+  }
 
   /**
    * Detect and create alert for a glucose reading
@@ -119,23 +147,7 @@ export class AlertsService {
       take: limit,
     });
 
-    return alerts.map((alert) => ({
-      id: alert.id,
-      userId: alert.userId,
-      type: alert.type,
-      severity: alert.severity,
-      message: alert.message,
-      glucoseReadingId: alert.glucoseReadingId || undefined,
-      acknowledged: alert.acknowledged,
-      acknowledgedAt: alert.acknowledgedAt?.toISOString(),
-      createdAt: alert.createdAt.toISOString(),
-      patient: {
-        id: alert.user.id,
-        email: alert.user.email,
-        firstName: alert.user.firstName || undefined,
-        lastName: alert.user.lastName || undefined,
-      },
-    }));
+    return alerts.map((alert) => this.mapAlertToDto(alert));
   }
 
   /**
@@ -170,23 +182,7 @@ export class AlertsService {
       },
     });
 
-    return alerts.map((alert) => ({
-      id: alert.id,
-      userId: alert.userId,
-      type: alert.type,
-      severity: alert.severity,
-      message: alert.message,
-      glucoseReadingId: alert.glucoseReadingId || undefined,
-      acknowledged: alert.acknowledged,
-      acknowledgedAt: alert.acknowledgedAt?.toISOString(),
-      createdAt: alert.createdAt.toISOString(),
-      patient: {
-        id: alert.user.id,
-        email: alert.user.email,
-        firstName: alert.user.firstName || undefined,
-        lastName: alert.user.lastName || undefined,
-      },
-    }));
+    return alerts.map((alert) => this.mapAlertToDto(alert));
   }
 
   /**
@@ -223,23 +219,7 @@ export class AlertsService {
       take: limit,
     });
 
-    return alerts.map((alert) => ({
-      id: alert.id,
-      userId: alert.userId,
-      type: alert.type,
-      severity: alert.severity,
-      message: alert.message,
-      glucoseReadingId: alert.glucoseReadingId || undefined,
-      acknowledged: alert.acknowledged,
-      acknowledgedAt: alert.acknowledgedAt?.toISOString(),
-      createdAt: alert.createdAt.toISOString(),
-      patient: {
-        id: alert.user.id,
-        email: alert.user.email,
-        firstName: alert.user.firstName || undefined,
-        lastName: alert.user.lastName || undefined,
-      },
-    }));
+    return alerts.map((alert) => this.mapAlertToDto(alert));
   }
 
   /**
@@ -290,22 +270,6 @@ export class AlertsService {
       },
     });
 
-    return {
-      id: updated.id,
-      userId: updated.userId,
-      type: updated.type,
-      severity: updated.severity,
-      message: updated.message,
-      glucoseReadingId: updated.glucoseReadingId || undefined,
-      acknowledged: updated.acknowledged,
-      acknowledgedAt: updated.acknowledgedAt?.toISOString(),
-      createdAt: updated.createdAt.toISOString(),
-      patient: {
-        id: updated.user.id,
-        email: updated.user.email,
-        firstName: updated.user.firstName || undefined,
-        lastName: updated.user.lastName || undefined,
-      },
-    };
+    return this.mapAlertToDto(updated);
   }
 }

@@ -4,32 +4,12 @@ import { PatientListItem } from "@/lib/dashboard-api";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { formatTimeAgo } from "@/utils/date-utils";
+import { getStatusBadgeColor, getDiabetesTypeLabel } from "@/utils/patient-utils";
+import { PatientAvatar } from "./PatientAvatar";
 
 interface PatientCardProps {
   patient: PatientListItem;
 }
-
-const getStatusColor = (activityStatus: PatientListItem["activityStatus"]) => {
-  switch (activityStatus) {
-    case "Activo":
-      return "bg-green-500";
-    case "Inactivo":
-      return "bg-gray-400";
-    default:
-      return "bg-gray-400";
-  }
-};
-
-const getStatusBadgeColor = (status: PatientListItem["status"]) => {
-  switch (status) {
-    case "Riesgo":
-      return "bg-red-100 text-red-800";
-    case "Estable":
-      return "bg-green-100 text-green-800";
-    default:
-      return "bg-green-100 text-green-800";
-  }
-};
 
 const getPatientName = (patient: PatientListItem) => {
   if (patient.firstName || patient.lastName) {
@@ -38,21 +18,15 @@ const getPatientName = (patient: PatientListItem) => {
   return patient.email;
 };
 
-const getDiabetesTypeLabel = (type?: "TYPE_1" | "TYPE_2") => {
-  if (!type) return null;
-  return type === "TYPE_1" ? "Tipo 1" : "Tipo 2";
-};
-
 export const PatientCard = ({ patient }: PatientCardProps) => {
   // Validate patient data
   if (!patient || !patient.id || typeof patient.id !== "string") {
     return null;
   }
 
-  const statusColor = getStatusColor(patient.activityStatus);
   const statusBadgeColor = getStatusBadgeColor(patient.status);
   const patientName = getPatientName(patient);
-  const diabetesTypeLabel = getDiabetesTypeLabel(patient.diabetesType);
+  const diabetesTypeLabel = getDiabetesTypeLabel(patient.diabetesType, null);
 
   // Ensure diabetesTypeLabel is a string or null
   const displayDiabetesType = typeof diabetesTypeLabel === "string" ? diabetesTypeLabel : null;
@@ -61,27 +35,12 @@ export const PatientCard = ({ patient }: PatientCardProps) => {
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
       <div className="flex items-start gap-4">
         {/* Avatar with status indicator */}
-        <div className="relative flex-shrink-0">
-          {patient.avatarUrl ? (
-            <img
-              src={patient.avatarUrl}
-              alt={patientName}
-              className="w-16 h-16 rounded-full object-cover"
-              loading="lazy"
-              decoding="async"
-            />
-          ) : (
-            <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center">
-              <span className="text-2xl font-semibold text-gray-600">
-                {patientName.charAt(0).toUpperCase()}
-              </span>
-            </div>
-          )}
-          {/* Status indicator dot */}
-          <div
-            className={`absolute bottom-0 right-0 w-4 h-4 ${statusColor} rounded-full border-2 border-white`}
-          />
-        </div>
+        <PatientAvatar
+          avatarUrl={patient.avatarUrl}
+          patientName={patientName}
+          activityStatus={patient.activityStatus}
+          size="sm"
+        />
 
         {/* Patient info */}
         <div className="flex-1 min-w-0">

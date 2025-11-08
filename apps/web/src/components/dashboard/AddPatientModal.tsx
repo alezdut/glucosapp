@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { X, Search, UserPlus, Loader2 } from "lucide-react";
 import { useSearchGlobalPatients, useAssignPatient } from "@/hooks/usePatients";
 import { PatientListItem } from "@/lib/dashboard-api";
+import { getDiabetesTypeLabel } from "@/utils/patient-utils";
 
 interface AddPatientModalProps {
   isOpen: boolean;
@@ -15,11 +16,6 @@ const getPatientName = (patient: PatientListItem) => {
     return `${patient.firstName || ""} ${patient.lastName || ""}`.trim();
   }
   return patient.email;
-};
-
-const getDiabetesTypeLabel = (type?: "TYPE_1" | "TYPE_2") => {
-  if (!type) return null;
-  return type === "TYPE_1" ? "Tipo 1" : "Tipo 2";
 };
 
 export const AddPatientModal = ({ isOpen, onClose }: AddPatientModalProps) => {
@@ -106,7 +102,7 @@ export const AddPatientModal = ({ isOpen, onClose }: AddPatientModalProps) => {
                 .filter((patient) => patient && patient.id && typeof patient.id === "string")
                 .map((patient) => {
                   const patientName = getPatientName(patient);
-                  const diabetesTypeLabel = getDiabetesTypeLabel(patient.diabetesType);
+                  const diabetesTypeLabel = getDiabetesTypeLabel(patient.diabetesType, null);
                   const displayDiabetesType =
                     typeof diabetesTypeLabel === "string" ? diabetesTypeLabel : null;
                   const isAssigning = assignPatientMutation.isPending;

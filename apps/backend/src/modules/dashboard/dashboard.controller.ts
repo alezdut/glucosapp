@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards, Query, Param } from "@nestjs/common";
+import { Controller, Get, UseGuards, Query, Param, ValidationPipe } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
 import { DashboardService } from "./dashboard.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -10,6 +10,9 @@ import { InsulinStatsDto } from "./dto/insulin-stats.dto";
 import { MealStatsDto } from "./dto/meal-stats.dto";
 import { PatientGlucoseEvolutionDto } from "./dto/patient-glucose-evolution.dto";
 import { PatientInsulinStatsDto } from "./dto/patient-insulin-stats.dto";
+import { GetStatsQueryDto } from "./dto/get-stats-query.dto";
+import { GetRecentAlertsQueryDto } from "./dto/get-recent-alerts-query.dto";
+import { GetPatientStatsQueryDto } from "./dto/get-patient-stats-query.dto";
 import { AlertsService } from "../alerts/alerts.service";
 import { AlertResponseDto } from "../alerts/dto/alert-response.dto";
 
@@ -69,10 +72,10 @@ export class DashboardController {
   @ApiResponse({ status: 403, description: "Forbidden - Only doctors can access" })
   async getInsulinStats(
     @AuthUser() user: UserResponseDto,
-    @Query("days") days?: string,
+    @Query(new ValidationPipe({ transform: true, whitelist: true })) query: GetStatsQueryDto,
   ): Promise<InsulinStatsDto> {
-    const daysNumber = days ? parseInt(days, 10) : 30;
-    return this.dashboardService.getInsulinStats(user.id, daysNumber);
+    const days = query.days ?? 30;
+    return this.dashboardService.getInsulinStats(user.id, days);
   }
 
   /**
@@ -88,10 +91,10 @@ export class DashboardController {
   @ApiResponse({ status: 403, description: "Forbidden - Only doctors can access" })
   async getMealStats(
     @AuthUser() user: UserResponseDto,
-    @Query("days") days?: string,
+    @Query(new ValidationPipe({ transform: true, whitelist: true })) query: GetStatsQueryDto,
   ): Promise<MealStatsDto> {
-    const daysNumber = days ? parseInt(days, 10) : 30;
-    return this.dashboardService.getMealStats(user.id, daysNumber);
+    const days = query.days ?? 30;
+    return this.dashboardService.getMealStats(user.id, days);
   }
 
   /**
@@ -107,10 +110,10 @@ export class DashboardController {
   @ApiResponse({ status: 403, description: "Forbidden - Only doctors can access" })
   async getRecentAlerts(
     @AuthUser() user: UserResponseDto,
-    @Query("limit") limit?: string,
+    @Query(new ValidationPipe({ transform: true, whitelist: true })) query: GetRecentAlertsQueryDto,
   ): Promise<AlertResponseDto[]> {
-    const limitNumber = limit ? parseInt(limit, 10) : 10;
-    return this.alertsService.getRecent(user.id, limitNumber);
+    const limit = query.limit ?? 10;
+    return this.alertsService.getRecent(user.id, limit);
   }
 
   /**
@@ -127,10 +130,10 @@ export class DashboardController {
   async getPatientGlucoseEvolution(
     @AuthUser() user: UserResponseDto,
     @Param("patientId") patientId: string,
-    @Query("months") months?: string,
+    @Query(new ValidationPipe({ transform: true, whitelist: true })) query: GetPatientStatsQueryDto,
   ): Promise<PatientGlucoseEvolutionDto> {
-    const monthsNumber = months ? parseInt(months, 10) : 12;
-    return this.dashboardService.getPatientGlucoseEvolution(user.id, patientId, monthsNumber);
+    const months = query.months ?? 12;
+    return this.dashboardService.getPatientGlucoseEvolution(user.id, patientId, months);
   }
 
   /**
@@ -147,9 +150,9 @@ export class DashboardController {
   async getPatientInsulinStats(
     @AuthUser() user: UserResponseDto,
     @Param("patientId") patientId: string,
-    @Query("months") months?: string,
+    @Query(new ValidationPipe({ transform: true, whitelist: true })) query: GetPatientStatsQueryDto,
   ): Promise<PatientInsulinStatsDto> {
-    const monthsNumber = months ? parseInt(months, 10) : 12;
-    return this.dashboardService.getPatientInsulinStats(user.id, patientId, monthsNumber);
+    const months = query.months ?? 12;
+    return this.dashboardService.getPatientInsulinStats(user.id, patientId, months);
   }
 }

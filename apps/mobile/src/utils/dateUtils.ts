@@ -106,9 +106,34 @@ export const minutesToTime = (minutes: number): Date => {
  * @returns Minutes since midnight (0-1439)
  */
 export const timeToMinutes = (date: Date): number => {
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  return (hours - 1) * 60 + minutes;
+  let hours = date.getHours();
+  let minutes = date.getMinutes();
+
+  // Subtract 1 hour to compensate for picker's timezone offset
+  hours = hours - 1;
+  if (hours < 0) {
+    hours = 23;
+  }
+
+  return hours * 60 + minutes;
+};
+
+/**
+ * Calculate age from birth date
+ * @param birthDate - Birth date as Date object, ISO string, or undefined
+ * @returns Age in years, or null if birthDate is not provided
+ */
+export const calculateAge = (birthDate: Date | string | undefined): number | null => {
+  if (!birthDate) return null;
+
+  const birthDateObj = birthDate instanceof Date ? birthDate : new Date(birthDate);
+  const today = new Date();
+  let age = today.getFullYear() - birthDateObj.getFullYear();
+  const monthDiff = today.getMonth() - birthDateObj.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate())) {
+    age--;
+  }
+  return age;
 };
 
 /**

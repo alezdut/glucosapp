@@ -14,6 +14,8 @@ import { PatientListItemDto } from "./dto/patient-list-item.dto";
 import { GetPatientsQueryDto } from "./dto/get-patients-query.dto";
 import { SearchPatientsDto } from "./dto/search-patients.dto";
 import { PatientDetailsDto } from "./dto/patient-details.dto";
+import { PatientProfileDto } from "./dto/patient-profile.dto";
+import type { Prisma } from "@prisma/client";
 
 @Injectable()
 export class DoctorPatientService {
@@ -40,7 +42,7 @@ export class DoctorPatientService {
     }
 
     // Build where clause for patient filtering
-    const where: any = {
+    const where: Prisma.UserWhereInput = {
       id: { in: assignedPatientIds },
       role: UserRole.PATIENT,
     };
@@ -230,7 +232,7 @@ export class DoctorPatientService {
     // Build search query
     const searchTerm = searchDto.q.trim();
 
-    const where: any = {
+    const where: Prisma.UserWhereInput = {
       role: UserRole.PATIENT,
       // Exclude already assigned patients
       ...(assignedPatientIds.length > 0 && { id: { notIn: assignedPatientIds } }),
@@ -665,7 +667,22 @@ export class DoctorPatientService {
   /**
    * Get meals for a specific patient with optional date range
    */
-  async getPatientMeals(doctorId: string, patientId: string, startDate?: string, endDate?: string) {
+  async getPatientMeals(
+    doctorId: string,
+    patientId: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<
+    Prisma.LogEntryGetPayload<{
+      include: {
+        mealTemplate: {
+          include: {
+            foodItems: true;
+          };
+        };
+      };
+    }>[]
+  > {
     await this.doctorUtils.verifyDoctor(doctorId);
 
     // Verify patient is assigned to doctor
@@ -803,7 +820,7 @@ export class DoctorPatientService {
   /**
    * Get patient profile/parameters
    */
-  async getPatientProfile(doctorId: string, patientId: string) {
+  async getPatientProfile(doctorId: string, patientId: string): Promise<PatientProfileDto> {
     await this.doctorUtils.verifyDoctor(doctorId);
 
     // Verify patient is assigned to doctor

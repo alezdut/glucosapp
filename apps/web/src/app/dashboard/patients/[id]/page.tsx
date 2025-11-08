@@ -20,39 +20,10 @@ import { PatientMealsList } from "@/components/dashboard/PatientMealsList";
 import { PatientLogs } from "@/components/dashboard/PatientLogs";
 import { PatientParameters } from "@/components/dashboard/PatientParameters";
 import { PatientNotesMessages } from "@/components/dashboard/PatientNotesMessages";
+import { PatientAvatar } from "@/components/dashboard/PatientAvatar";
 import { ArrowLeft, Loader2, User, MessageSquare } from "lucide-react";
-import { formatTimeAgo } from "@/utils/date-utils";
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case "Riesgo":
-      return "bg-red-100 text-red-800 border-red-200";
-    case "Estable":
-      return "bg-green-100 text-green-800 border-green-200";
-    case "Activo":
-      return "bg-blue-100 text-blue-800 border-blue-200";
-    case "Inactivo":
-      return "bg-gray-100 text-gray-800 border-gray-200";
-    default:
-      return "bg-gray-100 text-gray-800 border-gray-200";
-  }
-};
-
-const getActivityDotColor = (activityStatus: string) => {
-  switch (activityStatus) {
-    case "Activo":
-      return "bg-green-500";
-    case "Inactivo":
-      return "bg-gray-400";
-    default:
-      return "bg-gray-400";
-  }
-};
-
-const getDiabetesTypeLabel = (type?: "TYPE_1" | "TYPE_2") => {
-  if (!type) return "No especificado";
-  return type === "TYPE_1" ? "Tipo 1" : "Tipo 2";
-};
+import { formatTimeAgo, calculateAge } from "@/utils/date-utils";
+import { getStatusColor, getDiabetesTypeLabel } from "@/utils/patient-utils";
 
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
@@ -78,18 +49,6 @@ const formatDateTime = (dateString: string) => {
   };
 };
 
-const calculateAge = (birthDateString?: string): number | null => {
-  if (!birthDateString) return null;
-  const birthDate = new Date(birthDateString);
-  const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const monthDiff = today.getMonth() - birthDate.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
-  }
-  return age;
-};
-
 /**
  * Patient details page
  */
@@ -110,7 +69,6 @@ export default function PatientDetailsPage() {
     isLoading: isLoadingInsulin,
     error: errorInsulin,
   } = usePatientInsulinStats(patientId, 12);
-  const { data: meals } = usePatientMeals(patientId);
   const { data: profile } = usePatientProfile(patientId);
 
   // Extract chart data
@@ -191,38 +149,19 @@ export default function PatientDetailsPage() {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
             <div className="flex items-start gap-6">
               {/* Avatar */}
-              <div className="relative flex-shrink-0">
-                {patient.avatarUrl ? (
-                  <img
-                    src={patient.avatarUrl}
-                    alt={patientName}
-                    className="w-24 h-24 rounded-full object-cover"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                ) : (
-                  <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center">
-                    <span className="text-4xl font-semibold text-gray-600">
-                      {patientName.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                )}
-                {/* Status indicator */}
-                <div
-                  className={`absolute bottom-0 right-0 w-6 h-6 ${getActivityDotColor(
-                    patient.activityStatus,
-                  )} rounded-full border-4 border-white`}
-                />
-              </div>
+              <PatientAvatar
+                avatarUrl={patient.avatarUrl}
+                patientName={patientName}
+                activityStatus={patient.activityStatus}
+                size="lg"
+              />
 
               {/* Patient Info */}
               <div className="flex-1">
                 <div className="flex items-center gap-4 mb-2">
                   <h2 className="text-3xl font-bold text-gray-900">{patientName}</h2>
                   <span
-                    className={`px-3 py-1 rounded text-sm font-medium border ${getStatusColor(
-                      patient.status,
-                    )}`}
+                    className={`${getStatusColor(patient.status)} px-3 py-1 rounded text-sm font-medium`}
                   >
                     {patient.status}
                   </span>

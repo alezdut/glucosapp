@@ -10,6 +10,7 @@ import {
   Query,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
+import type { Prisma } from "@prisma/client";
 import { DoctorPatientService } from "./doctor-patient.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { AuthUser } from "../auth/decorators/auth-user.decorator";
@@ -21,6 +22,17 @@ import { GetPatientsQueryDto } from "./dto/get-patients-query.dto";
 import { SearchPatientsDto } from "./dto/search-patients.dto";
 import { PatientDetailsDto } from "./dto/patient-details.dto";
 import { UpdatePatientProfileDto } from "./dto/update-patient-profile.dto";
+import { PatientProfileDto } from "./dto/patient-profile.dto";
+
+type LogEntryWithMealTemplate = Prisma.LogEntryGetPayload<{
+  include: {
+    mealTemplate: {
+      include: {
+        foodItems: true;
+      };
+    };
+  };
+}>;
 
 /**
  * Controller handling doctor-patient relationships
@@ -97,7 +109,7 @@ export class DoctorPatientController {
     @Param("patientId") patientId: string,
     @Query("startDate") startDate?: string,
     @Query("endDate") endDate?: string,
-  ) {
+  ): Promise<LogEntryWithMealTemplate[]> {
     return this.doctorPatientService.getPatientMeals(user.id, patientId, startDate, endDate);
   }
 
@@ -122,13 +134,17 @@ export class DoctorPatientController {
    */
   @Get(":patientId/profile")
   @ApiOperation({ summary: "Get patient profile/parameters" })
-  @ApiResponse({ status: 200, description: "Patient profile retrieved successfully" })
+  @ApiResponse({
+    status: 200,
+    description: "Patient profile retrieved successfully",
+    type: PatientProfileDto,
+  })
   @ApiResponse({ status: 403, description: "Forbidden - Patient not assigned to doctor" })
   @ApiResponse({ status: 404, description: "Patient not found" })
   async getPatientProfile(
     @AuthUser() user: UserResponseDto,
     @Param("patientId") patientId: string,
-  ) {
+  ): Promise<PatientProfileDto> {
     return this.doctorPatientService.getPatientProfile(user.id, patientId);
   }
 

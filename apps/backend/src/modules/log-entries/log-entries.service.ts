@@ -5,6 +5,27 @@ import { EncryptionService } from "../../common/services/encryption.service";
 import { CreateLogEntryDto } from "./dto/create-log-entry.dto";
 
 /**
+ * Type for LogEntry with decrypted glucose value
+ * Extends Prisma's LogEntry type to include mgdl in glucoseEntry when present
+ */
+type LogEntryWithDecryptedGlucose = Omit<
+  Prisma.LogEntryGetPayload<{
+    include: {
+      glucoseEntry: true;
+      insulinDose: true;
+      mealTemplate: {
+        include: {
+          foodItems: true;
+        };
+      };
+    };
+  }>,
+  "glucoseEntry"
+> & {
+  glucoseEntry: (Prisma.GlucoseEntryGetPayload<{}> & { mgdl: number }) | null;
+};
+
+/**
  * Service handling log entries
  */
 @Injectable()
@@ -16,8 +37,13 @@ export class LogEntriesService {
 
   /**
    * Find all log entries for a user with optional date range filtering
+   * @returns Array of log entries with decrypted glucose values
    */
-  async findAll(userId: string, startDate?: string, endDate?: string) {
+  async findAll(
+    userId: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<LogEntryWithDecryptedGlucose[]> {
     const whereClause: Prisma.LogEntryWhereInput = {
       userId,
     };
@@ -50,7 +76,7 @@ export class LogEntriesService {
     });
 
     // Decrypt glucose values in the results
-    const decryptedResults = results.map((entry) => {
+    const decryptedResults: LogEntryWithDecryptedGlucose[] = results.map((entry) => {
       if (entry.glucoseEntry) {
         try {
           const decryptedMgdl = this.encryptionService.decryptGlucoseValue(
@@ -61,18 +87,18 @@ export class LogEntriesService {
             glucoseEntry: {
               ...entry.glucoseEntry,
               mgdl: decryptedMgdl, // Add decrypted value for client compatibility
-            } as any,
-          };
+            },
+          } as LogEntryWithDecryptedGlucose;
         } catch (error) {
           console.error(
             `[LogEntries] Failed to decrypt glucose entry ${entry.glucoseEntry.id}:`,
             error,
           );
           // Return entry without decrypted value if decryption fails
-          return entry;
+          return entry as LogEntryWithDecryptedGlucose;
         }
       }
-      return entry;
+      return entry as LogEntryWithDecryptedGlucose;
     });
 
     return decryptedResults;
