@@ -22,8 +22,8 @@ import { PatientParameters } from "@/components/dashboard/PatientParameters";
 import { PatientNotesMessages } from "@/components/dashboard/PatientNotesMessages";
 import { PatientAvatar } from "@/components/dashboard/PatientAvatar";
 import { ArrowLeft, Loader2, User, MessageSquare } from "lucide-react";
-import { formatTimeAgo, calculateAge } from "@/utils/date-utils";
-import { getStatusColor, getDiabetesTypeLabel } from "@/utils/patient-utils";
+import { calculateAge, formatTimeAgo, getDiabetesTypeLabel } from "@glucosapp/utils";
+import { getStatusColor } from "@/utils/patient-utils";
 
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);

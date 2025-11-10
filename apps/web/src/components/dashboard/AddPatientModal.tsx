@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { X, Search, UserPlus, Loader2 } from "lucide-react";
+import { Snackbar, Alert } from "@mui/material";
 import { useSearchGlobalPatients, useAssignPatient } from "@/hooks/usePatients";
 import { PatientListItem } from "@/lib/dashboard-api";
-import { getDiabetesTypeLabel } from "@/utils/patient-utils";
+import { getDiabetesTypeLabel } from "@glucosapp/utils";
 
 interface AddPatientModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ const getPatientName = (patient: PatientListItem) => {
 
 export const AddPatientModal = ({ isOpen, onClose }: AddPatientModalProps) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [errorToast, setErrorToast] = useState<string | null>(null);
   const { data: searchResults, isLoading: isSearching } = useSearchGlobalPatients(
     searchQuery,
     isOpen,
@@ -40,9 +42,12 @@ export const AddPatientModal = ({ isOpen, onClose }: AddPatientModalProps) => {
       onClose();
     } catch (error) {
       console.error("Failed to assign patient:", error);
-      // Error handling could be improved with toast notifications
-      // Re-throw to let React Query handle it
-      throw error;
+      // Show error toast to user
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Error al asignar el paciente. Por favor, intenta nuevamente.";
+      setErrorToast(errorMessage);
     }
   };
 
@@ -149,6 +154,18 @@ export const AddPatientModal = ({ isOpen, onClose }: AddPatientModalProps) => {
           )}
         </div>
       </div>
+
+      {/* Error Toast */}
+      <Snackbar
+        open={!!errorToast}
+        autoHideDuration={6000}
+        onClose={() => setErrorToast(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert onClose={() => setErrorToast(null)} severity="error" sx={{ width: "100%" }}>
+          {errorToast}
+        </Alert>
+      </Snackbar>
     </div>
   );
 };

@@ -5,7 +5,7 @@ import { acknowledgeAlert } from "@/lib/dashboard-api";
 import { useAuth } from "@/contexts/auth-context";
 import { useState } from "react";
 import { AlertTriangle } from "lucide-react";
-import { formatTimeAgo } from "@/utils/date-utils";
+import { formatTimeAgo } from "@glucosapp/utils";
 
 interface AlertCardProps {
   alert: Alert;

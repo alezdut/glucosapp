@@ -3,8 +3,8 @@
 import { PatientListItem } from "@/lib/dashboard-api";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { formatTimeAgo } from "@/utils/date-utils";
-import { getStatusBadgeColor, getDiabetesTypeLabel } from "@/utils/patient-utils";
+import { formatTimeAgo, getDiabetesTypeLabel } from "@glucosapp/utils";
+import { getStatusBadgeColor } from "@/utils/patient-utils";
 import { PatientAvatar } from "./PatientAvatar";
 
 interface PatientCardProps {
@@ -70,7 +70,7 @@ export const PatientCard = ({ patient }: PatientCardProps) => {
           {/* Status badge */}
           <div className="flex items-center justify-between">
             <span className={`px-2 py-1 rounded text-xs font-medium ${statusBadgeColor}`}>
-              {String(patient.status || "")}
+              {patient.status}
             </span>
 
             {/* Ver Detalles link */}

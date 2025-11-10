@@ -34,6 +34,23 @@ type LogEntryWithMealTemplate = Prisma.LogEntryGetPayload<{
   };
 }>;
 
+type LogEntryWithDecryptedGlucose = Omit<
+  Prisma.LogEntryGetPayload<{
+    include: {
+      glucoseEntry: true;
+      insulinDose: true;
+      mealTemplate: {
+        include: {
+          foodItems: true;
+        };
+      };
+    };
+  }>,
+  "glucoseEntry"
+> & {
+  glucoseEntry: (Prisma.GlucoseEntryGetPayload<{}> & { mgdl: number }) | null;
+};
+
 /**
  * Controller handling doctor-patient relationships
  */
@@ -125,7 +142,7 @@ export class DoctorPatientController {
     @Param("patientId") patientId: string,
     @Query("startDate") startDate?: string,
     @Query("endDate") endDate?: string,
-  ) {
+  ): Promise<LogEntryWithDecryptedGlucose[]> {
     return this.doctorPatientService.getPatientLogEntries(user.id, patientId, startDate, endDate);
   }
 

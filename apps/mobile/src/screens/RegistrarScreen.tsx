@@ -35,12 +35,8 @@ import {
   useRealTimeCorrectionCalculation,
   useDebouncedValidation,
 } from "../hooks";
-import {
-  validateGlucose,
-  validateCarbohydrates,
-  validateTargetGlucose,
-  validateForm,
-} from "../utils/validation";
+import { validateGlucose, validateCarbohydrates, validateTargetGlucose } from "@glucosapp/utils";
+import { validateForm } from "../utils/validation";
 
 /**
  * RegistrarScreen component - Register glucose, insulin, and meal entry

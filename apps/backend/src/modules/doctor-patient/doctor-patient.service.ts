@@ -15,7 +15,29 @@ import { GetPatientsQueryDto } from "./dto/get-patients-query.dto";
 import { SearchPatientsDto } from "./dto/search-patients.dto";
 import { PatientDetailsDto } from "./dto/patient-details.dto";
 import { PatientProfileDto } from "./dto/patient-profile.dto";
+import { UpdatePatientProfileDto } from "./dto/update-patient-profile.dto";
 import type { Prisma } from "@prisma/client";
+
+/**
+ * Type for LogEntry with decrypted glucose value
+ * Extends Prisma's LogEntry type to include mgdl in glucoseEntry when present
+ */
+type LogEntryWithDecryptedGlucose = Omit<
+  Prisma.LogEntryGetPayload<{
+    include: {
+      glucoseEntry: true;
+      insulinDose: true;
+      mealTemplate: {
+        include: {
+          foodItems: true;
+        };
+      };
+    };
+  }>,
+  "glucoseEntry"
+> & {
+  glucoseEntry: (Prisma.GlucoseEntryGetPayload<{}> & { mgdl: number }) | null;
+};
 
 @Injectable()
 export class DoctorPatientService {
@@ -691,7 +713,7 @@ export class DoctorPatientService {
       throw new ForbiddenException("Patient is not assigned to this doctor");
     }
 
-    const whereClause: any = {
+    const whereClause: Prisma.LogEntryWhereInput = {
       userId: patientId,
       OR: [
         { mealTemplateId: { not: null } }, // Entries with meal templates
@@ -731,13 +753,14 @@ export class DoctorPatientService {
    * Get unified log entries (historial) for a specific patient with optional date range
    * Includes glucoseEntry, insulinDose and mealTemplate with foodItems
    * Defaults to last 7 days if no date filters are provided
+   * @returns Array of log entries with decrypted glucose values
    */
   async getPatientLogEntries(
     doctorId: string,
     patientId: string,
     startDate?: string,
     endDate?: string,
-  ) {
+  ): Promise<LogEntryWithDecryptedGlucose[]> {
     await this.doctorUtils.verifyDoctor(doctorId);
 
     // Verify patient is assigned to doctor
@@ -789,7 +812,7 @@ export class DoctorPatientService {
     });
 
     // Decrypt glucose values in the results
-    const decryptedResults = results.map((entry) => {
+    const decryptedResults: LogEntryWithDecryptedGlucose[] = results.map((entry) => {
       if (entry.glucoseEntry) {
         try {
           const decryptedMgdl = this.encryptionService.decryptGlucoseValue(
@@ -800,18 +823,18 @@ export class DoctorPatientService {
             glucoseEntry: {
               ...entry.glucoseEntry,
               mgdl: decryptedMgdl, // Add decrypted value for client compatibility
-            } as any,
-          };
+            },
+          } as LogEntryWithDecryptedGlucose;
         } catch (error) {
           console.error(
             `[DoctorPatient] Failed to decrypt glucose entry ${entry.glucoseEntry.id}:`,
             error,
           );
           // Return entry without decrypted value if decryption fails
-          return entry;
+          return entry as LogEntryWithDecryptedGlucose;
         }
       }
-      return entry;
+      return entry as LogEntryWithDecryptedGlucose;
     });
 
     return decryptedResults;
@@ -881,7 +904,7 @@ export class DoctorPatientService {
   async updatePatientProfile(
     doctorId: string,
     patientId: string,
-    updateData: any, // Using any for now, will be properly typed with DTO
+    updateData: UpdatePatientProfileDto,
   ) {
     await this.doctorUtils.verifyDoctor(doctorId);
 
@@ -900,10 +923,18 @@ export class DoctorPatientService {
       throw new NotFoundException("Patient not found");
     }
 
+    // Convert DTO to Prisma update input (handle birthDate string to Date conversion)
+    const prismaUpdateData: Prisma.UserUpdateInput = {
+      ...updateData,
+      ...(updateData.birthDate !== undefined && {
+        birthDate: updateData.birthDate ? new Date(updateData.birthDate) : null,
+      }),
+    };
+
     // Update patient profile
     const updatedPatient = await this.prisma.user.update({
       where: { id: patientId },
-      data: updateData,
+      data: prismaUpdateData,
       select: {
         id: true,
         email: true,

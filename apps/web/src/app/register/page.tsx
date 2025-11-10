@@ -5,7 +5,7 @@ import Link from "next/link";
 import { TextField, Button, Box, Typography, Alert } from "@mui/material";
 import { useAuth } from "@/contexts/auth-context";
 import { PasswordField } from "@/components/PasswordField";
-import { type PasswordStrength } from "@/utils/password-validation";
+import { type PasswordStrength } from "@glucosapp/utils";
 import styles from "@/components/auth-form.module.css";
 
 /**

@@ -86,6 +86,42 @@ export const PatientParameters = ({ profile, patientId }: PatientParametersProps
   const prevDinnerStart = useRef<number | null>(profile.mealTimeDinnerStart || null);
   const prevDinnerEnd = useRef<number | null>(profile.mealTimeDinnerEnd || null);
 
+  // Reset form state when patientId or profile changes
+  useEffect(() => {
+    // Reset all state values to current profile values
+    setIcRatioBreakfast(profile.icRatioBreakfast?.toString() || "");
+    setIcRatioLunch(profile.icRatioLunch?.toString() || "");
+    setIcRatioDinner(profile.icRatioDinner?.toString() || "");
+    setInsulinSensitivityFactor(profile.insulinSensitivityFactor?.toString() || "");
+    setDiaHours(profile.diaHours?.toString() || "");
+    setTargetGlucose(profile.targetGlucose?.toString() || "");
+    setMinTargetGlucose(profile.minTargetGlucose?.toString() || "");
+    setMaxTargetGlucose(profile.maxTargetGlucose?.toString() || "");
+
+    // Reset meal times (convert minutes to time strings)
+    setBreakfastStart(
+      profile.mealTimeBreakfastStart ? minutesToTime(profile.mealTimeBreakfastStart) : "",
+    );
+    setBreakfastEnd(
+      profile.mealTimeBreakfastEnd ? minutesToTime(profile.mealTimeBreakfastEnd) : "",
+    );
+    setLunchStart(profile.mealTimeLunchStart ? minutesToTime(profile.mealTimeLunchStart) : "");
+    setLunchEnd(profile.mealTimeLunchEnd ? minutesToTime(profile.mealTimeLunchEnd) : "");
+    setDinnerStart(profile.mealTimeDinnerStart ? minutesToTime(profile.mealTimeDinnerStart) : "");
+    setDinnerEnd(profile.mealTimeDinnerEnd ? minutesToTime(profile.mealTimeDinnerEnd) : "");
+
+    // Reset adjustment flag
+    setIsAdjusting(false);
+
+    // Update prev refs to numeric profile meal times
+    prevBreakfastStart.current = profile.mealTimeBreakfastStart || null;
+    prevBreakfastEnd.current = profile.mealTimeBreakfastEnd || null;
+    prevLunchStart.current = profile.mealTimeLunchStart || null;
+    prevLunchEnd.current = profile.mealTimeLunchEnd || null;
+    prevDinnerStart.current = profile.mealTimeDinnerStart || null;
+    prevDinnerEnd.current = profile.mealTimeDinnerEnd || null;
+  }, [patientId, profile]);
+
   // Check if there are unsaved changes
   const hasUnsavedChanges = () => {
     return (

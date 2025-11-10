@@ -33,7 +33,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { type UserProfile, DiabetesType, GlucoseUnit, Theme, Language } from "@glucosapp/types";
 import { CustomDateTimePicker } from "../components";
 import type { RootStackParamList } from "../navigation/types";
-import { calculateAge } from "../utils/dateUtils";
+import { calculateAge } from "@glucosapp/utils";
 
 /**
  * Translate enum values to Spanish for display

@@ -98,7 +98,10 @@ export const PatientLogCard = ({ entry }: PatientLogCardProps) => {
       tabIndex={0}
       aria-label="Ver detalles del registro"
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") setExpanded((v) => !v);
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setExpanded((v) => !v);
+        }
       }}
     >
       {/* Header */}

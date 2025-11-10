@@ -14,7 +14,7 @@ import {
   getStrengthValue,
   getStrengthLabel,
   type PasswordStrength,
-} from "@/utils/password-validation";
+} from "@glucosapp/utils";
 
 interface PasswordFieldProps {
   label: string;

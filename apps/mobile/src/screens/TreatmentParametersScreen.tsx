@@ -17,12 +17,8 @@ import { createApiClient } from "../lib/api";
 import { type UserProfile } from "@glucosapp/types";
 import { CustomDateTimePicker } from "../components/DateTimePicker";
 import type { RootStackParamList } from "../navigation/types";
-import {
-  minutesToTime,
-  timeToMinutes,
-  formatTimeFromMinutes,
-  extractTimeFromPicker,
-} from "../utils/dateUtils";
+import { formatTimeFromMinutes } from "@glucosapp/utils";
+import { minutesToTime, timeToMinutes, extractTimeFromPicker } from "../utils/dateUtils";
 
 type TreatmentParametersScreenProps = NativeStackScreenProps<
   RootStackParamList,

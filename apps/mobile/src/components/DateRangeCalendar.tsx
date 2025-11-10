@@ -4,7 +4,7 @@ import type { MarkedDates } from "react-native-calendars/src/types";
 import { Calendar, DateData } from "react-native-calendars";
 import { X, Check } from "lucide-react-native";
 import { theme } from "../theme";
-import { formatLocalDateAsYYYYMMDD } from "../utils/dateUtils";
+import { formatLocalDateAsYYYYMMDD } from "@glucosapp/utils";
 
 interface DateRangeCalendarProps {
   visible: boolean;

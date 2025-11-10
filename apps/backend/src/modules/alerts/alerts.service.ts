@@ -50,14 +50,14 @@ export class AlertsService {
     let severity: AlertSeverity | null = null;
     let message = "";
 
-    // Severe hypoglycemia: < 70 mg/dL
-    if (glucoseMgdl < 70) {
+    // Severe hypoglycemia: < 54 mg/dL (medically standard threshold)
+    if (glucoseMgdl < 54) {
       alertType = AlertType.SEVERE_HYPOGLYCEMIA;
       severity = AlertSeverity.CRITICAL;
-      message = `Hipoglucemia severa: nivel de glucosa en ${glucoseMgdl} mg/dL. Requiere atención inmediata.`;
+      message = `Hipoglucemia severa: nivel de glucosa en ${glucoseMgdl} mg/dL (< 54 mg/dL). Requiere atención inmediata.`;
     }
-    // Hypoglycemia: 70-80 mg/dL
-    else if (glucoseMgdl < 80) {
+    // Hypoglycemia: 54-70 mg/dL
+    else if (glucoseMgdl < 70) {
       alertType = AlertType.HYPOGLYCEMIA;
       severity = AlertSeverity.HIGH;
       message = `Hipoglucemia: nivel de glucosa en ${glucoseMgdl} mg/dL.`;

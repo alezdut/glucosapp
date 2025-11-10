@@ -19,7 +19,7 @@ export class AppointmentsService {
   async findAll(doctorId: string, includePast: boolean = false): Promise<AppointmentResponseDto[]> {
     await this.doctorUtils.verifyDoctor(doctorId);
 
-    let where: Prisma.AppointmentWhereInput = { doctorId };
+    const where: Prisma.AppointmentWhereInput = { doctorId };
 
     if (!includePast) {
       where.scheduledAt = { gte: new Date() };

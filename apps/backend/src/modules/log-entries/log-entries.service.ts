@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { EncryptionService } from "../../common/services/encryption.service";
@@ -7,6 +7,7 @@ import { CreateLogEntryDto } from "./dto/create-log-entry.dto";
 /**
  * Type for LogEntry with decrypted glucose value
  * Extends Prisma's LogEntry type to include mgdl in glucoseEntry when present
+ * mgdl is number | null to handle decryption failures safely
  */
 type LogEntryWithDecryptedGlucose = Omit<
   Prisma.LogEntryGetPayload<{
@@ -22,7 +23,9 @@ type LogEntryWithDecryptedGlucose = Omit<
   }>,
   "glucoseEntry"
 > & {
-  glucoseEntry: (Prisma.GlucoseEntryGetPayload<{}> & { mgdl: number }) | null;
+  glucoseEntry:
+    | (Prisma.GlucoseEntryGetPayload<Record<string, never>> & { mgdl: number | null })
+    | null;
 };
 
 /**
@@ -30,6 +33,8 @@ type LogEntryWithDecryptedGlucose = Omit<
  */
 @Injectable()
 export class LogEntriesService {
+  private readonly logger = new Logger(LogEntriesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly encryptionService: EncryptionService,
@@ -76,30 +81,40 @@ export class LogEntriesService {
     });
 
     // Decrypt glucose values in the results
-    const decryptedResults: LogEntryWithDecryptedGlucose[] = results.map((entry) => {
-      if (entry.glucoseEntry) {
-        try {
-          const decryptedMgdl = this.encryptionService.decryptGlucoseValue(
-            entry.glucoseEntry.mgdlEncrypted,
-          );
-          return {
-            ...entry,
-            glucoseEntry: {
-              ...entry.glucoseEntry,
-              mgdl: decryptedMgdl, // Add decrypted value for client compatibility
-            },
-          } as LogEntryWithDecryptedGlucose;
-        } catch (error) {
-          console.error(
-            `[LogEntries] Failed to decrypt glucose entry ${entry.glucoseEntry.id}:`,
-            error,
-          );
-          // Return entry without decrypted value if decryption fails
-          return entry as LogEntryWithDecryptedGlucose;
+    const decryptedResults: LogEntryWithDecryptedGlucose[] = results.map(
+      (entry): LogEntryWithDecryptedGlucose => {
+        if (entry.glucoseEntry) {
+          try {
+            const decryptedMgdl = this.encryptionService.decryptGlucoseValue(
+              entry.glucoseEntry.mgdlEncrypted,
+            );
+            return {
+              ...entry,
+              glucoseEntry: {
+                ...entry.glucoseEntry,
+                mgdl: decryptedMgdl, // Add decrypted value for client compatibility
+              },
+            };
+          } catch (error) {
+            this.logger.error(
+              `Failed to decrypt glucose entry ${entry.glucoseEntry.id}`,
+              error instanceof Error ? error.stack : String(error),
+              LogEntriesService.name,
+            );
+            // Return entry with null mgdl if decryption fails
+            return {
+              ...entry,
+              glucoseEntry: {
+                ...entry.glucoseEntry,
+                mgdl: null,
+              },
+            };
+          }
         }
-      }
-      return entry as LogEntryWithDecryptedGlucose;
-    });
+        // Entry without glucoseEntry - return as is (glucoseEntry is already null, which matches the type)
+        return entry as LogEntryWithDecryptedGlucose;
+      },
+    );
 
     return decryptedResults;
   }

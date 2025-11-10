@@ -1,6 +1,6 @@
 import { renderHook, act } from "@testing-library/react-hooks";
 import { useDebouncedValidation } from "../useDebouncedValidation";
-import { validateGlucose } from "../../utils/validation";
+import { validateGlucose } from "@glucosapp/utils";
 
 // Mock timers
 jest.useFakeTimers();

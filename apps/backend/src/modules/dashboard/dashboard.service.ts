@@ -233,6 +233,16 @@ export class DashboardService {
       };
     }
 
+    // Guard against zero days
+    if (days === 0) {
+      return {
+        averageDose: 0,
+        unit: "unidades/día",
+        days: 0,
+        description: "No se puede calcular el promedio para 0 días.",
+      };
+    }
+
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
     startDate.setHours(0, 0, 0, 0);
@@ -258,7 +268,8 @@ export class DashboardService {
     }
 
     const totalUnits = doses.reduce((sum, dose) => sum + dose.units, 0);
-    const averageDose = totalUnits / doses.length;
+    // Calculate average units per day
+    const averageDose = totalUnits / days;
 
     return {
       averageDose: Math.round(averageDose * 10) / 10, // Round to 1 decimal
