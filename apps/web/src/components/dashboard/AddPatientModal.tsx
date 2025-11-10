@@ -6,6 +6,7 @@ import { Snackbar, Alert } from "@mui/material";
 import { useSearchGlobalPatients, useAssignPatient } from "@/hooks/usePatients";
 import { PatientListItem } from "@/lib/dashboard-api";
 import { getDiabetesTypeLabel } from "@glucosapp/utils";
+import { DiabetesType } from "@glucosapp/types";
 
 interface AddPatientModalProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ const getPatientName = (patient: PatientListItem) => {
 export const AddPatientModal = ({ isOpen, onClose }: AddPatientModalProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [errorToast, setErrorToast] = useState<string | null>(null);
+  const [assigningPatientId, setAssigningPatientId] = useState<string | null>(null);
   const { data: searchResults, isLoading: isSearching } = useSearchGlobalPatients(
     searchQuery,
     isOpen,
@@ -31,10 +33,12 @@ export const AddPatientModal = ({ isOpen, onClose }: AddPatientModalProps) => {
   useEffect(() => {
     if (!isOpen) {
       setSearchQuery("");
+      setAssigningPatientId(null);
     }
   }, [isOpen]);
 
   const handleAssign = async (patientId: string) => {
+    setAssigningPatientId(patientId);
     try {
       await assignPatientMutation.mutateAsync(patientId);
       // Clear search after successful assignment
@@ -48,6 +52,8 @@ export const AddPatientModal = ({ isOpen, onClose }: AddPatientModalProps) => {
           ? error.message
           : "Error al asignar el paciente. Por favor, intenta nuevamente.";
       setErrorToast(errorMessage);
+    } finally {
+      setAssigningPatientId(null);
     }
   };
 
@@ -107,10 +113,12 @@ export const AddPatientModal = ({ isOpen, onClose }: AddPatientModalProps) => {
                 .filter((patient) => patient && patient.id && typeof patient.id === "string")
                 .map((patient) => {
                   const patientName = getPatientName(patient);
-                  const diabetesTypeLabel = getDiabetesTypeLabel(patient.diabetesType, null);
-                  const displayDiabetesType =
-                    typeof diabetesTypeLabel === "string" ? diabetesTypeLabel : null;
-                  const isAssigning = assignPatientMutation.isPending;
+                  const diabetesTypeLabel = getDiabetesTypeLabel(
+                    patient.diabetesType as DiabetesType,
+                    null,
+                  );
+                  const displayDiabetesType = diabetesTypeLabel ? diabetesTypeLabel : null;
+                  const isAssigning = assigningPatientId === patient.id;
 
                   return (
                     <div

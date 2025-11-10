@@ -404,11 +404,15 @@ export class DashboardService {
         .filter((reading): reading is { value: number; recordedAt: Date } => reading !== null),
     ];
 
-    // Group by month (YYYY-MM format)
+    // Group by month (YYYY-MM format) using UTC to avoid timezone-dependent buckets
     const groupedByMonth = new Map<string, number[]>();
 
     allReadings.forEach((reading) => {
-      const monthKey = `${reading.recordedAt.getFullYear()}-${String(reading.recordedAt.getMonth() + 1).padStart(2, "0")}`;
+      // Ensure recordedAt is a Date object (convert from string if needed)
+      const recordedAtDate =
+        reading.recordedAt instanceof Date ? reading.recordedAt : new Date(reading.recordedAt);
+      // Use UTC getters to avoid timezone-dependent buckets
+      const monthKey = `${recordedAtDate.getUTCFullYear()}-${String(recordedAtDate.getUTCMonth() + 1).padStart(2, "0")}`;
       if (!groupedByMonth.has(monthKey)) {
         groupedByMonth.set(monthKey, []);
       }
@@ -419,10 +423,15 @@ export class DashboardService {
     const data: PatientGlucoseEvolutionPointDto[] = [];
     const today = new Date();
 
-    // Generate all months from (today - months) to today
+    // Generate all months from (today - months) to today using UTC
     for (let i = months - 1; i >= 0; i--) {
-      const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      // Calculate target month in UTC
+      const targetYear = today.getUTCFullYear();
+      const targetMonth = today.getUTCMonth() - i;
+      // Handle year rollover
+      const year = targetMonth < 0 ? targetYear - 1 : targetYear;
+      const month = targetMonth < 0 ? 12 + targetMonth : targetMonth;
+      const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
 
       const values = groupedByMonth.get(monthKey) || [];
       if (values.length > 0) {
@@ -489,7 +498,11 @@ export class DashboardService {
     const groupedByMonth = new Map<string, { basal: number[]; bolus: number[] }>();
 
     doses.forEach((dose) => {
-      const monthKey = `${dose.recordedAt.getFullYear()}-${String(dose.recordedAt.getMonth() + 1).padStart(2, "0")}`;
+      // Ensure recordedAt is a Date object (convert from string if needed)
+      const recordedAtDate =
+        dose.recordedAt instanceof Date ? dose.recordedAt : new Date(dose.recordedAt);
+      // Use UTC getters to avoid timezone-dependent buckets
+      const monthKey = `${recordedAtDate.getUTCFullYear()}-${String(recordedAtDate.getUTCMonth() + 1).padStart(2, "0")}`;
       if (!groupedByMonth.has(monthKey)) {
         groupedByMonth.set(monthKey, { basal: [], bolus: [] });
       }

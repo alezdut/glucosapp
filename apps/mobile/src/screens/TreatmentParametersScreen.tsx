@@ -76,7 +76,7 @@ export default function TreatmentParametersScreen({ navigation }: TreatmentParam
       if (response.error) {
         throw new Error("Failed to fetch profile");
       }
-      return response.data as UserProfile;
+      return response.data as unknown as UserProfile;
     },
   });
 

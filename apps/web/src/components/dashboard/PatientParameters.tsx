@@ -10,6 +10,27 @@ interface PatientParametersProps {
   patientId: string;
 }
 
+/**
+ * Type for updating patient profile parameters
+ * All fields except targetGlucose are required
+ */
+type UpdatePatientProfileData = {
+  icRatioBreakfast: number;
+  icRatioLunch: number;
+  icRatioDinner: number;
+  insulinSensitivityFactor: number;
+  diaHours: number;
+  targetGlucose?: number;
+  minTargetGlucose: number;
+  maxTargetGlucose: number;
+  mealTimeBreakfastStart: number;
+  mealTimeBreakfastEnd: number;
+  mealTimeLunchStart: number;
+  mealTimeLunchEnd: number;
+  mealTimeDinnerStart: number;
+  mealTimeDinnerEnd: number;
+};
+
 const minutesToTime = (minutes: number): string => {
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
@@ -271,7 +292,7 @@ export const PatientParameters = ({ profile, patientId }: PatientParametersProps
 
   // Update profile mutation
   const updateProfile = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: UpdatePatientProfileData) => {
       const token = localStorage.getItem("accessToken");
       if (!token) throw new Error("Not authenticated");
 
@@ -396,13 +417,13 @@ export const PatientParameters = ({ profile, patientId }: PatientParametersProps
     }
 
     // Prepare update data
-    const updateData = {
+    const updateData: UpdatePatientProfileData = {
       icRatioBreakfast: icBreakfastNum,
       icRatioLunch: icLunchNum,
       icRatioDinner: icDinnerNum,
       insulinSensitivityFactor: sensitivityNum,
       diaHours: diaNum,
-      targetGlucose: targetNum,
+      targetGlucose: targetNum ?? undefined,
       minTargetGlucose: minTargetNum,
       maxTargetGlucose: maxTargetNum,
       mealTimeBreakfastStart: breakfastStartMinutes,

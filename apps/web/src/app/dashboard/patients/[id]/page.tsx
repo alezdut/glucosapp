@@ -9,21 +9,20 @@ import { usePatientDetails } from "@/hooks/usePatients";
 import {
   usePatientGlucoseEvolution,
   usePatientInsulinStats,
-  usePatientMeals,
   usePatientProfile,
 } from "@/hooks/usePatientData";
 import type { PatientGlucoseEvolution, PatientInsulinStats } from "@/lib/dashboard-api";
 import { Tabs } from "@/components/dashboard/Tabs";
 import { PatientGlucoseChart } from "@/components/dashboard/PatientGlucoseChart";
 import { PatientInsulinChart } from "@/components/dashboard/PatientInsulinChart";
-import { PatientMealsList } from "@/components/dashboard/PatientMealsList";
 import { PatientLogs } from "@/components/dashboard/PatientLogs";
 import { PatientParameters } from "@/components/dashboard/PatientParameters";
 import { PatientNotesMessages } from "@/components/dashboard/PatientNotesMessages";
 import { PatientAvatar } from "@/components/dashboard/PatientAvatar";
-import { ArrowLeft, Loader2, User, MessageSquare } from "lucide-react";
+import { Loader2, User, MessageSquare } from "lucide-react";
 import { calculateAge, formatTimeAgo, getDiabetesTypeLabel } from "@glucosapp/utils";
 import { getStatusColor } from "@/utils/patient-utils";
+import { DiabetesType } from "@glucosapp/types";
 
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
@@ -32,21 +31,6 @@ const formatDate = (dateString: string) => {
     month: "long",
     day: "numeric",
   });
-};
-
-const formatDateTime = (dateString: string) => {
-  const date = new Date(dateString);
-  return {
-    date: date.toLocaleDateString("es-ES", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    }),
-    time: date.toLocaleTimeString("es-ES", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
-  };
 };
 
 /**
@@ -178,7 +162,7 @@ export default function PatientDetailsPage() {
                   <div>
                     <p className="text-sm text-gray-500">Tipo de Diabetes</p>
                     <p className="font-medium text-gray-900">
-                      {getDiabetesTypeLabel(patient.diabetesType)}
+                      {getDiabetesTypeLabel(patient.diabetesType as DiabetesType)}
                     </p>
                   </div>
                   {patient.lastGlucoseReading ? (

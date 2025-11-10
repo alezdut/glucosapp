@@ -6,6 +6,7 @@ import Link from "next/link";
 import { formatTimeAgo, getDiabetesTypeLabel } from "@glucosapp/utils";
 import { getStatusBadgeColor } from "@/utils/patient-utils";
 import { PatientAvatar } from "./PatientAvatar";
+import { DiabetesType } from "@glucosapp/types";
 
 interface PatientCardProps {
   patient: PatientListItem;
@@ -26,10 +27,10 @@ export const PatientCard = ({ patient }: PatientCardProps) => {
 
   const statusBadgeColor = getStatusBadgeColor(patient.status);
   const patientName = getPatientName(patient);
-  const diabetesTypeLabel = getDiabetesTypeLabel(patient.diabetesType, null);
+  const diabetesTypeLabel = getDiabetesTypeLabel(patient.diabetesType as DiabetesType, null);
 
   // Ensure diabetesTypeLabel is a string or null
-  const displayDiabetesType = typeof diabetesTypeLabel === "string" ? diabetesTypeLabel : null;
+  const displayDiabetesType = diabetesTypeLabel ? diabetesTypeLabel : null;
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">

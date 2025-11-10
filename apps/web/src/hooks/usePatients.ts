@@ -55,7 +55,6 @@ export const useSearchGlobalPatients = (query: string, enabled: boolean = true) 
  * Hook to assign a patient to the doctor
  */
 export const useAssignPatient = () => {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({

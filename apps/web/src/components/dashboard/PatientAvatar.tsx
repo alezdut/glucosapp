@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { getActivityDotColor } from "@/utils/patient-utils";
 
 interface PatientAvatarProps {
@@ -15,18 +16,24 @@ const sizeClasses = {
     text: "text-2xl",
     dot: "w-4 h-4",
     border: "border-2",
+    width: 64,
+    height: 64,
   },
   md: {
     container: "w-20 h-20",
     text: "text-3xl",
     dot: "w-5 h-5",
     border: "border-2",
+    width: 80,
+    height: 80,
   },
   lg: {
     container: "w-24 h-24",
     text: "text-4xl",
     dot: "w-6 h-6",
     border: "border-4",
+    width: 96,
+    height: 96,
   },
 };
 
@@ -44,12 +51,13 @@ export const PatientAvatar = ({
   return (
     <div className="relative flex-shrink-0">
       {avatarUrl ? (
-        <img
+        <Image
           src={avatarUrl}
           alt={patientName}
+          width={sizes.width}
+          height={sizes.height}
           className={`${sizes.container} rounded-full object-cover`}
           loading="lazy"
-          decoding="async"
         />
       ) : (
         <div

@@ -5,7 +5,7 @@ import {
   ConflictException,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
-import { UserRole, DiabetesType } from "@prisma/client";
+import { UserRole, DiabetesType, GlucoseEntry } from "@prisma/client";
 import { DoctorUtilsService } from "../../common/services/doctor-utils.service";
 import { EncryptionService } from "../../common/services/encryption.service";
 import { CreateDoctorPatientDto } from "./dto/create-doctor-patient.dto";
@@ -36,7 +36,7 @@ type LogEntryWithDecryptedGlucose = Omit<
   }>,
   "glucoseEntry"
 > & {
-  glucoseEntry: (Prisma.GlucoseEntryGetPayload<{}> & { mgdl: number }) | null;
+  glucoseEntry: (GlucoseEntry & { mgdl: number }) | null;
 };
 
 @Injectable()

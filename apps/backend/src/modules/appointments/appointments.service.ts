@@ -6,12 +6,50 @@ import { CreateAppointmentDto } from "./dto/create-appointment.dto";
 import { UpdateAppointmentDto } from "./dto/update-appointment.dto";
 import { AppointmentResponseDto } from "./dto/appointment-response.dto";
 
+/**
+ * Type for Appointment with patient included
+ */
+type AppointmentWithPatient = Prisma.AppointmentGetPayload<{
+  include: {
+    patient: {
+      select: {
+        id: true;
+        email: true;
+        firstName: true;
+        lastName: true;
+      };
+    };
+  };
+}>;
+
 @Injectable()
 export class AppointmentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly doctorUtils: DoctorUtilsService,
   ) {}
+
+  /**
+   * Map Appointment entity to AppointmentResponseDto
+   */
+  private mapAppointmentToDto(apt: AppointmentWithPatient): AppointmentResponseDto {
+    return {
+      id: apt.id,
+      doctorId: apt.doctorId,
+      patientId: apt.patientId,
+      scheduledAt: apt.scheduledAt.toISOString(),
+      notes: apt.notes || undefined,
+      status: apt.status,
+      createdAt: apt.createdAt.toISOString(),
+      updatedAt: apt.updatedAt.toISOString(),
+      patient: {
+        id: apt.patient.id,
+        email: apt.patient.email,
+        firstName: apt.patient.firstName || undefined,
+        lastName: apt.patient.lastName || undefined,
+      },
+    };
+  }
 
   /**
    * Get all appointments for a doctor
@@ -42,22 +80,7 @@ export class AppointmentsService {
       },
     });
 
-    return appointments.map((apt) => ({
-      id: apt.id,
-      doctorId: apt.doctorId,
-      patientId: apt.patientId,
-      scheduledAt: apt.scheduledAt.toISOString(),
-      notes: apt.notes || undefined,
-      status: apt.status,
-      createdAt: apt.createdAt.toISOString(),
-      updatedAt: apt.updatedAt.toISOString(),
-      patient: {
-        id: apt.patient.id,
-        email: apt.patient.email,
-        firstName: apt.patient.firstName || undefined,
-        lastName: apt.patient.lastName || undefined,
-      },
-    }));
+    return appointments.map((apt) => this.mapAppointmentToDto(apt));
   }
 
   /**
@@ -99,22 +122,7 @@ export class AppointmentsService {
       },
     });
 
-    return {
-      id: appointment.id,
-      doctorId: appointment.doctorId,
-      patientId: appointment.patientId,
-      scheduledAt: appointment.scheduledAt.toISOString(),
-      notes: appointment.notes || undefined,
-      status: appointment.status,
-      createdAt: appointment.createdAt.toISOString(),
-      updatedAt: appointment.updatedAt.toISOString(),
-      patient: {
-        id: appointment.patient.id,
-        email: appointment.patient.email,
-        firstName: appointment.patient.firstName || undefined,
-        lastName: appointment.patient.lastName || undefined,
-      },
-    };
+    return this.mapAppointmentToDto(appointment);
   }
 
   /**
@@ -158,22 +166,7 @@ export class AppointmentsService {
       },
     });
 
-    return {
-      id: updated.id,
-      doctorId: updated.doctorId,
-      patientId: updated.patientId,
-      scheduledAt: updated.scheduledAt.toISOString(),
-      notes: updated.notes || undefined,
-      status: updated.status,
-      createdAt: updated.createdAt.toISOString(),
-      updatedAt: updated.updatedAt.toISOString(),
-      patient: {
-        id: updated.patient.id,
-        email: updated.patient.email,
-        firstName: updated.patient.firstName || undefined,
-        lastName: updated.patient.lastName || undefined,
-      },
-    };
+    return this.mapAppointmentToDto(updated);
   }
 
   /**

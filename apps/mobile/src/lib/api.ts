@@ -137,6 +137,18 @@ const refreshTokenIfNeeded = async (): Promise<boolean> => {
 };
 
 /**
+ * Type for API error responses
+ * Can be an HTTP error with status and message, or a caught error
+ */
+type ApiError =
+  | {
+      status: number;
+      message: string;
+    }
+  | Error
+  | unknown;
+
+/**
  * Create API client with automatic token injection and refresh handling
  */
 export function createApiClient() {
@@ -146,10 +158,10 @@ export function createApiClient() {
    * Execute a request with automatic token refresh on 401 errors
    */
   const executeWithAuth = async <T>(
-    executeFn: () => Promise<{ data?: T; error?: any }>,
-    retryFn: () => Promise<{ data?: T; error?: any }>,
+    executeFn: () => Promise<{ data?: T; error?: ApiError }>,
+    retryFn: () => Promise<{ data?: T; error?: ApiError }>,
     path: string,
-  ): Promise<{ data?: T; error?: any }> => {
+  ): Promise<{ data?: T; error?: ApiError }> => {
     // Skip token refresh for auth endpoints
     const isAuthEndpoint =
       path.startsWith("/auth/refresh") ||
@@ -167,7 +179,12 @@ export function createApiClient() {
     let response = await executeFn();
 
     // If we get a 401, try to refresh the token and retry once
-    if (response.error?.status === 401) {
+    if (
+      response.error &&
+      typeof response.error === "object" &&
+      "status" in response.error &&
+      response.error.status === 401
+    ) {
       console.log("Received 401, attempting to refresh token...");
       const refreshResult = await refreshAccessToken();
 

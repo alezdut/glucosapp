@@ -5,12 +5,27 @@
 /**
  * Calculate age from birth date
  * @param birthDate - Birth date as Date object, ISO string, or undefined
- * @returns Age in years, or null if birthDate is not provided
+ * @returns Age in years, or null if birthDate is not provided or invalid
  */
 export const calculateAge = (birthDate: Date | string | undefined): number | null => {
   if (!birthDate) return null;
 
-  const birthDateObj = birthDate instanceof Date ? birthDate : new Date(birthDate);
+  // Normalize string input (trim whitespace)
+  const normalizedBirthDate = typeof birthDate === "string" ? birthDate.trim() : birthDate;
+
+  // Return null if string is empty after trimming
+  if (typeof normalizedBirthDate === "string" && normalizedBirthDate.length === 0) {
+    return null;
+  }
+
+  const birthDateObj =
+    normalizedBirthDate instanceof Date ? normalizedBirthDate : new Date(normalizedBirthDate);
+
+  // Validate date to prevent NaN values
+  if (isNaN(birthDateObj.getTime())) {
+    return null;
+  }
+
   const today = new Date();
   let age = today.getFullYear() - birthDateObj.getFullYear();
   const monthDiff = today.getMonth() - birthDateObj.getMonth();
@@ -27,6 +42,12 @@ export const calculateAge = (birthDate: Date | string | undefined): number | nul
  */
 export const formatTimeAgo = (dateString: string): string => {
   const date = new Date(dateString);
+
+  // Validate date to prevent NaN values
+  if (isNaN(date.getTime())) {
+    return "Fecha inválida";
+  }
+
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / 60000);

@@ -3,12 +3,10 @@ import { useAuth } from "@/contexts/auth-context";
 import {
   getPatientGlucoseEvolution,
   getPatientInsulinStats,
-  getPatientMeals,
   getPatientProfile,
   getPatientLogEntries,
   PatientGlucoseEvolution,
   PatientInsulinStats,
-  PatientMeal,
   PatientProfile,
 } from "@/lib/dashboard-api";
 import type { LogEntry } from "@glucosapp/types";
@@ -49,23 +47,6 @@ export const usePatientInsulinStats = (patientId: string, months?: number) => {
       const token = getToken();
       if (!token) throw new Error("Not authenticated");
       return getPatientInsulinStats(token, patientId, months);
-    },
-    enabled: !!user && !!patientId,
-  });
-};
-
-/**
- * Hook to fetch patient meals
- */
-export const usePatientMeals = (patientId: string, startDate?: string, endDate?: string) => {
-  const { user } = useAuth();
-
-  return useQuery<PatientMeal[]>({
-    queryKey: ["patientMeals", patientId, startDate, endDate],
-    queryFn: async () => {
-      const token = getToken();
-      if (!token) throw new Error("Not authenticated");
-      return getPatientMeals(token, patientId, startDate, endDate);
     },
     enabled: !!user && !!patientId,
   });

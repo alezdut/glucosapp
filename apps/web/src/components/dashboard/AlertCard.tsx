@@ -5,7 +5,13 @@ import { acknowledgeAlert } from "@/lib/dashboard-api";
 import { useAuth } from "@/contexts/auth-context";
 import { useState } from "react";
 import { AlertTriangle } from "lucide-react";
-import { formatTimeAgo } from "@glucosapp/utils";
+import {
+  formatTimeAgo,
+  getAlertTypeLabel,
+  PATIENT_UNKNOWN,
+  BUTTON_TEXT_ACKNOWLEDGE,
+  BUTTON_TEXT_ACKNOWLEDGING,
+} from "@glucosapp/utils";
 
 interface AlertCardProps {
   alert: Alert;
@@ -66,7 +72,7 @@ export const AlertCard = ({ alert, onAcknowledge }: AlertCardProps) => {
   const patientName = alert.patient
     ? `${alert.patient.firstName || ""} ${alert.patient.lastName || ""}`.trim() ||
       alert.patient.email
-    : "Paciente desconocido";
+    : PATIENT_UNKNOWN;
 
   const severityColor = getSeverityColor(alert.severity);
   const severityIconColor = getSeverityIconColor(alert.severity);
@@ -77,10 +83,7 @@ export const AlertCard = ({ alert, onAcknowledge }: AlertCardProps) => {
         <AlertTriangle className={`w-6 h-6 ${severityIconColor} flex-shrink-0`} />
         <div className="flex-1">
           <h3 className="font-semibold mb-1">
-            {patientName}:{" "}
-            {alert.type === "SEVERE_HYPOGLYCEMIA"
-              ? "Hipoglucemia Severa"
-              : "Hiperglucemia Persistente"}
+            {patientName}: {getAlertTypeLabel(alert.type)}
           </h3>
           <p className="text-sm mb-2">{alert.message}</p>
           <p className="text-xs opacity-75">{formatTimeAgo(alert.createdAt)}</p>
@@ -93,7 +96,7 @@ export const AlertCard = ({ alert, onAcknowledge }: AlertCardProps) => {
             disabled={isAcknowledging}
             className="px-4 py-2 bg-white text-gray-800 rounded-lg hover:bg-gray-100 transition-colors text-sm font-medium disabled:opacity-50"
           >
-            {isAcknowledging ? "Marcando..." : "Ver Detalles del Paciente"}
+            {isAcknowledging ? BUTTON_TEXT_ACKNOWLEDGING : BUTTON_TEXT_ACKNOWLEDGE}
           </button>
         </div>
       )}
