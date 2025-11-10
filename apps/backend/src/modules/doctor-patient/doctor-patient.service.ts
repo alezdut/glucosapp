@@ -268,8 +268,13 @@ export class DoctorPatientService {
       }
     }
 
-    // Build result with enhanced data
-    const result: PatientListItemDto[] = [];
+    // Build patient data without statuses (collect in loop, calculate statuses in batch after)
+    interface PatientDataWithoutStatus {
+      patient: (typeof patients)[0];
+      lastGlucoseReading: { value: number; recordedAt: Date } | null;
+    }
+
+    const patientsData: PatientDataWithoutStatus[] = [];
 
     for (const patient of patients) {
       // Skip if activeOnly filter is enabled and patient is not active
@@ -317,30 +322,59 @@ export class DoctorPatientService {
         }
       }
 
-      // Calculate clinical status (Riesgo/Estable) and activity status (Activo/Inactivo)
-      const [clinicalStatus, activityStatus] = await Promise.all([
-        this.calculatePatientClinicalStatus(patient.id),
-        this.calculatePatientActivityStatus(patient.id),
-      ]);
-
-      result.push({
-        id: patient.id,
-        email: patient.email,
-        firstName: patient.firstName || undefined,
-        lastName: patient.lastName || undefined,
-        avatarUrl: patient.avatarUrl || undefined,
-        diabetesType: patient.diabetesType || undefined,
-        lastGlucoseReading: lastGlucoseReading
-          ? {
-              value: lastGlucoseReading.value,
-              recordedAt: lastGlucoseReading.recordedAt.toISOString(),
-            }
-          : undefined,
-        status: clinicalStatus,
-        activityStatus,
-        registrationDate: patient.createdAt.toISOString(),
+      patientsData.push({
+        patient,
+        lastGlucoseReading,
       });
     }
+
+    // Calculate all statuses in parallel (batch processing to avoid N+1)
+    const statusPromises = patientsData.map((patientData) =>
+      Promise.all([
+        this.calculatePatientClinicalStatus(patientData.patient.id),
+        this.calculatePatientActivityStatus(patientData.patient.id),
+      ]).then(([clinicalStatus, activityStatus]) => ({
+        patientId: patientData.patient.id,
+        clinicalStatus,
+        activityStatus,
+      })),
+    );
+
+    const statusesResults = await Promise.all(statusPromises);
+
+    // Build Map for quick lookup of statuses by patient ID
+    const statusesMap = new Map<
+      string,
+      { clinicalStatus: "Riesgo" | "Estable"; activityStatus: "Activo" | "Inactivo" }
+    >();
+    for (const statusResult of statusesResults) {
+      statusesMap.set(statusResult.patientId, {
+        clinicalStatus: statusResult.clinicalStatus,
+        activityStatus: statusResult.activityStatus,
+      });
+    }
+
+    // Build final result with statuses
+    const result: PatientListItemDto[] = patientsData.map((patientData) => {
+      const statuses = statusesMap.get(patientData.patient.id)!;
+      return {
+        id: patientData.patient.id,
+        email: patientData.patient.email,
+        firstName: patientData.patient.firstName || undefined,
+        lastName: patientData.patient.lastName || undefined,
+        avatarUrl: patientData.patient.avatarUrl || undefined,
+        diabetesType: patientData.patient.diabetesType || undefined,
+        lastGlucoseReading: patientData.lastGlucoseReading
+          ? {
+              value: patientData.lastGlucoseReading.value,
+              recordedAt: patientData.lastGlucoseReading.recordedAt.toISOString(),
+            }
+          : undefined,
+        status: statuses.clinicalStatus,
+        activityStatus: statuses.activityStatus,
+        registrationDate: patientData.patient.createdAt.toISOString(),
+      };
+    });
 
     return result;
   }
@@ -976,7 +1010,7 @@ export class DoctorPatientService {
     }
 
     const patient = await this.prisma.user.findUnique({
-      where: { id: patientId, role: "PATIENT" },
+      where: { id: patientId, role: UserRole.PATIENT },
       select: { id: true },
     });
 

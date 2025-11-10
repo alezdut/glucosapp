@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { PatientProfile, updatePatientProfile } from "@/lib/dashboard-api";
 import { Loader2, Save, Clock } from "lucide-react";
@@ -96,9 +96,6 @@ export const PatientParameters = ({ profile, patientId }: PatientParametersProps
     profile.mealTimeDinnerEnd ? minutesToTime(profile.mealTimeDinnerEnd) : "",
   );
 
-  // Adjustment flag to prevent infinite loops
-  const [isAdjusting, setIsAdjusting] = useState(false);
-
   // Refs to track previous values
   const prevBreakfastStart = useRef<number | null>(profile.mealTimeBreakfastStart || null);
   const prevBreakfastEnd = useRef<number | null>(profile.mealTimeBreakfastEnd || null);
@@ -106,6 +103,126 @@ export const PatientParameters = ({ profile, patientId }: PatientParametersProps
   const prevLunchEnd = useRef<number | null>(profile.mealTimeLunchEnd || null);
   const prevDinnerStart = useRef<number | null>(profile.mealTimeDinnerStart || null);
   const prevDinnerEnd = useRef<number | null>(profile.mealTimeDinnerEnd || null);
+
+  /**
+   * Pure function to calculate adjusted meal times based on detected changes
+   * Returns new meal times and updated refs in one atomic calculation
+   */
+  const calculateAdjustedMealTimes = (
+    currentTimes: {
+      breakfastStart: string;
+      breakfastEnd: string;
+      lunchStart: string;
+      lunchEnd: string;
+      dinnerStart: string;
+      dinnerEnd: string;
+    },
+    prevTimes: {
+      breakfastStart: number | null;
+      breakfastEnd: number | null;
+      lunchStart: number | null;
+      lunchEnd: number | null;
+      dinnerStart: number | null;
+      dinnerEnd: number | null;
+    },
+  ): {
+    newTimes: {
+      breakfastStart: string;
+      breakfastEnd: string;
+      lunchStart: string;
+      lunchEnd: string;
+      dinnerStart: string;
+      dinnerEnd: string;
+    };
+    newRefs: {
+      breakfastStart: number | null;
+      breakfastEnd: number | null;
+      lunchStart: number | null;
+      lunchEnd: number | null;
+      dinnerStart: number | null;
+      dinnerEnd: number | null;
+    };
+  } => {
+    // Convert current times to minutes
+    const breakfastStartMin = currentTimes.breakfastStart
+      ? timeToMinutes(currentTimes.breakfastStart)
+      : null;
+    const breakfastEndMin = currentTimes.breakfastEnd
+      ? timeToMinutes(currentTimes.breakfastEnd)
+      : null;
+    const lunchStartMin = currentTimes.lunchStart ? timeToMinutes(currentTimes.lunchStart) : null;
+    const lunchEndMin = currentTimes.lunchEnd ? timeToMinutes(currentTimes.lunchEnd) : null;
+    const dinnerStartMin = currentTimes.dinnerStart
+      ? timeToMinutes(currentTimes.dinnerStart)
+      : null;
+    const dinnerEndMin = currentTimes.dinnerEnd ? timeToMinutes(currentTimes.dinnerEnd) : null;
+
+    // Detect what changed
+    const breakfastStartChanged =
+      prevTimes.breakfastStart !== null && breakfastStartMin !== prevTimes.breakfastStart;
+    const breakfastEndChanged =
+      prevTimes.breakfastEnd !== null && breakfastEndMin !== prevTimes.breakfastEnd;
+    const lunchStartChanged =
+      prevTimes.lunchStart !== null && lunchStartMin !== prevTimes.lunchStart;
+    const lunchEndChanged = prevTimes.lunchEnd !== null && lunchEndMin !== prevTimes.lunchEnd;
+    const dinnerStartChanged =
+      prevTimes.dinnerStart !== null && dinnerStartMin !== prevTimes.dinnerStart;
+    const dinnerEndChanged = prevTimes.dinnerEnd !== null && dinnerEndMin !== prevTimes.dinnerEnd;
+
+    // Initialize new times with current values
+    let newBreakfastStart = breakfastStartMin;
+    let newBreakfastEnd = breakfastEndMin;
+    let newLunchStart = lunchStartMin;
+    let newLunchEnd = lunchEndMin;
+    let newDinnerStart = dinnerStartMin;
+    let newDinnerEnd = dinnerEndMin;
+
+    // Apply adjustments atomically
+    if (breakfastStartChanged) {
+      // Adjust breakfast start -> adjust dinner end (previous meal, may cross midnight)
+      newDinnerEnd = newBreakfastStart;
+    }
+    if (breakfastEndChanged) {
+      // Adjust breakfast end -> adjust lunch start (next meal)
+      newLunchStart = newBreakfastEnd;
+    }
+    if (lunchStartChanged) {
+      // Adjust lunch start -> adjust breakfast end (previous meal)
+      newBreakfastEnd = newLunchStart;
+    }
+    if (lunchEndChanged) {
+      // Adjust lunch end -> adjust dinner start (next meal)
+      newDinnerStart = newLunchEnd;
+    }
+    if (dinnerStartChanged) {
+      // Adjust dinner start -> adjust lunch end (previous meal)
+      newLunchEnd = newDinnerStart;
+    }
+    if (dinnerEndChanged) {
+      // Adjust dinner end -> adjust breakfast start (next meal, may cross midnight)
+      newBreakfastStart = newDinnerEnd;
+    }
+
+    // Convert back to time strings
+    return {
+      newTimes: {
+        breakfastStart: newBreakfastStart !== null ? minutesToTime(newBreakfastStart) : "",
+        breakfastEnd: newBreakfastEnd !== null ? minutesToTime(newBreakfastEnd) : "",
+        lunchStart: newLunchStart !== null ? minutesToTime(newLunchStart) : "",
+        lunchEnd: newLunchEnd !== null ? minutesToTime(newLunchEnd) : "",
+        dinnerStart: newDinnerStart !== null ? minutesToTime(newDinnerStart) : "",
+        dinnerEnd: newDinnerEnd !== null ? minutesToTime(newDinnerEnd) : "",
+      },
+      newRefs: {
+        breakfastStart: newBreakfastStart,
+        breakfastEnd: newBreakfastEnd,
+        lunchStart: newLunchStart,
+        lunchEnd: newLunchEnd,
+        dinnerStart: newDinnerStart,
+        dinnerEnd: newDinnerEnd,
+      },
+    };
+  };
 
   // Reset form state when patientId or profile changes
   useEffect(() => {
@@ -130,9 +247,6 @@ export const PatientParameters = ({ profile, patientId }: PatientParametersProps
     setLunchEnd(profile.mealTimeLunchEnd ? minutesToTime(profile.mealTimeLunchEnd) : "");
     setDinnerStart(profile.mealTimeDinnerStart ? minutesToTime(profile.mealTimeDinnerStart) : "");
     setDinnerEnd(profile.mealTimeDinnerEnd ? minutesToTime(profile.mealTimeDinnerEnd) : "");
-
-    // Reset adjustment flag
-    setIsAdjusting(false);
 
     // Update prev refs to numeric profile meal times
     prevBreakfastStart.current = profile.mealTimeBreakfastStart || null;
@@ -168,9 +282,9 @@ export const PatientParameters = ({ profile, patientId }: PatientParametersProps
   };
 
   // Auto-adjust adjacent meal times to ensure 24-hour coverage without gaps
-  useEffect(() => {
+  useLayoutEffect(() => {
+    // Skip if any time is empty (initialization or incomplete input)
     if (
-      isAdjusting ||
       !breakfastStart ||
       !breakfastEnd ||
       !lunchStart ||
@@ -178,7 +292,7 @@ export const PatientParameters = ({ profile, patientId }: PatientParametersProps
       !dinnerStart ||
       !dinnerEnd
     ) {
-      // Update refs even if we're not adjusting
+      // Update refs with current values if they exist
       if (breakfastStart) prevBreakfastStart.current = timeToMinutes(breakfastStart);
       if (breakfastEnd) prevBreakfastEnd.current = timeToMinutes(breakfastEnd);
       if (lunchStart) prevLunchStart.current = timeToMinutes(lunchStart);
@@ -188,107 +302,61 @@ export const PatientParameters = ({ profile, patientId }: PatientParametersProps
       return;
     }
 
-    const breakfastStartMin = timeToMinutes(breakfastStart);
-    const breakfastEndMin = timeToMinutes(breakfastEnd);
-    const lunchStartMin = timeToMinutes(lunchStart);
-    const lunchEndMin = timeToMinutes(lunchEnd);
-    const dinnerStartMin = timeToMinutes(dinnerStart);
-    const dinnerEndMin = timeToMinutes(dinnerEnd);
+    // Calculate all adjustments atomically
+    const { newTimes, newRefs } = calculateAdjustedMealTimes(
+      {
+        breakfastStart,
+        breakfastEnd,
+        lunchStart,
+        lunchEnd,
+        dinnerStart,
+        dinnerEnd,
+      },
+      {
+        breakfastStart: prevBreakfastStart.current,
+        breakfastEnd: prevBreakfastEnd.current,
+        lunchStart: prevLunchStart.current,
+        lunchEnd: prevLunchEnd.current,
+        dinnerStart: prevDinnerStart.current,
+        dinnerEnd: prevDinnerEnd.current,
+      },
+    );
 
-    // Check what changed and adjust accordingly
-    const breakfastStartChanged =
-      prevBreakfastStart.current !== null && breakfastStartMin !== prevBreakfastStart.current;
-    const breakfastEndChanged =
-      prevBreakfastEnd.current !== null && breakfastEndMin !== prevBreakfastEnd.current;
-    const lunchStartChanged =
-      prevLunchStart.current !== null && lunchStartMin !== prevLunchStart.current;
-    const lunchEndChanged = prevLunchEnd.current !== null && lunchEndMin !== prevLunchEnd.current;
-    const dinnerStartChanged =
-      prevDinnerStart.current !== null && dinnerStartMin !== prevDinnerStart.current;
-    const dinnerEndChanged =
-      prevDinnerEnd.current !== null && dinnerEndMin !== prevDinnerEnd.current;
+    // Check if any adjustments were made
+    const hasChanges =
+      newTimes.breakfastStart !== breakfastStart ||
+      newTimes.breakfastEnd !== breakfastEnd ||
+      newTimes.lunchStart !== lunchStart ||
+      newTimes.lunchEnd !== lunchEnd ||
+      newTimes.dinnerStart !== dinnerStart ||
+      newTimes.dinnerEnd !== dinnerEnd;
 
-    // Only adjust if something actually changed
-    if (
-      !breakfastStartChanged &&
-      !breakfastEndChanged &&
-      !lunchStartChanged &&
-      !lunchEndChanged &&
-      !dinnerStartChanged &&
-      !dinnerEndChanged
-    ) {
-      return;
+    if (hasChanges) {
+      // Apply all state updates synchronously
+      setBreakfastStart(newTimes.breakfastStart);
+      setBreakfastEnd(newTimes.breakfastEnd);
+      setLunchStart(newTimes.lunchStart);
+      setLunchEnd(newTimes.lunchEnd);
+      setDinnerStart(newTimes.dinnerStart);
+      setDinnerEnd(newTimes.dinnerEnd);
+
+      // Update refs immediately with new values
+      prevBreakfastStart.current = newRefs.breakfastStart;
+      prevBreakfastEnd.current = newRefs.breakfastEnd;
+      prevLunchStart.current = newRefs.lunchStart;
+      prevLunchEnd.current = newRefs.lunchEnd;
+      prevDinnerStart.current = newRefs.dinnerStart;
+      prevDinnerEnd.current = newRefs.dinnerEnd;
+    } else {
+      // No adjustments needed, just update refs with current values
+      prevBreakfastStart.current = timeToMinutes(breakfastStart);
+      prevBreakfastEnd.current = timeToMinutes(breakfastEnd);
+      prevLunchStart.current = timeToMinutes(lunchStart);
+      prevLunchEnd.current = timeToMinutes(lunchEnd);
+      prevDinnerStart.current = timeToMinutes(dinnerStart);
+      prevDinnerEnd.current = timeToMinutes(dinnerEnd);
     }
-
-    setIsAdjusting(true);
-
-    // Update refs with current values first
-    prevBreakfastStart.current = breakfastStartMin;
-    prevBreakfastEnd.current = breakfastEndMin;
-    prevLunchStart.current = lunchStartMin;
-    prevLunchEnd.current = lunchEndMin;
-    prevDinnerStart.current = dinnerStartMin;
-    prevDinnerEnd.current = dinnerEndMin;
-
-    // Adjust breakfast start -> adjust dinner end (previous meal, may cross midnight)
-    if (breakfastStartChanged) {
-      const newDinnerEndMin = breakfastStartMin;
-      setDinnerEnd(minutesToTime(newDinnerEndMin));
-      setTimeout(() => {
-        prevDinnerEnd.current = newDinnerEndMin;
-      }, 0);
-    }
-
-    // Adjust breakfast end -> adjust lunch start (next meal)
-    if (breakfastEndChanged) {
-      const newLunchStartMin = breakfastEndMin;
-      setLunchStart(minutesToTime(newLunchStartMin));
-      setTimeout(() => {
-        prevLunchStart.current = newLunchStartMin;
-      }, 0);
-    }
-
-    // Adjust lunch start -> adjust breakfast end (previous meal)
-    if (lunchStartChanged) {
-      const newBreakfastEndMin = lunchStartMin;
-      setBreakfastEnd(minutesToTime(newBreakfastEndMin));
-      setTimeout(() => {
-        prevBreakfastEnd.current = newBreakfastEndMin;
-      }, 0);
-    }
-
-    // Adjust lunch end -> adjust dinner start (next meal)
-    if (lunchEndChanged) {
-      const newDinnerStartMin = lunchEndMin;
-      setDinnerStart(minutesToTime(newDinnerStartMin));
-      setTimeout(() => {
-        prevDinnerStart.current = newDinnerStartMin;
-      }, 0);
-    }
-
-    // Adjust dinner start -> adjust lunch end (previous meal)
-    if (dinnerStartChanged) {
-      const newLunchEndMin = dinnerStartMin;
-      setLunchEnd(minutesToTime(newLunchEndMin));
-      setTimeout(() => {
-        prevLunchEnd.current = newLunchEndMin;
-      }, 0);
-    }
-
-    // Adjust dinner end -> adjust breakfast start (next meal, may cross midnight)
-    if (dinnerEndChanged) {
-      const newBreakfastStartMin = dinnerEndMin;
-      setBreakfastStart(minutesToTime(newBreakfastStartMin));
-      setTimeout(() => {
-        prevBreakfastStart.current = newBreakfastStartMin;
-      }, 0);
-    }
-
-    // Allow React to process state updates before clearing the flag
-    setTimeout(() => {
-      setIsAdjusting(false);
-    }, 0);
-  }, [breakfastStart, breakfastEnd, lunchStart, lunchEnd, dinnerStart, dinnerEnd, isAdjusting]);
+  }, [breakfastStart, breakfastEnd, lunchStart, lunchEnd, dinnerStart, dinnerEnd]);
 
   // Helper function to get access token
   const getAccessToken = (): string => {
