@@ -93,9 +93,15 @@ export class TokenService {
     for (const storedToken of storedTokens) {
       const isMatch = await bcrypt.compare(token, storedToken.token);
       if (isMatch) {
-        await this.prisma.refreshToken.delete({
-          where: { id: storedToken.id },
-        });
+        try {
+          await this.prisma.refreshToken.delete({
+            where: { id: storedToken.id },
+          });
+        } catch (error) {
+          // Token may have been deleted by another operation (e.g., concurrent refresh)
+          // This is not a critical error - the goal is that the token doesn't exist
+          console.warn(`Refresh token ${storedToken.id} was already deleted or doesn't exist`);
+        }
         return;
       }
     }

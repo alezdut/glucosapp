@@ -17,12 +17,8 @@ import { createApiClient } from "../lib/api";
 import { type UserProfile } from "@glucosapp/types";
 import { CustomDateTimePicker } from "../components/DateTimePicker";
 import type { RootStackParamList } from "../navigation/types";
-import {
-  minutesToTime,
-  timeToMinutes,
-  formatTimeFromMinutes,
-  extractTimeFromPicker,
-} from "../utils/dateUtils";
+import { formatTimeFromMinutes } from "@glucosapp/utils";
+import { minutesToTime, timeToMinutes, extractTimeFromPicker } from "../utils/dateUtils";
 
 type TreatmentParametersScreenProps = NativeStackScreenProps<
   RootStackParamList,
@@ -80,7 +76,7 @@ export default function TreatmentParametersScreen({ navigation }: TreatmentParam
       if (response.error) {
         throw new Error("Failed to fetch profile");
       }
-      return response.data as UserProfile;
+      return response.data as unknown as UserProfile;
     },
   });
 

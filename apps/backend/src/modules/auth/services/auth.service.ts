@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { UserRole } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { TokenService } from "./token.service";
 import { EmailService } from "./email.service";
@@ -48,6 +49,7 @@ export class AuthService {
         password: hashedPassword,
         firstName: registerDto.firstName,
         lastName: registerDto.lastName,
+        role: registerDto.role ?? UserRole.PATIENT, // Default to PATIENT if not specified (web sends DOCTOR)
         verificationToken,
         verificationTokenExpiry,
       },

@@ -1,19 +1,54 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+import { EncryptionService } from "../../common/services/encryption.service";
 import { CreateLogEntryDto } from "./dto/create-log-entry.dto";
+
+/**
+ * Type for LogEntry with decrypted glucose value
+ * Extends Prisma's LogEntry type to include mgdl in glucoseEntry when present
+ * mgdl is number | null to handle decryption failures safely
+ */
+type LogEntryWithDecryptedGlucose = Omit<
+  Prisma.LogEntryGetPayload<{
+    include: {
+      glucoseEntry: true;
+      insulinDose: true;
+      mealTemplate: {
+        include: {
+          foodItems: true;
+        };
+      };
+    };
+  }>,
+  "glucoseEntry"
+> & {
+  glucoseEntry:
+    | (Prisma.GlucoseEntryGetPayload<Record<string, never>> & { mgdl: number | null })
+    | null;
+};
 
 /**
  * Service handling log entries
  */
 @Injectable()
 export class LogEntriesService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(LogEntriesService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly encryptionService: EncryptionService,
+  ) {}
 
   /**
    * Find all log entries for a user with optional date range filtering
+   * @returns Array of log entries with decrypted glucose values
    */
-  async findAll(userId: string, startDate?: string, endDate?: string) {
+  async findAll(
+    userId: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<LogEntryWithDecryptedGlucose[]> {
     const whereClause: Prisma.LogEntryWhereInput = {
       userId,
     };
@@ -45,7 +80,43 @@ export class LogEntriesService {
       },
     });
 
-    return results;
+    // Decrypt glucose values in the results
+    const decryptedResults: LogEntryWithDecryptedGlucose[] = results.map(
+      (entry): LogEntryWithDecryptedGlucose => {
+        if (entry.glucoseEntry) {
+          try {
+            const decryptedMgdl = this.encryptionService.decryptGlucoseValue(
+              entry.glucoseEntry.mgdlEncrypted,
+            );
+            return {
+              ...entry,
+              glucoseEntry: {
+                ...entry.glucoseEntry,
+                mgdl: decryptedMgdl, // Add decrypted value for client compatibility
+              },
+            };
+          } catch (error) {
+            this.logger.error(
+              `Failed to decrypt glucose entry ${entry.glucoseEntry.id}`,
+              error instanceof Error ? error.stack : String(error),
+              LogEntriesService.name,
+            );
+            // Return entry with null mgdl if decryption fails
+            return {
+              ...entry,
+              glucoseEntry: {
+                ...entry.glucoseEntry,
+                mgdl: null,
+              },
+            };
+          }
+        }
+        // Entry without glucoseEntry - return as is (glucoseEntry is already null, which matches the type)
+        return entry as LogEntryWithDecryptedGlucose;
+      },
+    );
+
+    return decryptedResults;
   }
 
   /**
@@ -55,11 +126,12 @@ export class LogEntriesService {
     const recordedAt = data.recordedAt ? new Date(data.recordedAt) : new Date();
 
     return this.prisma.$transaction(async (tx) => {
-      // Create glucose entry
+      // Create glucose entry with encryption
+      const mgdlEncrypted = this.encryptionService.encryptGlucoseValue(data.glucoseMgdl);
       const glucoseEntry = await tx.glucoseEntry.create({
         data: {
           userId,
-          mgdl: data.glucoseMgdl,
+          mgdlEncrypted,
           recordedAt,
         },
       });

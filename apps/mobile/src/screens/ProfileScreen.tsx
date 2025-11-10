@@ -33,6 +33,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { type UserProfile, DiabetesType, GlucoseUnit, Theme, Language } from "@glucosapp/types";
 import { CustomDateTimePicker } from "../components";
 import type { RootStackParamList } from "../navigation/types";
+import { calculateAge } from "@glucosapp/utils";
 
 /**
  * Translate enum values to Spanish for display
@@ -56,19 +57,6 @@ function translateLanguage(lang: Language): string {
 /**
  * ProfileScreen component - Display and edit user profile
  */
-/**
- * Calculate age from date of birth
- */
-function calculateAge(birthDate: Date): number {
-  const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const monthDiff = today.getMonth() - birthDate.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
-  }
-  return age;
-}
-
 type ProfileScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function ProfileScreen() {
@@ -161,7 +149,7 @@ export default function ProfileScreen() {
     // Validar que la fecha de nacimiento resulte en una edad válida
     if (!profile?.birthDate && birthDate !== null) {
       const calculatedAge = calculateAge(birthDate);
-      if (calculatedAge < 1 || calculatedAge > 120) {
+      if (calculatedAge === null || calculatedAge < 1 || calculatedAge > 120) {
         Alert.alert("Error", "La edad debe estar entre 1 y 120 años");
         return;
       }

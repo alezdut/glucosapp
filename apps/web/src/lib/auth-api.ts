@@ -18,9 +18,13 @@ export interface LoginData {
 
 /**
  * Register a new user
+ * Web app users are automatically assigned DOCTOR role
  */
 export async function register(data: RegisterData): Promise<{ message: string }> {
-  const response = await client.POST<{ message: string }>("/auth/register", data);
+  const response = await client.POST<{ message: string }>("/auth/register", {
+    ...data,
+    role: "DOCTOR", // Web app users are doctors by default
+  });
   if (response.error) {
     throw new Error(response.error.message || "Registration failed");
   }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import type { ValidationResult } from "../utils/validation";
+import type { ValidationResult } from "@glucosapp/utils";
 
 /**
  * Hook for debounced validation with immediate validation on error correction

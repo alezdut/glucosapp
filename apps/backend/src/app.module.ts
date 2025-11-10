@@ -13,6 +13,10 @@ import { LogEntriesModule } from "./modules/log-entries/log-entries.module";
 import { FoodSearchModule } from "./modules/food-search/food-search.module";
 import { InsulinCalculationModule } from "./modules/insulin-calculation/insulin-calculation.module";
 import { SensorReadingsModule } from "./modules/sensor-readings/sensor-readings.module";
+import { DashboardModule } from "./modules/dashboard/dashboard.module";
+import { DoctorPatientModule } from "./modules/doctor-patient/doctor-patient.module";
+import { AppointmentsModule } from "./modules/appointments/appointments.module";
+import { AlertsModule } from "./modules/alerts/alerts.module";
 
 @Module({
   imports: [
@@ -29,6 +33,10 @@ import { SensorReadingsModule } from "./modules/sensor-readings/sensor-readings.
     FoodSearchModule,
     InsulinCalculationModule,
     SensorReadingsModule,
+    DashboardModule,
+    DoctorPatientModule,
+    AppointmentsModule,
+    AlertsModule,
   ],
   providers: [PrismaService],
 })

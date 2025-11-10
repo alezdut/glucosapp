@@ -1,3 +1,7 @@
+/**
+ * Password validation utilities
+ */
+
 export type PasswordStrength = "weak" | "medium" | "strong";
 
 /**

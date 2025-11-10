@@ -47,6 +47,33 @@ enum ReadingSource {
   OTHER_CGM
 }
 
+enum UserRole {
+  DOCTOR
+  PATIENT
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AlertType {
+  HYPOGLYCEMIA
+  SEVERE_HYPOGLYCEMIA
+  HYPERGLYCEMIA
+  PERSISTENT_HYPERGLYCEMIA
+  OTHER
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
 model User {
   id                       String           @id @default(cuid())
   email                    String           @unique
@@ -81,6 +108,7 @@ model User {
   mealTimeLunchEnd         Int              @default(1020) // 5:00 PM
   mealTimeDinnerStart      Int              @default(1020) // 5:00 PM
   mealTimeDinnerEnd        Int              @default(300) // 5:00 AM (next day)
+  role                     UserRole         @default(PATIENT)
   createdAt                DateTime         @default(now())
   entries                  GlucoseEntry[]
   accounts                 Account[]
@@ -89,6 +117,14 @@ model User {
   meals                    Meal[]
   logEntries               LogEntry[]
   glucoseReadings          GlucoseReading[]
+  // Doctor-Patient relationships
+  doctorRelations          DoctorPatient[]  @relation("Doctor")
+  patientRelations         DoctorPatient[]  @relation("Patient")
+  // Appointments
+  appointmentsAsDoctor     Appointment[]    @relation("Doctor")
+  appointmentsAsPatient    Appointment[]    @relation("Patient")
+  // Alerts
+  alerts                   Alert[]
 }
 
 model Account {
@@ -118,13 +154,15 @@ model RefreshToken {
 }
 
 model GlucoseEntry {
-  id         String    @id @default(cuid())
-  mgdl       Int
-  recordedAt DateTime  @default(now())
-  note       String?
-  user       User      @relation(fields: [userId], references: [id])
-  userId     String
-  logEntry   LogEntry?
+  id            String    @id @default(cuid())
+  mgdlEncrypted String
+  recordedAt    DateTime  @default(now())
+  note          String?
+  user          User      @relation(fields: [userId], references: [id])
+  userId        String
+  logEntry      LogEntry?
+
+  @@index([userId, recordedAt])
 }
 
 model InsulinDose {
@@ -144,6 +182,7 @@ model InsulinDose {
   logEntry          LogEntry?
 
   @@index([userId])
+  @@index([userId, recordedAt])
 }
 
 model Meal {
@@ -158,6 +197,7 @@ model Meal {
   user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([userId, createdAt])
 }
 
 model MealItem {
@@ -208,4 +248,53 @@ model GlucoseReading {
 
   @@index([userId, recordedAt])
   @@index([userId, source])
+}
+
+model DoctorPatient {
+  id        String   @id @default(cuid())
+  doctorId  String
+  patientId String
+  createdAt DateTime @default(now())
+  doctor    User     @relation("Doctor", fields: [doctorId], references: [id], onDelete: Cascade)
+  patient   User     @relation("Patient", fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorId, patientId])
+  @@index([doctorId])
+  @@index([patientId])
+}
+
+model Appointment {
+  id          String            @id @default(cuid())
+  doctorId    String
+  patientId   String
+  scheduledAt DateTime
+  notes       String?
+  status      AppointmentStatus @default(SCHEDULED)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  doctor      User              @relation("Doctor", fields: [doctorId], references: [id], onDelete: Cascade)
+  patient     User              @relation("Patient", fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId])
+  @@index([patientId])
+  @@index([doctorId, scheduledAt])
+  @@index([status])
+}
+
+model Alert {
+  id               String        @id @default(cuid())
+  userId           String
+  type             AlertType
+  severity         AlertSeverity
+  message          String
+  glucoseReadingId String?
+  acknowledged     Boolean       @default(false)
+  acknowledgedAt   DateTime?
+  createdAt        DateTime      @default(now())
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, acknowledged])
+  @@index([severity])
+  @@index([createdAt])
 }

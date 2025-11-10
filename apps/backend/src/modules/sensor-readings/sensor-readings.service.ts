@@ -93,9 +93,15 @@ export class SensorReadingsService {
     // Use transaction for atomicity
     const result = await this.prisma.$transaction(async (tx) => {
       const created = [];
+      let currentReadingData: CreateSensorReadingDto | null = null;
 
       for (const reading of data.readings) {
         const recordedAt = new Date(reading.recordedAt);
+
+        // Track the current reading (not historical) for LogEntry creation
+        if (!reading.isHistorical) {
+          currentReadingData = reading;
+        }
 
         // Check for duplicates
         const existing = await tx.glucoseReading.findFirst({
@@ -120,6 +126,57 @@ export class SensorReadingsService {
             },
           });
           created.push(newReading);
+        }
+      }
+
+      // Create LogEntry with GlucoseEntry for the current reading (NFC scan result)
+      if (currentReadingData) {
+        const currentRecordedAt = new Date(currentReadingData.recordedAt);
+
+        // Check if a LogEntry already exists for this exact timestamp
+        const existingLogEntry = await tx.logEntry.findFirst({
+          where: {
+            userId,
+            recordedAt: currentRecordedAt,
+          },
+        });
+
+        // Only create if LogEntry doesn't exist
+        if (!existingLogEntry) {
+          // Encrypt glucose value for GlucoseEntry
+          const mgdlEncrypted = this.encryptionService.encryptGlucoseValue(
+            currentReadingData.glucose,
+          );
+
+          // Create GlucoseEntry
+          const glucoseEntry = await tx.glucoseEntry.create({
+            data: {
+              userId,
+              mgdlEncrypted,
+              recordedAt: currentRecordedAt,
+            },
+          });
+
+          // Create LogEntry linking to the GlucoseEntry
+          await tx.logEntry.create({
+            data: {
+              userId,
+              recordedAt: currentRecordedAt,
+              glucoseEntryId: glucoseEntry.id,
+              // No insulin dose or meal for NFC sensor scan
+              mealType: null,
+              carbohydrates: null,
+              insulinDoseId: null,
+              mealTemplateId: null,
+              // Context factors default to false
+              recentExercise: false,
+              alcohol: false,
+              illness: false,
+              stress: false,
+              menstruation: false,
+              highFatMeal: false,
+            },
+          });
         }
       }
 

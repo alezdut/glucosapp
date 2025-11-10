@@ -1,5 +1,5 @@
 import type { LogEntry, MealCategory, DecryptedSensorReading } from "@glucosapp/types";
-import { formatLocalDateAsYYYYMMDD } from "./dateUtils";
+import { formatLocalDateAsYYYYMMDD } from "@glucosapp/utils";
 
 /**
  * Escape CSV field to handle commas, quotes, and newlines

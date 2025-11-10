@@ -20,7 +20,7 @@ import { createApiClient } from "../lib/api";
 import type { LogEntry, DecryptedSensorReading } from "@glucosapp/types";
 import { ScreenHeader, DateRangePicker, HistoryListItem } from "../components";
 import { convertCombinedDataToCsv, generateCsvFilename } from "../utils/csvExport";
-import { getUtcDateRangeIsoStrings } from "../utils/dateUtils";
+import { getUtcDateRangeIsoStrings } from "@glucosapp/utils";
 
 /**
  * Get default date range (last 7 days)
