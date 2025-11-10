@@ -452,3 +452,29 @@ export async function getPatientLogEntries(
   }
   return response.data || [];
 }
+
+/**
+ * Update patient profile/parameters
+ */
+export async function updatePatientProfile(
+  accessToken: string,
+  patientId: string,
+  data: Partial<PatientProfile>,
+): Promise<PatientProfile> {
+  const response = await client.PATCH<PatientProfile>(
+    `/doctor-patients/${patientId}/profile`,
+    data,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  );
+  if (response.error) {
+    throw new Error(response.error.message || "Failed to update patient profile");
+  }
+  if (!response.data) {
+    throw new Error("No data returned from update patient profile endpoint");
+  }
+  return response.data;
+}

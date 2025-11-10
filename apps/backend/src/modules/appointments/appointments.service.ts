@@ -1,5 +1,5 @@
 import { Injectable, ForbiddenException, NotFoundException } from "@nestjs/common";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, Appointment } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { DoctorUtilsService } from "../../common/services/doctor-utils.service";
 import { CreateAppointmentDto } from "./dto/create-appointment.dto";
@@ -49,6 +49,30 @@ export class AppointmentsService {
         lastName: apt.patient.lastName || undefined,
       },
     };
+  }
+
+  /**
+   * Find and verify appointment exists and belongs to doctor
+   * @throws NotFoundException if appointment not found
+   * @throws ForbiddenException if appointment does not belong to doctor
+   */
+  private async findAndVerifyAppointment(
+    doctorId: string,
+    appointmentId: string,
+  ): Promise<Appointment> {
+    const appointment = await this.prisma.appointment.findUnique({
+      where: { id: appointmentId },
+    });
+
+    if (!appointment) {
+      throw new NotFoundException("Appointment not found");
+    }
+
+    if (appointment.doctorId !== doctorId) {
+      throw new ForbiddenException("You can only update your own appointments");
+    }
+
+    return appointment;
   }
 
   /**
@@ -135,17 +159,7 @@ export class AppointmentsService {
   ): Promise<AppointmentResponseDto> {
     await this.doctorUtils.verifyDoctor(doctorId);
 
-    const appointment = await this.prisma.appointment.findUnique({
-      where: { id: appointmentId },
-    });
-
-    if (!appointment) {
-      throw new NotFoundException("Appointment not found");
-    }
-
-    if (appointment.doctorId !== doctorId) {
-      throw new ForbiddenException("You can only update your own appointments");
-    }
+    await this.findAndVerifyAppointment(doctorId, appointmentId);
 
     const updated = await this.prisma.appointment.update({
       where: { id: appointmentId },
@@ -175,17 +189,7 @@ export class AppointmentsService {
   async remove(doctorId: string, appointmentId: string): Promise<{ message: string }> {
     await this.doctorUtils.verifyDoctor(doctorId);
 
-    const appointment = await this.prisma.appointment.findUnique({
-      where: { id: appointmentId },
-    });
-
-    if (!appointment) {
-      throw new NotFoundException("Appointment not found");
-    }
-
-    if (appointment.doctorId !== doctorId) {
-      throw new ForbiddenException("You can only delete your own appointments");
-    }
+    await this.findAndVerifyAppointment(doctorId, appointmentId);
 
     await this.prisma.appointment.delete({
       where: { id: appointmentId },

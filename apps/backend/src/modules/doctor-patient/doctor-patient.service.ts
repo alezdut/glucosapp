@@ -48,6 +48,65 @@ export class DoctorPatientService {
   ) {}
 
   /**
+   * Get last glucose reading for a patient (prioritizes GlucoseEntry over GlucoseReading)
+   * @param patientId - Patient ID
+   * @returns Decrypted glucose reading with value and recordedAt, or null if not found
+   */
+  private async getLastGlucoseReading(
+    patientId: string,
+  ): Promise<{ value: number; recordedAt: Date } | null> {
+    // Try GlucoseEntry first
+    const lastGlucoseEntry = await this.prisma.glucoseEntry.findFirst({
+      where: { userId: patientId },
+      orderBy: { recordedAt: "desc" },
+      select: { mgdlEncrypted: true, recordedAt: true },
+    });
+
+    if (lastGlucoseEntry) {
+      try {
+        const decryptedValue = this.encryptionService.decryptGlucoseValue(
+          lastGlucoseEntry.mgdlEncrypted,
+        );
+        return {
+          value: decryptedValue,
+          recordedAt: lastGlucoseEntry.recordedAt,
+        };
+      } catch (error) {
+        console.error(
+          `[DoctorPatient] Failed to decrypt glucose entry for patient ${patientId}:`,
+          error,
+        );
+      }
+    }
+
+    // Fallback to GlucoseReading if no GlucoseEntry
+    const lastGlucoseReadingRecord = await this.prisma.glucoseReading.findFirst({
+      where: { userId: patientId },
+      orderBy: { recordedAt: "desc" },
+      select: { glucoseEncrypted: true, recordedAt: true },
+    });
+
+    if (lastGlucoseReadingRecord) {
+      try {
+        const glucoseValue = this.encryptionService.decryptGlucoseValue(
+          lastGlucoseReadingRecord.glucoseEncrypted,
+        );
+        return {
+          value: glucoseValue,
+          recordedAt: lastGlucoseReadingRecord.recordedAt,
+        };
+      } catch (error) {
+        console.error(
+          `[DoctorPatient] Failed to decrypt glucose reading for patient ${patientId}:`,
+          error,
+        );
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Get all patients for a doctor with filters and enhanced data
    */
   async getPatients(
@@ -151,6 +210,64 @@ export class DoctorPatientService {
       activePatientIds = Array.from(allActiveIds);
     }
 
+    // Determine which patients will be processed (after activeOnly filter)
+    const patientsToProcess = filters?.activeOnly
+      ? patients.filter((p) => activePatientIds.includes(p.id))
+      : patients;
+    const patientIdsToProcess = patientsToProcess.map((p) => p.id);
+
+    // Batch fetch latest GlucoseEntry for all patients to process
+    const glucoseEntries = await this.prisma.glucoseEntry.findMany({
+      where: { userId: { in: patientIdsToProcess } },
+      select: {
+        userId: true,
+        mgdlEncrypted: true,
+        recordedAt: true,
+      },
+      orderBy: { recordedAt: "desc" },
+    });
+
+    // Build Map<userId, latest entry> - keep only the latest entry per user
+    const latestGlucoseEntryMap = new Map<string, { mgdlEncrypted: string; recordedAt: Date }>();
+    for (const entry of glucoseEntries) {
+      if (!latestGlucoseEntryMap.has(entry.userId)) {
+        latestGlucoseEntryMap.set(entry.userId, {
+          mgdlEncrypted: entry.mgdlEncrypted,
+          recordedAt: entry.recordedAt,
+        });
+      }
+    }
+
+    // Identify patients without GlucoseEntry
+    const patientIdsWithoutEntry = patientIdsToProcess.filter(
+      (id) => !latestGlucoseEntryMap.has(id),
+    );
+
+    // Batch fetch latest GlucoseReading for patients without GlucoseEntry
+    const glucoseReadings = await this.prisma.glucoseReading.findMany({
+      where: { userId: { in: patientIdsWithoutEntry } },
+      select: {
+        userId: true,
+        glucoseEncrypted: true,
+        recordedAt: true,
+      },
+      orderBy: { recordedAt: "desc" },
+    });
+
+    // Build Map<userId, latest reading> - keep only the latest reading per user
+    const latestGlucoseReadingMap = new Map<
+      string,
+      { glucoseEncrypted: string; recordedAt: Date }
+    >();
+    for (const reading of glucoseReadings) {
+      if (!latestGlucoseReadingMap.has(reading.userId)) {
+        latestGlucoseReadingMap.set(reading.userId, {
+          glucoseEncrypted: reading.glucoseEncrypted,
+          recordedAt: reading.recordedAt,
+        });
+      }
+    }
+
     // Build result with enhanced data
     const result: PatientListItemDto[] = [];
 
@@ -160,23 +277,18 @@ export class DoctorPatientService {
         continue;
       }
 
-      // Get last glucose reading (prioritize GlucoseEntry)
-      const lastGlucoseEntry = await this.prisma.glucoseEntry.findFirst({
-        where: { userId: patient.id },
-        orderBy: { recordedAt: "desc" },
-        select: { mgdlEncrypted: true, recordedAt: true },
-      });
-
+      // Get last glucose reading from pre-fetched maps (no DB calls in loop)
       let lastGlucoseReading: { value: number; recordedAt: Date } | null = null;
 
-      if (lastGlucoseEntry) {
+      const glucoseEntry = latestGlucoseEntryMap.get(patient.id);
+      if (glucoseEntry) {
         try {
           const decryptedValue = this.encryptionService.decryptGlucoseValue(
-            lastGlucoseEntry.mgdlEncrypted,
+            glucoseEntry.mgdlEncrypted,
           );
           lastGlucoseReading = {
             value: decryptedValue,
-            recordedAt: lastGlucoseEntry.recordedAt,
+            recordedAt: glucoseEntry.recordedAt,
           };
         } catch (error) {
           console.error(
@@ -186,20 +298,15 @@ export class DoctorPatientService {
         }
       } else {
         // Fallback to GlucoseReading if no GlucoseEntry
-        const lastGlucoseReadingRecord = await this.prisma.glucoseReading.findFirst({
-          where: { userId: patient.id },
-          orderBy: { recordedAt: "desc" },
-          select: { glucoseEncrypted: true, recordedAt: true },
-        });
-
-        if (lastGlucoseReadingRecord) {
+        const glucoseReading = latestGlucoseReadingMap.get(patient.id);
+        if (glucoseReading) {
           try {
             const glucoseValue = this.encryptionService.decryptGlucoseValue(
-              lastGlucoseReadingRecord.glucoseEncrypted,
+              glucoseReading.glucoseEncrypted,
             );
             lastGlucoseReading = {
               value: glucoseValue,
-              recordedAt: lastGlucoseReadingRecord.recordedAt,
+              recordedAt: glucoseReading.recordedAt,
             };
           } catch (error) {
             console.error(
@@ -568,53 +675,7 @@ export class DoctorPatientService {
     }
 
     // Get last glucose reading
-    const lastGlucoseEntry = await this.prisma.glucoseEntry.findFirst({
-      where: { userId: patientId },
-      orderBy: { recordedAt: "desc" },
-      select: { mgdlEncrypted: true, recordedAt: true },
-    });
-
-    let lastGlucoseReading: { value: number; recordedAt: Date } | null = null;
-
-    if (lastGlucoseEntry) {
-      try {
-        const decryptedValue = this.encryptionService.decryptGlucoseValue(
-          lastGlucoseEntry.mgdlEncrypted,
-        );
-        lastGlucoseReading = {
-          value: decryptedValue,
-          recordedAt: lastGlucoseEntry.recordedAt,
-        };
-      } catch (error) {
-        console.error(
-          `[DoctorPatient] Failed to decrypt glucose entry for patient ${patientId}:`,
-          error,
-        );
-      }
-    } else {
-      const lastGlucoseReadingRecord = await this.prisma.glucoseReading.findFirst({
-        where: { userId: patientId },
-        orderBy: { recordedAt: "desc" },
-        select: { glucoseEncrypted: true, recordedAt: true },
-      });
-
-      if (lastGlucoseReadingRecord) {
-        try {
-          const glucoseValue = this.encryptionService.decryptGlucoseValue(
-            lastGlucoseReadingRecord.glucoseEncrypted,
-          );
-          lastGlucoseReading = {
-            value: glucoseValue,
-            recordedAt: lastGlucoseReadingRecord.recordedAt,
-          };
-        } catch (error) {
-          console.error(
-            `[DoctorPatient] Failed to decrypt glucose reading for patient ${patientId}:`,
-            error,
-          );
-        }
-      }
-    }
+    const lastGlucoseReading = await this.getLastGlucoseReading(patientId);
 
     // Calculate clinical status (Riesgo/Estable) and activity status (Activo/Inactivo)
     const [status, activityStatus] = await Promise.all([

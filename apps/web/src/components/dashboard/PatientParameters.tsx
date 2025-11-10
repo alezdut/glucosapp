@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { PatientProfile } from "@/lib/dashboard-api";
+import { PatientProfile, updatePatientProfile } from "@/lib/dashboard-api";
 import { Loader2, Save, Clock } from "lucide-react";
 
 interface PatientParametersProps {
@@ -290,29 +290,23 @@ export const PatientParameters = ({ profile, patientId }: PatientParametersProps
     }, 0);
   }, [breakfastStart, breakfastEnd, lunchStart, lunchEnd, dinnerStart, dinnerEnd, isAdjusting]);
 
+  // Helper function to get access token
+  const getAccessToken = (): string => {
+    if (typeof window === "undefined") {
+      throw new Error("Not authenticated");
+    }
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      throw new Error("Not authenticated");
+    }
+    return token;
+  };
+
   // Update profile mutation
   const updateProfile = useMutation({
     mutationFn: async (data: UpdatePatientProfileData) => {
-      const token = localStorage.getItem("accessToken");
-      if (!token) throw new Error("Not authenticated");
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/v1/doctor-patients/${patientId}/profile`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(data),
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to update profile");
-      }
-
-      return response.json();
+      const accessToken = getAccessToken();
+      return updatePatientProfile(accessToken, patientId, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["patientProfile", patientId] });

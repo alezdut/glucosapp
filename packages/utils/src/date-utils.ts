@@ -74,6 +74,10 @@ export const formatTimeAgo = (dateString: string): string => {
  * @returns Date string in YYYY-MM-DD format
  */
 export const formatLocalDateAsYYYYMMDD = (date: Date): string => {
+  if (isNaN(date.getTime())) {
+    throw new Error("Invalid date provided to formatLocalDateAsYYYYMMDD");
+  }
+
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
@@ -93,6 +97,14 @@ export const formatLocalDateAsYYYYMMDD = (date: Date): string => {
  * @returns Date object representing the start of the local day in UTC
  */
 export const getUtcStartOfLocalDay = (localDate: Date): Date => {
+  // Validate input Date
+  if (!(localDate instanceof Date)) {
+    throw new TypeError("invalid Date input: expected Date instance");
+  }
+  if (isNaN(localDate.getTime())) {
+    throw new TypeError("invalid Date input: Date has invalid time");
+  }
+
   const start = new Date(localDate);
   start.setHours(0, 0, 0, 0);
   return start;
@@ -111,6 +123,14 @@ export const getUtcStartOfLocalDay = (localDate: Date): Date => {
  * @returns Date object representing the end of the local day in UTC
  */
 export const getUtcEndOfLocalDay = (localDate: Date): Date => {
+  // Validate input Date
+  if (!(localDate instanceof Date)) {
+    throw new TypeError("invalid Date input: expected Date instance");
+  }
+  if (isNaN(localDate.getTime())) {
+    throw new TypeError("invalid Date input: Date has invalid time");
+  }
+
   const end = new Date(localDate);
   end.setHours(23, 59, 59, 999);
   return end;
@@ -144,6 +164,15 @@ export const getUtcDateRangeIsoStrings = (
  * @returns Formatted time string (HH:MM)
  */
 export const formatTimeFromMinutes = (minutes: number): string => {
+  // Validate input: must be a finite number
+  if (typeof minutes !== "number" || !Number.isFinite(minutes)) {
+    throw new TypeError("invalid minutes input: expected a finite number");
+  }
+  // Validate range: 0-1439 (0 minutes to 23:59)
+  if (minutes < 0 || minutes > 1439) {
+    throw new RangeError(`invalid minutes input: must be between 0 and 1439 (got ${minutes})`);
+  }
+
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
   return `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`;
