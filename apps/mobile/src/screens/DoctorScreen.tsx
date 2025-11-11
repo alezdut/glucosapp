@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
-import { Droplet, Syringe, TrendingUp, Stethoscope, Mail, Info } from "lucide-react-native";
+import { Droplet, Syringe, Stethoscope, Mail, Info } from "lucide-react-native";
 import { theme } from "../theme";
 import { createApiClient } from "../lib/api";
 import { GlucoseChart, type GlucoseDataPoint } from "../components/GlucoseChart";
@@ -336,32 +336,37 @@ export default function DoctorScreen() {
             </Text>
           </View>
 
-          {/* Insulin Sensitivity Factor */}
-          <View style={styles.parameterCard}>
-            <Text style={styles.parameterLabel}>Factor de Sensibilidad a la Insulina (FSI)</Text>
-            <View style={styles.parameterRow}>
-              <View style={styles.parameterItem}>
-                <Text style={styles.parameterValue}>{profile.insulinSensitivityFactor || "-"}</Text>
-                <Text style={styles.parameterUnit}>mg/dL/U</Text>
+          {/* Insulin Sensitivity Factor and DIA Hours - Side by Side */}
+          <View style={styles.parameterCardsRow}>
+            {/* Insulin Sensitivity Factor */}
+            <View style={styles.parameterCardHalf}>
+              <Text style={styles.parameterLabelHalf}>Factor de Sensibilidad (FSI)</Text>
+              <View style={styles.parameterValueContainer}>
+                <View style={styles.parameterItem}>
+                  <Text style={styles.parameterValue}>
+                    {profile.insulinSensitivityFactor || "-"}
+                  </Text>
+                  <Text style={styles.parameterUnit}>mg/dL/U</Text>
+                </View>
               </View>
+              <Text style={styles.parameterDescriptionHalf}>
+                Reducción de glucosa por una unidad de insulina.
+              </Text>
             </View>
-            <Text style={styles.parameterDescription}>
-              Reducción de glucosa por una unidad de insulina.
-            </Text>
-          </View>
 
-          {/* DIA Hours */}
-          <View style={styles.parameterCard}>
-            <Text style={styles.parameterLabel}>Duración de Acción de Insulina (DIA)</Text>
-            <View style={styles.parameterRow}>
-              <View style={styles.parameterItem}>
-                <Text style={styles.parameterValue}>{profile.diaHours || "-"}</Text>
-                <Text style={styles.parameterUnit}>horas</Text>
+            {/* DIA Hours */}
+            <View style={styles.parameterCardHalf}>
+              <Text style={styles.parameterLabelHalf}>Duración de Acción de Insulina (DIA)</Text>
+              <View style={styles.parameterValueContainer}>
+                <View style={styles.parameterItem}>
+                  <Text style={styles.parameterValue}>{profile.diaHours || "-"}</Text>
+                  <Text style={styles.parameterUnit}>horas</Text>
+                </View>
               </View>
+              <Text style={styles.parameterDescriptionHalf}>
+                Tiempo que la insulina permanece activa.
+              </Text>
             </View>
-            <Text style={styles.parameterDescription}>
-              Tiempo que la insulina permanece activa.
-            </Text>
           </View>
 
           {/* Target Glucose Range */}
@@ -573,6 +578,46 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  parameterCardsRow: {
+    flexDirection: "row",
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+    alignItems: "stretch",
+  },
+  parameterCardHalf: {
+    flex: 1,
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    justifyContent: "space-between",
+  },
+  parameterLabelHalf: {
+    fontSize: theme.fontSize.md,
+    fontWeight: "600",
+    color: theme.colors.text,
+    marginBottom: theme.spacing.sm,
+    minHeight: 44,
+  },
+  parameterValueContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: theme.spacing.sm,
+  },
+  parameterDescriptionHalf: {
+    fontSize: theme.fontSize.xs,
+    color: theme.colors.textSecondary,
+    fontStyle: "italic",
+    textAlign: "center",
   },
   parameterLabel: {
     fontSize: theme.fontSize.md,

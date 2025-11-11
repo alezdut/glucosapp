@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -77,6 +77,9 @@ export default function ProfileScreen() {
       if (response.error) {
         throw new Error("Failed to fetch profile");
       }
+      if (!response.data) {
+        throw new Error("Profile data is missing");
+      }
       const data = response.data as UserProfile;
       // Update local state with fetched data
       if (data.birthDate) {
@@ -93,25 +96,13 @@ export default function ProfileScreen() {
     queryKey: ["my-doctor"],
     queryFn: async () => {
       const client = createApiClient();
-      const response = await client.GET("/doctor-patients/my-doctor", {});
+      const response = await client.GET("/profile/doctor", {});
       if (response.error) {
-        // If 404, no doctor assigned - return null
-        if (
-          typeof response.error === "object" &&
-          "status" in response.error &&
-          response.error.status === 404
-        ) {
-          return null;
-        }
         throw new Error("Failed to fetch doctor information");
       }
-      return response.data;
+      return response.data ?? null;
     },
-    retry: (failureCount, error) => {
-      // Don't retry on 404 (no doctor assigned)
-      if (error && typeof error === "object" && "status" in error && error.status === 404) {
-        return false;
-      }
+    retry: (failureCount) => {
       return failureCount < 3;
     },
   });
@@ -456,14 +447,16 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         )}
         {hasDoctor && (
-          <View style={styles.fieldRow}>
+          <View style={[styles.fieldRow, styles.fieldRowDisabled]}>
             <View style={styles.fieldIconContainer}>
-              <Syringe size={20} color={theme.colors.textSecondary} />
+              <Syringe size={20} color={theme.colors.textTertiary} />
             </View>
             <View style={styles.fieldContent}>
-              <Text style={styles.fieldLabel}>Parámetros de tratamiento</Text>
-              <Text style={styles.fieldValue}>
-                Administrados por tu médico. Ver en la sección "Médico"
+              <Text style={[styles.fieldLabel, styles.fieldLabelDisabled]}>
+                Parámetros de tratamiento
+              </Text>
+              <Text style={[styles.fieldValue, styles.fieldValueDisabled]}>
+                Administrados por tu médico.
               </Text>
             </View>
           </View>
@@ -587,6 +580,15 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.md,
     color: theme.colors.text,
     fontWeight: "500",
+  },
+  fieldRowDisabled: {
+    opacity: 0.6,
+  },
+  fieldLabelDisabled: {
+    color: theme.colors.textTertiary,
+  },
+  fieldValueDisabled: {
+    color: theme.colors.textTertiary,
   },
   fieldInput: {
     fontSize: theme.fontSize.md,

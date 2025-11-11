@@ -497,7 +497,6 @@ export const GlucoseChart = ({
           rulesType="solid"
           showVerticalLines={false}
           // Behavior
-          adjustToWidth={true}
           disableScroll={true}
           // Reference lines for target range
           showReferenceLine1={!!targetRange}
