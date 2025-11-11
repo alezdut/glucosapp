@@ -30,4 +30,46 @@ export class StatisticsController {
   async getSummary(@AuthUser() user: UserResponseDto): Promise<StatisticsResponseDto> {
     return this.statisticsService.getSummary(user.id);
   }
+
+  /**
+   * Get weekly glucose average (last 7 days)
+   */
+  @Get("weekly-glucose-average")
+  @ApiOperation({ summary: "Get weekly glucose average" })
+  @ApiResponse({
+    status: 200,
+    description: "Weekly glucose average",
+  })
+  @ApiResponse({ status: 401, description: "Unauthorized" })
+  async getWeeklyGlucoseAverage(@AuthUser() user: UserResponseDto) {
+    return this.statisticsService.getWeeklyGlucoseAverage(user.id);
+  }
+
+  /**
+   * Get daily insulin average (last 7 days)
+   */
+  @Get("daily-insulin-average")
+  @ApiOperation({ summary: "Get daily insulin average" })
+  @ApiResponse({
+    status: 200,
+    description: "Daily insulin average",
+  })
+  @ApiResponse({ status: 401, description: "Unauthorized" })
+  async getDailyInsulinAverage(@AuthUser() user: UserResponseDto) {
+    return this.statisticsService.getDailyInsulinAverage(user.id);
+  }
+
+  /**
+   * Get glucose trend for the last 7 days (daily averages)
+   */
+  @Get("glucose-trend")
+  @ApiOperation({ summary: "Get glucose trend (last 7 days - daily averages)" })
+  @ApiResponse({
+    status: 200,
+    description: "Glucose trend data with daily averages",
+  })
+  @ApiResponse({ status: 401, description: "Unauthorized" })
+  async getGlucoseTrend(@AuthUser() user: UserResponseDto) {
+    return this.statisticsService.getGlucoseTrend(user.id);
+  }
 }

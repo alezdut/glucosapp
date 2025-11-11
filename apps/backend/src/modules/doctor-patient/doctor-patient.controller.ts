@@ -8,6 +8,7 @@ import {
   Body,
   UseGuards,
   Query,
+  NotFoundException,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
 import type { Prisma } from "@prisma/client";
@@ -214,5 +215,23 @@ export class DoctorPatientController {
     @Param("patientId") patientId: string,
   ): Promise<{ message: string }> {
     return this.doctorPatientService.removePatient(user.id, patientId);
+  }
+
+  /**
+   * Get the doctor assigned to the authenticated patient
+   */
+  @Get("my-doctor")
+  @ApiOperation({ summary: "Get patient's assigned doctor" })
+  @ApiResponse({
+    status: 200,
+    description: "Doctor information retrieved successfully",
+  })
+  @ApiResponse({ status: 404, description: "No doctor assigned" })
+  async getMyDoctor(@AuthUser() user: UserResponseDto) {
+    const doctor = await this.doctorPatientService.getPatientDoctor(user.id);
+    if (!doctor) {
+      throw new NotFoundException("No doctor assigned");
+    }
+    return doctor;
   }
 }

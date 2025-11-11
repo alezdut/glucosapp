@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagg
 import { ProfileService } from "./profile.service";
 import { UpdateProfileDto } from "./dto/update-profile.dto";
 import { ProfileResponseDto } from "./dto/profile-response.dto";
+import { AssignedDoctorResponseDto } from "./dto/assigned-doctor-response.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { AuthUser } from "../auth/decorators/auth-user.decorator";
 import { UserResponseDto } from "../auth/dto/auth-response.dto";
@@ -30,6 +31,23 @@ export class ProfileController {
   @ApiResponse({ status: 401, description: "Unauthorized" })
   async getProfile(@AuthUser() user: UserResponseDto): Promise<ProfileResponseDto> {
     return this.profileService.getProfile(user.id);
+  }
+
+  /**
+   * Get doctor assigned to the current patient
+   */
+  @Get("doctor")
+  @ApiOperation({ summary: "Get doctor assigned to current patient" })
+  @ApiResponse({
+    status: 200,
+    description: "Assigned doctor information (or null if not assigned)",
+    type: AssignedDoctorResponseDto,
+  })
+  @ApiResponse({ status: 401, description: "Unauthorized" })
+  async getAssignedDoctor(
+    @AuthUser() user: UserResponseDto,
+  ): Promise<AssignedDoctorResponseDto | null> {
+    return this.profileService.getAssignedDoctor(user.id);
   }
 
   /**

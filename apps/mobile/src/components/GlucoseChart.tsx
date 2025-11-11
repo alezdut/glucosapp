@@ -41,6 +41,14 @@ type GlucoseChartProps = {
   smoothing?: boolean;
   /** Window size for moving average smoothing (odd number recommended). Default: 5 */
   smoothingWindow?: number;
+  /** Force showing data points for all values (useful for daily averages) */
+  showAllDataPoints?: boolean;
+  /** Align first/last data points exactly with x-axis labels */
+  alignToLabels?: boolean;
+  /** Additional padding to remove from chart width (useful to add breathing room at the end) */
+  endPadding?: number;
+  /** Horizontal offset (px) applied to labels and reference lines */
+  labelOffset?: number;
 };
 
 /**
@@ -74,6 +82,10 @@ export const GlucoseChart = ({
   inline = false,
   smoothing = true,
   smoothingWindow = 4,
+  showAllDataPoints = false,
+  alignToLabels = false,
+  endPadding = 0,
+  labelOffset = 0,
 }: GlucoseChartProps) => {
   // Calculate optimal spacing to fit all data in screen width
   const screenWidth = useMemo(() => Dimensions.get("window").width, []);
@@ -89,12 +101,18 @@ export const GlucoseChart = ({
     return screenWidth - containerPadding - cardPadding - yAxisWidth;
   }, [screenWidth, inline]);
 
+  const chartWidth = Math.max(0, availableWidth - endPadding);
+
   // Calculate spacing based on data points to fit exactly in available width
   // Note: react-native-gifted-charts uses uniform spacing, so we calculate based on point count
   // The last point should always be at endDate (now) to ensure it appears at the rightmost position
   const dataPointsCount = data.length > 0 ? data.length : 1;
-  const endSpacing = 0; // Small margin at the end
-  const spacing = Math.max(2, (availableWidth - endSpacing) / dataPointsCount);
+  const segmentsCount = dataPointsCount > 1 ? dataPointsCount - 1 : 1;
+  const endSpacing = 0; // Avoid margin so points align with labels when needed
+  const spacing = Math.max(
+    2,
+    (chartWidth - endSpacing) / (alignToLabels ? segmentsCount : dataPointsCount),
+  );
 
   /**
    * Transform glucose data to chart format
@@ -130,6 +148,33 @@ export const GlucoseChart = ({
       // Use unsmoothed value for the last point, smoothed for the rest
       const isLast = index === data.length - 1;
       const value = isLast ? values[index] : smoothedValues[index];
+
+      // If showAllDataPoints is true, always show points
+      if (showAllDataPoints) {
+        if (!targetRange) {
+          return {
+            value,
+            dataPointRadius: 5,
+            dataPointColor: theme.colors.primary,
+          };
+        }
+
+        const isBelowMin = value < targetRange.min;
+        const isAboveMax = value > targetRange.max;
+        const isOutOfRange = isBelowMin || isAboveMax;
+
+        return {
+          value,
+          dataPointRadius: 5,
+          dataPointColor: isOutOfRange
+            ? isBelowMin
+              ? theme.colors.error
+              : theme.colors.warning
+            : theme.colors.primary,
+        };
+      }
+
+      // Original behavior: only show points when out of range
       if (!targetRange) {
         return {
           value,
@@ -150,10 +195,94 @@ export const GlucoseChart = ({
   };
 
   /**
-   * Get hourly time labels positioned based on point indices (uniform spacing).
+   * Get time labels (hourly for short ranges, daily for week ranges).
    * Returns array of { position: number (0..1), time: string }.
    */
   const getTimeLabels = () => {
+    if (!data || data.length === 0) return [];
+
+    const startTimeMs = new Date(data[0].timestamp).getTime();
+    const endTimeMs = new Date(data[data.length - 1].timestamp).getTime();
+    const timeRangeMs = endTimeMs - startTimeMs;
+    const daysRange = timeRangeMs / (24 * 60 * 60 * 1000);
+
+    // If range is more than 5 days, use daily labels
+    if (daysRange > 5) {
+      return getDailyLabels();
+    }
+
+    // Otherwise use hourly labels
+    return getHourlyLabels();
+  };
+
+  /**
+   * Get daily labels for week-long charts
+   */
+  const getDailyLabels = () => {
+    if (!data || data.length === 0) return [];
+
+    const dayNames = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+
+    const startTimeMs = new Date(data[0].timestamp).getTime();
+    const endTimeMs = new Date(data[data.length - 1].timestamp).getTime();
+
+    // Get start and end dates (midnight)
+    const startDate = new Date(startTimeMs);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(endTimeMs);
+    endDate.setHours(0, 0, 0, 0);
+
+    const labels: Array<{ position: number; time: string }> = [];
+    const pointTimes = data.map((p) => new Date(p.timestamp).getTime());
+
+    // Generate labels for each day from start to end
+    const currentDate = new Date(startDate);
+    while (currentDate <= endDate) {
+      const dayStartMs = currentDate.getTime();
+
+      // Find the closest data point to the middle of this day
+      const dayMidMs = dayStartMs + 12 * 60 * 60 * 1000;
+
+      let closestIndex = 0;
+      let minDistance = Math.abs(pointTimes[0] - dayMidMs);
+
+      for (let i = 1; i < pointTimes.length; i++) {
+        const dist = Math.abs(pointTimes[i] - dayMidMs);
+        if (dist < minDistance) {
+          minDistance = dist;
+          closestIndex = i;
+        }
+      }
+
+      // Only add label if there's data for this day (within 12 hours of day start)
+      const THRESHOLD_MS = 12 * 60 * 60 * 1000;
+      if (minDistance <= THRESHOLD_MS) {
+        const dayOfWeek = currentDate.getDay();
+        const dayName = dayNames[dayOfWeek];
+        const position =
+          alignToLabels && data.length > 1
+            ? closestIndex / (data.length - 1)
+            : closestIndex / data.length;
+
+        if (position >= 0 && position <= 1) {
+          labels.push({
+            position,
+            time: dayName,
+          });
+        }
+      }
+
+      // Move to next day
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    return labels;
+  };
+
+  /**
+   * Get hourly labels for short-range charts
+   */
+  const getHourlyLabels = () => {
     if (!data || data.length === 0) return [];
 
     const formatTime = (ts: number) => {
@@ -177,7 +306,7 @@ export const GlucoseChart = ({
 
     const labels: Array<{ position: number; time: string }> = [];
 
-    // If only one point, place single label at 0 (or 1) — aquí lo ponemos en 0
+    // If only one point, place single label at 0
     if (data.length === 1) {
       const pos = 0;
       const t = formatTime(startTimeMs);
@@ -192,7 +321,7 @@ export const GlucoseChart = ({
       // Only consider hours strictly inside the data interval
       if (hourTime <= startTimeMs || hourTime >= endTimeMs) continue;
 
-      // Find closest index to this hourTime (binary search could be used if data sorted)
+      // Find closest index to this hourTime
       let closestIndex = 0;
       let minDistance = Math.abs(pointTimes[0] - hourTime);
 
@@ -204,7 +333,7 @@ export const GlucoseChart = ({
         }
       }
 
-      // threshold: solo si el punto está razonablemente cercano (ej. 20 minutos)
+      // threshold: solo si el punto está razonablemente cercano (5 minutos)
       const THRESHOLD_MS = 5 * 60 * 1000;
       if (minDistance <= THRESHOLD_MS) {
         const position = (closestIndex - 4) / data.length;
@@ -314,7 +443,12 @@ export const GlucoseChart = ({
       {/* Chart */}
       <View style={styles.chartWrapper}>
         {/* Vertical reference lines - positioned to align with custom labels */}
-        <View style={[styles.referenceLinesContainer, { height: height, width: availableWidth }]}>
+        <View
+          style={[
+            styles.referenceLinesContainer,
+            { height: height, width: chartWidth, transform: [{ translateX: -labelOffset }] },
+          ]}
+        >
           {timeLabels.map((label, index) => (
             <View
               key={`line-${index}`}
@@ -326,7 +460,7 @@ export const GlucoseChart = ({
         <LineChart
           data={chartData}
           height={height}
-          width={availableWidth}
+          width={chartWidth}
           // Y-Axis config - must come first
           yAxisOffset={yAxisConfig.yAxisOffset}
           maxValue={yAxisConfig.maxValue}
@@ -338,6 +472,8 @@ export const GlucoseChart = ({
           spacing={spacing}
           initialSpacing={0}
           endSpacing={endSpacing}
+          adjustToWidth={!alignToLabels}
+          xAxisLength={alignToLabels ? chartWidth : undefined}
           // Appearance
           color={theme.colors.primary}
           thickness={3}
@@ -405,7 +541,12 @@ export const GlucoseChart = ({
         />
 
         {/* Custom X-axis labels */}
-        <View style={[styles.customXAxisContainer, { width: availableWidth }]}>
+        <View
+          style={[
+            styles.customXAxisContainer,
+            { width: chartWidth, transform: [{ translateX: -labelOffset }] },
+          ]}
+        >
           {timeLabels.map((label, index) => (
             <Text
               key={index}

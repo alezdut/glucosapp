@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { UpdateProfileDto } from "./dto/update-profile.dto";
 import { ProfileResponseDto } from "./dto/profile-response.dto";
+import { AssignedDoctorResponseDto } from "./dto/assigned-doctor-response.dto";
 
 /**
  * Service handling profile operations
@@ -137,6 +138,47 @@ export class ProfileService {
       minTargetGlucose: user.minTargetGlucose,
       maxTargetGlucose: user.maxTargetGlucose,
       createdAt: user.createdAt.toISOString(),
+    };
+  }
+
+  /**
+   * Get assigned doctor for patient (if any)
+   */
+  async getAssignedDoctor(userId: string): Promise<AssignedDoctorResponseDto | null> {
+    const relation = await this.prisma.doctorPatient.findFirst({
+      where: { patientId: userId },
+      include: {
+        doctor: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    if (!relation) {
+      return null;
+    }
+
+    return {
+      id: relation.id,
+      doctorId: relation.doctorId,
+      patientId: relation.patientId,
+      createdAt: relation.createdAt.toISOString(),
+      doctor: {
+        id: relation.doctor.id,
+        email: relation.doctor.email,
+        firstName: relation.doctor.firstName ?? undefined,
+        lastName: relation.doctor.lastName ?? undefined,
+        avatarUrl: relation.doctor.avatarUrl ?? undefined,
+      },
     };
   }
 }

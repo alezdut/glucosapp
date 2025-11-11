@@ -1052,4 +1052,59 @@ export class DoctorPatientService {
 
     return updatedPatient;
   }
+
+  /**
+   * Get the doctor assigned to a patient
+   * @param patientId - Patient ID
+   * @returns Doctor information or null if no doctor assigned
+   */
+  async getPatientDoctor(patientId: string): Promise<{
+    id: string;
+    doctorId: string;
+    patientId: string;
+    createdAt: string;
+    doctor: {
+      id: string;
+      email: string;
+      firstName?: string;
+      lastName?: string;
+      avatarUrl?: string;
+    };
+  } | null> {
+    const relation = await this.prisma.doctorPatient.findFirst({
+      where: { patientId },
+      include: {
+        doctor: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    if (!relation) {
+      return null;
+    }
+
+    return {
+      id: relation.id,
+      doctorId: relation.doctorId,
+      patientId: relation.patientId,
+      createdAt: relation.createdAt.toISOString(),
+      doctor: {
+        id: relation.doctor.id,
+        email: relation.doctor.email,
+        firstName: relation.doctor.firstName ?? undefined,
+        lastName: relation.doctor.lastName ?? undefined,
+        avatarUrl: relation.doctor.avatarUrl ?? undefined,
+      },
+    };
+  }
 }

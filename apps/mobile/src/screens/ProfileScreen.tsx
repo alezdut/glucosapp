@@ -88,6 +88,36 @@ export default function ProfileScreen() {
     },
   });
 
+  // Check if patient has a doctor assigned
+  const { data: doctorInfo } = useQuery({
+    queryKey: ["my-doctor"],
+    queryFn: async () => {
+      const client = createApiClient();
+      const response = await client.GET("/doctor-patients/my-doctor", {});
+      if (response.error) {
+        // If 404, no doctor assigned - return null
+        if (
+          typeof response.error === "object" &&
+          "status" in response.error &&
+          response.error.status === 404
+        ) {
+          return null;
+        }
+        throw new Error("Failed to fetch doctor information");
+      }
+      return response.data;
+    },
+    retry: (failureCount, error) => {
+      // Don't retry on 404 (no doctor assigned)
+      if (error && typeof error === "object" && "status" in error && error.status === 404) {
+        return false;
+      }
+      return failureCount < 3;
+    },
+  });
+
+  const hasDoctor = !!doctorInfo;
+
   // Check if there are pending changes
   const hasChanges = useMemo(() => {
     if (!profile) return false;
@@ -410,19 +440,34 @@ export default function ProfileScreen() {
           <ChevronRight size={20} color={theme.colors.textTertiary} />
         </View>
 
-        <TouchableOpacity
-          style={styles.fieldRow}
-          onPress={() => navigation.navigate("TreatmentParameters")}
-        >
-          <View style={styles.fieldIconContainer}>
-            <Syringe size={20} color={theme.colors.textSecondary} />
+        {!hasDoctor && (
+          <TouchableOpacity
+            style={styles.fieldRow}
+            onPress={() => navigation.navigate("TreatmentParameters")}
+          >
+            <View style={styles.fieldIconContainer}>
+              <Syringe size={20} color={theme.colors.textSecondary} />
+            </View>
+            <View style={styles.fieldContent}>
+              <Text style={styles.fieldLabel}>Parámetros de tratamiento</Text>
+              <Text style={styles.fieldValue}>Configurar insulina y objetivos</Text>
+            </View>
+            <ChevronRight size={20} color={theme.colors.textTertiary} />
+          </TouchableOpacity>
+        )}
+        {hasDoctor && (
+          <View style={styles.fieldRow}>
+            <View style={styles.fieldIconContainer}>
+              <Syringe size={20} color={theme.colors.textSecondary} />
+            </View>
+            <View style={styles.fieldContent}>
+              <Text style={styles.fieldLabel}>Parámetros de tratamiento</Text>
+              <Text style={styles.fieldValue}>
+                Administrados por tu médico. Ver en la sección "Médico"
+              </Text>
+            </View>
           </View>
-          <View style={styles.fieldContent}>
-            <Text style={styles.fieldLabel}>Parámetros de tratamiento</Text>
-            <Text style={styles.fieldValue}>Configurar insulina y objetivos</Text>
-          </View>
-          <ChevronRight size={20} color={theme.colors.textTertiary} />
-        </TouchableOpacity>
+        )}
       </View>
 
       {/* Soporte y Políticas */}
