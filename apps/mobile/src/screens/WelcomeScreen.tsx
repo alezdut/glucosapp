@@ -1,7 +1,9 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { theme } from "../theme";
 import { useAuth } from "../contexts/AuthContext";
+import { BrandLogo } from "../components/BrandLogo";
 
 /**
  * WelcomeScreen component
@@ -9,6 +11,7 @@ import { useAuth } from "../contexts/AuthContext";
  */
 export default function WelcomeScreen() {
   const { signInWithGoogle, isLoading } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const handleGoogleSignIn = async () => {
     try {
@@ -19,12 +22,11 @@ export default function WelcomeScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top + theme.spacing.lg }]}>
       {/* Logo/Icon Section */}
       <View style={styles.logoSection}>
         <View style={styles.iconContainer}>
-          {/* Placeholder for app icon - using text as icon */}
-          <Text style={styles.iconText}>✱</Text>
+          <BrandLogo size={56} accessibilityLabel="GlucosApp logo" />
         </View>
         <Text style={styles.appName}>GlucosApp</Text>
         <Text style={styles.tagline}>Tu control, Más simple cada día</Text>
@@ -62,7 +64,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
     paddingHorizontal: theme.spacing.lg,
-    justifyContent: "center",
+    justifyContent: "flex-start",
   },
   logoSection: {
     alignItems: "center",
@@ -98,6 +100,8 @@ const styles = StyleSheet.create({
   },
   contentSection: {
     alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
   },
   title: {
     fontSize: theme.fontSize.xxxl,
