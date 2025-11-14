@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -77,6 +77,9 @@ export default function ProfileScreen() {
       if (response.error) {
         throw new Error("Failed to fetch profile");
       }
+      if (!response.data) {
+        throw new Error("Profile data is missing");
+      }
       const data = response.data as UserProfile;
       // Update local state with fetched data
       if (data.birthDate) {
@@ -87,6 +90,24 @@ export default function ProfileScreen() {
       return data;
     },
   });
+
+  // Check if patient has a doctor assigned
+  const { data: doctorInfo } = useQuery({
+    queryKey: ["my-doctor"],
+    queryFn: async () => {
+      const client = createApiClient();
+      const response = await client.GET("/profile/doctor", {});
+      if (response.error) {
+        throw new Error("Failed to fetch doctor information");
+      }
+      return response.data ?? null;
+    },
+    retry: (failureCount) => {
+      return failureCount < 3;
+    },
+  });
+
+  const hasDoctor = !!doctorInfo;
 
   // Check if there are pending changes
   const hasChanges = useMemo(() => {
@@ -410,19 +431,36 @@ export default function ProfileScreen() {
           <ChevronRight size={20} color={theme.colors.textTertiary} />
         </View>
 
-        <TouchableOpacity
-          style={styles.fieldRow}
-          onPress={() => navigation.navigate("TreatmentParameters")}
-        >
-          <View style={styles.fieldIconContainer}>
-            <Syringe size={20} color={theme.colors.textSecondary} />
+        {!hasDoctor && (
+          <TouchableOpacity
+            style={styles.fieldRow}
+            onPress={() => navigation.navigate("TreatmentParameters")}
+          >
+            <View style={styles.fieldIconContainer}>
+              <Syringe size={20} color={theme.colors.textSecondary} />
+            </View>
+            <View style={styles.fieldContent}>
+              <Text style={styles.fieldLabel}>Parámetros de tratamiento</Text>
+              <Text style={styles.fieldValue}>Configurar insulina y objetivos</Text>
+            </View>
+            <ChevronRight size={20} color={theme.colors.textTertiary} />
+          </TouchableOpacity>
+        )}
+        {hasDoctor && (
+          <View style={[styles.fieldRow, styles.fieldRowDisabled]}>
+            <View style={styles.fieldIconContainer}>
+              <Syringe size={20} color={theme.colors.textTertiary} />
+            </View>
+            <View style={styles.fieldContent}>
+              <Text style={[styles.fieldLabel, styles.fieldLabelDisabled]}>
+                Parámetros de tratamiento
+              </Text>
+              <Text style={[styles.fieldValue, styles.fieldValueDisabled]}>
+                Administrados por tu médico.
+              </Text>
+            </View>
           </View>
-          <View style={styles.fieldContent}>
-            <Text style={styles.fieldLabel}>Parámetros de tratamiento</Text>
-            <Text style={styles.fieldValue}>Configurar insulina y objetivos</Text>
-          </View>
-          <ChevronRight size={20} color={theme.colors.textTertiary} />
-        </TouchableOpacity>
+        )}
       </View>
 
       {/* Soporte y Políticas */}
@@ -542,6 +580,15 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.md,
     color: theme.colors.text,
     fontWeight: "500",
+  },
+  fieldRowDisabled: {
+    opacity: 0.6,
+  },
+  fieldLabelDisabled: {
+    color: theme.colors.textTertiary,
+  },
+  fieldValueDisabled: {
+    color: theme.colors.textTertiary,
   },
   fieldInput: {
     fontSize: theme.fontSize.md,

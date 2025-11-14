@@ -8,6 +8,7 @@ import {
   Body,
   UseGuards,
   Query,
+  NotFoundException,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
 import type { Prisma } from "@prisma/client";
