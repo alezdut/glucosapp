@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   TextInput as RNTextInput,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useFocusEffect } from "@react-navigation/native";
 import {
@@ -43,6 +44,7 @@ import { validateForm } from "../utils/validation";
  */
 export default function RegistrarScreen({ navigation, route }: RegistrarScreenProps) {
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
   const prefilledCarbs = route?.params?.carbohydrates;
 
   // Fetch user profile to get insulin parameters
@@ -559,7 +561,10 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + theme.spacing.lg }]}
+    >
       <ScreenHeader title="Registrar" />
 
       {/* Glucose Input */}
@@ -1002,7 +1007,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.xxl,
+    paddingBottom: theme.spacing.xxl,
   },
   section: {
     marginBottom: theme.spacing.lg,

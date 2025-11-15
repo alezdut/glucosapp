@@ -19,6 +19,7 @@ import { createApiClient } from "../lib/api";
 import type { Statistics } from "@glucosapp/types";
 import type { HomeStackParamList } from "../navigation/HomeStackNavigator";
 import type { RootStackParamList, RootTabParamList } from "../navigation/types";
+import { BrandLogo } from "../components/BrandLogo";
 
 type HomeScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<HomeStackParamList, "Home">,
@@ -52,7 +53,10 @@ export default function HomeScreen() {
   });
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + theme.spacing.lg }]}
+    >
       {/* Floating NFC Scan Button (top-right) */}
       <TouchableOpacity
         style={[
@@ -68,8 +72,8 @@ export default function HomeScreen() {
       </TouchableOpacity>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.logoContainer}>
-          <Hexagon size={36} color={theme.colors.primary} strokeWidth={2.5} />
+        <View style={styles.logoWrapper}>
+          <BrandLogo size={100} accessibilityLabel="GlucosApp logo" />
         </View>
         <Text style={styles.appName}>GlucosApp</Text>
         <Text style={styles.tagline}>Tu control, más simple cada día</Text>
@@ -136,23 +140,14 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.xxl,
     paddingBottom: theme.spacing.xl,
   },
   header: {
     alignItems: "center",
     marginBottom: theme.spacing.xl,
   },
-  logoContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: theme.borderRadius.lg,
-    backgroundColor: theme.colors.primary + "15",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: theme.spacing.md,
-    borderWidth: 2,
-    borderColor: theme.colors.primary + "30",
+  logoWrapper: {
+    marginBottom: -theme.spacing.xs,
   },
   appName: {
     fontSize: theme.fontSize.xxl,

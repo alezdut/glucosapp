@@ -10,10 +10,12 @@ import {
   Box,
   Typography,
   Alert,
+  useTheme,
 } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { useAuth } from "@/contexts/auth-context";
 import styles from "@/components/auth-form.module.css";
+import { BrandLogo } from "@/components/BrandLogo";
 
 /**
  * Validates email format
@@ -33,6 +35,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
+  const theme = useTheme();
 
   /**
    * Handles form submission with validation
@@ -62,8 +65,16 @@ export default function LoginPage() {
   return (
     <div className={styles.container}>
       <div className={styles.card}>
+        <Box
+          sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5, mb: 2 }}
+        >
+          <BrandLogo size={80} color={theme.palette.primary.main} />
+          <Typography variant="h3" component="div" sx={{ fontWeight: 700 }}>
+            GlucosApp
+          </Typography>
+        </Box>
         <Typography
-          variant="h4"
+          variant="h6"
           component="h1"
           sx={{ mb: 3, textAlign: "center", fontWeight: 600 }}
         >
@@ -132,14 +143,20 @@ export default function LoginPage() {
         </Box>
 
         <Box sx={{ textAlign: "center", mt: 2 }}>
-          <Link href="/forgot-password" style={{ color: "#1976d2", textDecoration: "none" }}>
+          <Link
+            href="/forgot-password"
+            style={{ color: theme.palette.primary.main, textDecoration: "none" }}
+          >
             ¿Olvidaste tu contraseña?
           </Link>
         </Box>
 
-        <Box sx={{ textAlign: "center", mt: 1, color: "#666" }}>
+        <Box sx={{ textAlign: "center", mt: 1, color: theme.palette.text.secondary }}>
           ¿No tienes cuenta?{" "}
-          <Link href="/register" style={{ color: "#1976d2", textDecoration: "none" }}>
+          <Link
+            href="/register"
+            style={{ color: theme.palette.primary.main, textDecoration: "none" }}
+          >
             Regístrate
           </Link>
         </Box>

@@ -2,10 +2,11 @@
 import { useState, FormEvent, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { TextField, Button, Box, Typography, Alert } from "@mui/material";
+import { TextField, Button, Box, Typography, Alert, useTheme } from "@mui/material";
 import { useAuth } from "@/contexts/auth-context";
 import { PasswordField } from "@/components/PasswordField";
 import { type PasswordStrength } from "@glucosapp/utils";
+import { BrandLogo } from "@/components/BrandLogo";
 import styles from "@/components/auth-form.module.css";
 
 /**
@@ -24,6 +25,7 @@ export default function RegisterPage() {
   const { register } = useAuth();
   const router = useRouter();
   const timeoutRef = useRef<number | null>(null);
+  const theme = useTheme();
 
   /**
    * Cleanup timeout on unmount
@@ -104,7 +106,10 @@ export default function RegisterPage() {
             </Box>
           </Alert>
           <Box sx={{ textAlign: "center", mt: 2 }}>
-            <Link href="/login" style={{ color: "#1976d2", textDecoration: "none" }}>
+            <Link
+              href="/login"
+              style={{ color: theme.palette.primary.main, textDecoration: "none" }}
+            >
               Ir a Iniciar Sesión
             </Link>
           </Box>
@@ -116,8 +121,16 @@ export default function RegisterPage() {
   return (
     <div className={styles.container}>
       <div className={styles.card}>
+        <Box
+          sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5, mb: 2 }}
+        >
+          <BrandLogo size={80} color={theme.palette.primary.main} />
+          <Typography variant="h3" component="div" sx={{ fontWeight: 700 }}>
+            GlucosApp
+          </Typography>
+        </Box>
         <Typography
-          variant="h4"
+          variant="h6"
           component="h1"
           sx={{ mb: 3, textAlign: "center", fontWeight: 600 }}
         >
@@ -202,9 +215,9 @@ export default function RegisterPage() {
           </Button>
         </Box>
 
-        <Box sx={{ textAlign: "center", mt: 2, color: "#666" }}>
+        <Box sx={{ textAlign: "center", mt: 2, color: theme.palette.text.secondary }}>
           ¿Ya tienes cuenta?{" "}
-          <Link href="/login" style={{ color: "#1976d2", textDecoration: "none" }}>
+          <Link href="/login" style={{ color: theme.palette.primary.main, textDecoration: "none" }}>
             Inicia Sesión
           </Link>
         </Box>

@@ -10,6 +10,7 @@ import {
   Alert,
   Image,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   User as UserIcon,
   Cake,
@@ -63,6 +64,7 @@ export default function ProfileScreen() {
   const { user, signOut } = useAuth();
   const queryClient = useQueryClient();
   const navigation = useNavigation<ProfileScreenNavigationProp>();
+  const insets = useSafeAreaInsets();
 
   const [birthDate, setBirthDate] = useState<Date | null>(null);
   const [weight, setWeight] = useState("");
@@ -233,7 +235,10 @@ export default function ProfileScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + theme.spacing.lg }]}
+    >
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.avatarContainer}>
@@ -514,7 +519,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.xxl,
     paddingBottom: theme.spacing.xxxl,
   },
   loadingContainer: {
