@@ -6,6 +6,7 @@ import {
   Box,
   Typography,
   LinearProgress,
+  useTheme,
 } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import {
@@ -42,6 +43,7 @@ export function PasswordField({
   helperText,
   onStrengthChange,
 }: PasswordFieldProps) {
+  const theme = useTheme();
   const [showPassword, setShowPassword] = useState(false);
   const strength = validatePassword(value);
 
@@ -92,7 +94,7 @@ export function PasswordField({
             sx={{
               height: 4,
               borderRadius: 2,
-              backgroundColor: "#e0e0e0",
+              backgroundColor: theme.palette.action.disabledBackground,
               "& .MuiLinearProgress-bar": {
                 backgroundColor: getStrengthColor(strength),
                 transition: "background-color 0.3s ease",
@@ -113,7 +115,10 @@ export function PasswordField({
         </Box>
       )}
       {showStrengthIndicator && helperText && (
-        <Typography variant="caption" sx={{ display: "block", mt: 0.5, color: "#666" }}>
+        <Typography
+          variant="caption"
+          sx={{ display: "block", mt: 0.5, color: theme.palette.text.secondary }}
+        >
           {helperText}
         </Typography>
       )}

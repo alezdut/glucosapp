@@ -1,7 +1,7 @@
 "use client";
 import { useState, FormEvent } from "react";
 import Link from "next/link";
-import { TextField, Button, Box, Typography, Alert } from "@mui/material";
+import { TextField, Button, Box, Typography, Alert, useTheme } from "@mui/material";
 import { forgotPassword } from "@/lib/auth-api";
 import styles from "@/components/auth-form.module.css";
 
@@ -9,6 +9,7 @@ import styles from "@/components/auth-form.module.css";
  * Forgot password page component
  */
 export default function ForgotPasswordPage() {
+  const theme = useTheme();
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -51,7 +52,10 @@ export default function ForgotPasswordPage() {
             </Box>
           </Alert>
           <Box sx={{ textAlign: "center", mt: 2 }}>
-            <Link href="/login" style={{ color: "#1976d2", textDecoration: "none" }}>
+            <Link
+              href="/login"
+              style={{ color: theme.palette.primary.main, textDecoration: "none" }}
+            >
               Volver a Iniciar Sesión
             </Link>
           </Box>
@@ -111,7 +115,7 @@ export default function ForgotPasswordPage() {
         </Box>
 
         <Box sx={{ textAlign: "center", mt: 2 }}>
-          <Link href="/login" style={{ color: "#1976d2", textDecoration: "none" }}>
+          <Link href="/login" style={{ color: theme.palette.primary.main, textDecoration: "none" }}>
             Volver a Iniciar Sesión
           </Link>
         </Box>

@@ -2,7 +2,7 @@
 import { useState, FormEvent, Suspense, useRef, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Button, Box, Typography, Alert, CircularProgress } from "@mui/material";
+import { Button, Box, Typography, Alert, CircularProgress, useTheme } from "@mui/material";
 import { resetPassword } from "@/lib/auth-api";
 import { PasswordField } from "@/components/PasswordField";
 import { type PasswordStrength } from "@glucosapp/utils";
@@ -12,6 +12,7 @@ import styles from "@/components/auth-form.module.css";
  * Reset password page content component
  */
 function ResetPasswordContent() {
+  const theme = useTheme();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordStrength, setPasswordStrength] = useState<PasswordStrength>("weak");
@@ -90,7 +91,10 @@ function ResetPasswordContent() {
             Token de restablecimiento no proporcionado
           </Alert>
           <Box sx={{ textAlign: "center", mt: 2 }}>
-            <Link href="/forgot-password" style={{ color: "#1976d2", textDecoration: "none" }}>
+            <Link
+              href="/forgot-password"
+              style={{ color: theme.palette.primary.main, textDecoration: "none" }}
+            >
               Solicitar Nuevo Token
             </Link>
           </Box>
@@ -117,7 +121,10 @@ function ResetPasswordContent() {
             </Box>
           </Alert>
           <Box sx={{ textAlign: "center", mt: 2 }}>
-            <Link href="/login" style={{ color: "#1976d2", textDecoration: "none" }}>
+            <Link
+              href="/login"
+              style={{ color: theme.palette.primary.main, textDecoration: "none" }}
+            >
               Ir a Iniciar Sesión
             </Link>
           </Box>
@@ -180,7 +187,7 @@ function ResetPasswordContent() {
         </Box>
 
         <Box sx={{ textAlign: "center", mt: 2 }}>
-          <Link href="/login" style={{ color: "#1976d2", textDecoration: "none" }}>
+          <Link href="/login" style={{ color: theme.palette.primary.main, textDecoration: "none" }}>
             Volver a Iniciar Sesión
           </Link>
         </Box>
