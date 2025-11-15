@@ -7,20 +7,294 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum DiabetesType {
+  TYPE_1
+  TYPE_2
+}
+
+enum GlucoseUnit {
+  MG_DL
+  MMOL_L
+}
+
+enum Theme {
+  LIGHT
+  DARK
+}
+
+enum Language {
+  ES
+  EN
+}
+
+enum InsulinType {
+  BASAL
+  BOLUS
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+  CORRECTION
+}
+
+enum ReadingSource {
+  MANUAL
+  LIBRE_NFC
+  DEXCOM
+  OTHER_CGM
+}
+
+enum UserRole {
+  DOCTOR
+  PATIENT
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AlertType {
+  HYPOGLYCEMIA
+  SEVERE_HYPOGLYCEMIA
+  HYPERGLYCEMIA
+  PERSISTENT_HYPERGLYCEMIA
+  OTHER
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
 model User {
+  id                       String           @id @default(cuid())
+  email                    String           @unique
+  password                 String?
+  firstName                String?
+  lastName                 String?
+  avatarUrl                String?
+  emailVerified            Boolean          @default(false)
+  verificationToken        String?          @unique
+  verificationTokenExpiry  DateTime?
+  resetPasswordToken       String?          @unique
+  resetPasswordExpiry      DateTime?
+  birthDate                DateTime?
+  weight                   Float?
+  diabetesType             DiabetesType?
+  glucoseUnit              GlucoseUnit      @default(MG_DL)
+  theme                    Theme            @default(LIGHT)
+  language                 Language         @default(ES)
+  // Insulin Profile - Time-of-day specific IC Ratios
+  icRatioBreakfast         Float            @default(15)
+  icRatioLunch             Float            @default(12)
+  icRatioDinner            Float            @default(10)
+  insulinSensitivityFactor Float            @default(50)
+  diaHours                 Float            @default(4)
+  targetGlucose            Int?
+  minTargetGlucose         Int              @default(80)
+  maxTargetGlucose         Int              @default(140)
+  // Meal time ranges (in minutes from midnight, 0-1439)
+  mealTimeBreakfastStart   Int              @default(300) // 5:00 AM
+  mealTimeBreakfastEnd     Int              @default(660) // 11:00 AM
+  mealTimeLunchStart       Int              @default(660) // 11:00 AM
+  mealTimeLunchEnd         Int              @default(1020) // 5:00 PM
+  mealTimeDinnerStart      Int              @default(1020) // 5:00 PM
+  mealTimeDinnerEnd        Int              @default(300) // 5:00 AM (next day)
+  role                     UserRole         @default(PATIENT)
+  createdAt                DateTime         @default(now())
+  entries                  GlucoseEntry[]
+  accounts                 Account[]
+  refreshTokens            RefreshToken[]
+  insulinDoses             InsulinDose[]
+  meals                    Meal[]
+  logEntries               LogEntry[]
+  glucoseReadings          GlucoseReading[]
+  // Doctor-Patient relationships
+  doctorRelations          DoctorPatient[]  @relation("Doctor")
+  patientRelations         DoctorPatient[]  @relation("Patient")
+  // Appointments
+  appointmentsAsDoctor     Appointment[]    @relation("Doctor")
+  appointmentsAsPatient    Appointment[]    @relation("Patient")
+  // Alerts
+  alerts                   Alert[]
+}
+
+model Account {
+  id           String   @id @default(cuid())
+  userId       String
+  provider     String
+  providerId   String
+  accessToken  String?
+  refreshToken String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@index([userId])
+}
+
+model RefreshToken {
   id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String?
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
   createdAt DateTime @default(now())
-  entries   GlucoseEntry[]
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model GlucoseEntry {
-  id         String   @id @default(cuid())
-  mgdl       Int
-  recordedAt DateTime @default(now())
-  note       String?
-  user       User     @relation(fields: [userId], references: [id])
-  userId     String
+  id            String    @id @default(cuid())
+  mgdlEncrypted String
+  recordedAt    DateTime  @default(now())
+  note          String?
+  user          User      @relation(fields: [userId], references: [id])
+  userId        String
+  logEntry      LogEntry?
+
+  @@index([userId, recordedAt])
+}
+
+model InsulinDose {
+  id                String      @id @default(cuid())
+  userId            String
+  units             Float
+  calculatedUnits   Float?
+  wasManuallyEdited Boolean     @default(false)
+  recordedAt        DateTime    @default(now())
+  type              InsulinType
+  isCorrection      Boolean     @default(false)
+  // Calculation breakdown (for transparency)
+  carbInsulin       Float?
+  correctionInsulin Float?
+  iobSubtracted     Float?
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logEntry          LogEntry?
+
+  @@index([userId])
+  @@index([userId, recordedAt])
+}
+
+model Meal {
+  id            String     @id @default(cuid())
+  userId        String
+  name          String
+  carbohydrates Float
+  foodItems     MealItem[]
+  logEntries    LogEntry[]
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, createdAt])
+}
+
+model MealItem {
+  id       String @id @default(cuid())
+  mealId   String
+  name     String
+  quantity Float
+  carbs    Float
+  meal     Meal   @relation(fields: [mealId], references: [id], onDelete: Cascade)
+
+  @@index([mealId])
+}
+
+model LogEntry {
+  id             String        @id @default(cuid())
+  userId         String
+  recordedAt     DateTime      @default(now())
+  mealType       MealType?
+  carbohydrates  Float?
+  glucoseEntryId String?       @unique
+  insulinDoseId  String?       @unique
+  mealTemplateId String?
+  // Context factors at time of entry
+  recentExercise Boolean       @default(false)
+  alcohol        Boolean       @default(false)
+  illness        Boolean       @default(false)
+  stress         Boolean       @default(false)
+  menstruation   Boolean       @default(false)
+  highFatMeal    Boolean       @default(false)
+  glucoseEntry   GlucoseEntry? @relation(fields: [glucoseEntryId], references: [id], onDelete: Cascade)
+  insulinDose    InsulinDose?  @relation(fields: [insulinDoseId], references: [id], onDelete: Cascade)
+  mealTemplate   Meal?         @relation(fields: [mealTemplateId], references: [id], onDelete: SetNull)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, recordedAt])
+}
+
+model GlucoseReading {
+  id               String        @id @default(cuid())
+  userId           String
+  glucoseEncrypted String
+  recordedAt       DateTime
+  source           ReadingSource @default(MANUAL)
+  isHistorical     Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, recordedAt])
+  @@index([userId, source])
+}
+
+model DoctorPatient {
+  id        String   @id @default(cuid())
+  doctorId  String
+  patientId String
+  createdAt DateTime @default(now())
+  doctor    User     @relation("Doctor", fields: [doctorId], references: [id], onDelete: Cascade)
+  patient   User     @relation("Patient", fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorId, patientId])
+  @@index([doctorId])
+  @@index([patientId])
+}
+
+model Appointment {
+  id          String            @id @default(cuid())
+  doctorId    String
+  patientId   String
+  scheduledAt DateTime
+  notes       String?
+  status      AppointmentStatus @default(SCHEDULED)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  doctor      User              @relation("Doctor", fields: [doctorId], references: [id], onDelete: Cascade)
+  patient     User              @relation("Patient", fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId])
+  @@index([patientId])
+  @@index([doctorId, scheduledAt])
+  @@index([status])
+}
+
+model Alert {
+  id               String        @id @default(cuid())
+  userId           String
+  type             AlertType
+  severity         AlertSeverity
+  message          String
+  glucoseReadingId String?
+  acknowledged     Boolean       @default(false)
+  acknowledgedAt   DateTime?
+  createdAt        DateTime      @default(now())
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, acknowledged])
+  @@index([severity])
+  @@index([createdAt])
 }

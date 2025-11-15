@@ -6,7 +6,11 @@ import { AppModule } from "./app.module";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.enableCors();
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [];
+  app.enableCors({
+    origin: allowedOrigins,
+    credentials: true,
+  });
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: "1" });
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
@@ -22,8 +26,8 @@ async function bootstrap() {
   SwaggerModule.setup("docs", app, document);
 
   const port = process.env.PORT ? Number(process.env.PORT) : 3000;
-  await app.listen(port);
+  await app.listen(port, "0.0.0.0");
   // eslint-disable-next-line no-console
-  console.log(`API running on http://localhost:${port}/v1 (docs: /docs)`);
+  console.log(`API running on http://0.0.0.0:${port}/v1 (docs: /docs)`);
 }
 bootstrap();

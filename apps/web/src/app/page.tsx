@@ -1,20 +1,29 @@
 "use client";
-import { useQuery } from "@tanstack/react-query";
-import { makeApiClient } from "@glucosapp/api-client";
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/auth-context";
+import styles from "@/components/auth-form.module.css";
+
 export default function Home() {
-  const { client } = makeApiClient(`${apiBaseUrl}/v1`);
-  const { data, isLoading } = useQuery({
-    queryKey: ["health"],
-    queryFn: async () => {
-      const res = await client.GET("/health");
-      return res?.data ?? { ok: true };
-    },
-  });
+  const { isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading) {
+      if (isAuthenticated) {
+        router.push("/dashboard");
+      } else {
+        router.push("/login");
+      }
+    }
+  }, [isAuthenticated, isLoading, router]);
+
   return (
-    <main style={{ padding: 24 }}>
-      <h1>Glucosapp Web</h1>
-      <pre>{isLoading ? "Cargando..." : JSON.stringify(data, null, 2)}</pre>
-    </main>
+    <div className={styles.container}>
+      <div className={styles.loading}>
+        <h1>Glucosapp</h1>
+        <p>Cargando...</p>
+      </div>
+    </div>
   );
 }

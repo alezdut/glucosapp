@@ -1,20 +1,28 @@
 import { Platform } from "react-native";
+import {
+  colors as sharedColors,
+  spacing as sharedSpacing,
+  fontSize as sharedFontSize,
+  borderRadius as sharedBorderRadius,
+} from "@glucosapp/theme";
 
 export const theme = {
   colors: {
-    primary: "#007AFF", // iOS blue for primary actions like scan button
-    background: "#FFFFFF", // White background
-    text: "#000000", // Black text
-    tabBarBackground: "#F8F9FA", // Light gray for tab bar background
-    tabBarIconActive: "#007AFF", // Primary color for active tab icons
-    tabBarIconInactive: "#8E8E93", // Gray for inactive tab icons
-    secondary: "#6C757D", // Secondary gray
-    success: "#28A745", // Green for success states
-    warning: "#FFC107", // Yellow for warnings
-    error: "#DC3545", // Red for errors
-    border: "#E5E5E7", // Light border color
-    card: "#FFFFFF", // Card background
-    shadow: "#000000", // Shadow color
+    ...sharedColors,
+    // Mobile-specific overrides if needed
+    primary: sharedColors.primary,
+    background: sharedColors.background,
+    text: sharedColors.text,
+    tabBarBackground: sharedColors.tabBarBackground,
+    tabBarIconActive: sharedColors.tabBarIconActive,
+    tabBarIconInactive: sharedColors.tabBarIconInactive,
+    secondary: sharedColors.secondary,
+    success: sharedColors.success,
+    warning: sharedColors.warning,
+    error: sharedColors.error,
+    border: sharedColors.border,
+    card: sharedColors.card,
+    shadow: sharedColors.shadow,
   },
   platform: {
     ios: {
@@ -56,29 +64,14 @@ export const theme = {
       },
     },
   },
-  spacing: {
-    xs: 4,
-    sm: 8,
-    md: 16,
-    lg: 24,
-    xl: 32,
-    xxl: 48,
-  },
-  borderRadius: {
-    sm: 4,
-    md: 8,
-    lg: 12,
-    xl: 16,
-    full: 9999,
-  },
-  fontSize: {
-    xs: 12,
-    sm: 14,
-    md: 16,
-    lg: 18,
-    xl: 20,
-    xxl: 24,
-    xxxl: 32,
+  spacing: sharedSpacing,
+  borderRadius: sharedBorderRadius,
+  fontSize: sharedFontSize,
+  chartDimensions: {
+    defaultWidth: 320,
+    defaultHeight: 220,
+    compactHeight: 180,
+    expandedHeight: 280,
   },
 } as const;
 
