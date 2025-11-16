@@ -22,8 +22,14 @@ jobs:
           corepack prepare pnpm@9.12.2 --activate
       - name: Install
         run: pnpm install --frozen-lockfile=false
+      - name: Generate Prisma Client
+        run: cd apps/backend && pnpm prisma:generate
       - name: Build
         run: pnpm build
+      - name: Test
+        run: pnpm test
+        env:
+          CI: true
       - name: Lint
         run: pnpm lint || true
       - name: Typecheck
