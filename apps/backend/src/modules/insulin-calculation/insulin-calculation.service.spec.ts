@@ -7,19 +7,6 @@ import { createMockConfigService } from "../../common/test-helpers/config.mock";
 import { createMockUser } from "../../common/test-helpers/fixtures";
 import { CalculateDoseDto } from "./dto/calculate-dose.dto";
 
-// Mock the mdi-insulin-algorithm package
-jest.mock("@glucosapp/mdi-insulin-algorithm", () => ({
-  calculateDose: jest.fn(),
-  calculateBreakfastDose: jest.fn(),
-  calculateLunchDose: jest.fn(),
-  calculateDinnerDose: jest.fn(),
-  calculateCorrectionDose: jest.fn(),
-  evaluatePreSleep: jest.fn(),
-  calculateBetweenMealCorrection: jest.fn(),
-  calculateIOB: jest.fn(),
-  configure: jest.fn(),
-}));
-
 import {
   calculateDose,
   calculateBreakfastDose,

@@ -2,6 +2,7 @@ module.exports = {
   moduleFileExtensions: ["js", "json", "ts"],
   rootDir: "src",
   testRegex: ".*\\.spec\\.ts$",
+  setupFilesAfterEnv: ["<rootDir>/../jest.setup.js"],
   transform: {
     "^.+\\.(t|j)s$": "ts-jest",
   },
@@ -21,6 +22,11 @@ module.exports = {
   testEnvironment: "node",
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
+    "^@glucosapp/types$": "<rootDir>/../../../packages/types/src/index.ts",
+    "^@glucosapp/(.*)$": "<rootDir>/../../../packages/$1/src",
+    "^@glucosapp/mdi-insulin-algorithm$":
+      "<rootDir>/../../../../mdi-insulin-algorithm/dist/index.cjs",
+    "^mdi-insulin-algorithm$": "<rootDir>/../../../../mdi-insulin-algorithm/dist/index.cjs",
   },
   coverageThreshold: {
     global: {
@@ -31,4 +37,6 @@ module.exports = {
     },
   },
   coverageReporters: ["text", "json", "html", "lcov"],
+  testTimeout: 10000,
+  maxWorkers: process.env.CI ? 2 : "50%",
 };
