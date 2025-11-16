@@ -48,7 +48,7 @@ export default function HomeScreen() {
       if (response.error) {
         throw new Error("Failed to fetch statistics");
       }
-      return response.data as Statistics;
+      return response.data as unknown as Statistics;
     },
   });
 
