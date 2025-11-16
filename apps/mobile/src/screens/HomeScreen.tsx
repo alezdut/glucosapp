@@ -7,7 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
-import { Activity, Beaker, UtensilsCrossed, Hexagon, Nfc } from "lucide-react-native";
+import { Activity, Beaker, UtensilsCrossed, Nfc } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
