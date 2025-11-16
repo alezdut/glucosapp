@@ -37,7 +37,7 @@ describe("AlertsController", () => {
 
   describe("findAll", () => {
     it("should return all alerts with default limit", async () => {
-      const expectedResult = [];
+      const expectedResult: any[] = [];
 
       (service.findAll as jest.Mock).mockResolvedValue(expectedResult);
 
@@ -48,7 +48,7 @@ describe("AlertsController", () => {
     });
 
     it("should return all alerts with custom limit", async () => {
-      const expectedResult = [];
+      const expectedResult: any[] = [];
 
       (service.findAll as jest.Mock).mockResolvedValue(expectedResult);
 
@@ -61,7 +61,7 @@ describe("AlertsController", () => {
 
   describe("getCritical", () => {
     it("should return critical alerts", async () => {
-      const expectedResult = [];
+      const expectedResult: any[] = [];
 
       (service.getCritical as jest.Mock).mockResolvedValue(expectedResult);
 
@@ -74,7 +74,7 @@ describe("AlertsController", () => {
 
   describe("getRecent", () => {
     it("should return recent alerts with default limit", async () => {
-      const expectedResult = [];
+      const expectedResult: any[] = [];
 
       (service.getRecent as jest.Mock).mockResolvedValue(expectedResult);
 
@@ -85,7 +85,7 @@ describe("AlertsController", () => {
     });
 
     it("should return recent alerts with custom limit", async () => {
-      const expectedResult = [];
+      const expectedResult: any[] = [];
 
       (service.getRecent as jest.Mock).mockResolvedValue(expectedResult);
 

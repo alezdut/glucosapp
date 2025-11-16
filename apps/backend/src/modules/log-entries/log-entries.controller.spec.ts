@@ -4,6 +4,7 @@ import { LogEntriesService } from "./log-entries.service";
 import { createMockUserResponse } from "../../common/test-helpers/fixtures";
 import { CreateLogEntryDto } from "./dto/create-log-entry.dto";
 import { QueryLogEntriesDto } from "./dto/query-log-entries.dto";
+import { InsulinType } from "@glucosapp/types";
 
 describe("LogEntriesController", () => {
   let controller: LogEntriesController;
@@ -38,7 +39,7 @@ describe("LogEntriesController", () => {
   describe("findAll", () => {
     it("should return log entries", async () => {
       const query: QueryLogEntriesDto = {};
-      const expectedResult = [];
+      const expectedResult: any[] = [];
 
       (service.findAll as jest.Mock).mockResolvedValue(expectedResult);
 
@@ -53,7 +54,7 @@ describe("LogEntriesController", () => {
         startDate: "2024-01-01",
         endDate: "2024-01-31",
       };
-      const expectedResult = [];
+      const expectedResult: any[] = [];
 
       (service.findAll as jest.Mock).mockResolvedValue(expectedResult);
 
@@ -69,7 +70,7 @@ describe("LogEntriesController", () => {
       const createDto: CreateLogEntryDto = {
         glucoseMgdl: 120,
         insulinUnits: 5,
-        insulinType: "BOLUS",
+        insulinType: InsulinType.BOLUS,
         carbohydrates: 50,
       };
       const expectedResult = {

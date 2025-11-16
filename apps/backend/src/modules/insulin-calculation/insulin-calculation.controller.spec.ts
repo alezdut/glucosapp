@@ -63,6 +63,7 @@ describe("InsulinCalculationController", () => {
       const dto: CalculateDoseDto = {
         glucose: 180,
         carbohydrates: 0,
+        mealType: "CORRECTION",
       };
       const expectedResult = {
         units: 1.6,

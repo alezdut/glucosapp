@@ -40,7 +40,7 @@ describe("MealsController", () => {
     it("should create meal template", async () => {
       const createDto: CreateMealDto = {
         name: "Breakfast",
-        foodItems: [{ name: "Bread", carbs: 30 }],
+        foodItems: [{ name: "Bread", quantity: 100, carbs: 30 }],
       };
       const expectedResult = {
         id: "meal-1",
@@ -58,7 +58,7 @@ describe("MealsController", () => {
 
   describe("findAll", () => {
     it("should return all meal templates", async () => {
-      const expectedResult = [];
+      const expectedResult: any[] = [];
 
       (service.findAll as jest.Mock).mockResolvedValue(expectedResult);
 

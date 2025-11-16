@@ -217,6 +217,7 @@ describe("InsulinCalculationService", () => {
       const dto: CalculateDoseDto = {
         glucose: 180,
         carbohydrates: 0,
+        mealType: "CORRECTION",
       };
       const mockResult = {
         units: 1.6,

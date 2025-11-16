@@ -3,6 +3,7 @@ import { InsulinDosesController } from "./insulin-doses.controller";
 import { InsulinDosesService } from "./insulin-doses.service";
 import { createMockUserResponse } from "../../common/test-helpers/fixtures";
 import { CreateInsulinDoseDto } from "./dto/create-insulin-dose.dto";
+import { InsulinType } from "@glucosapp/types";
 
 describe("InsulinDosesController", () => {
   let controller: InsulinDosesController;
@@ -37,7 +38,7 @@ describe("InsulinDosesController", () => {
     it("should create insulin dose", async () => {
       const createDto: CreateInsulinDoseDto = {
         units: 5,
-        type: "BOLUS",
+        type: InsulinType.BOLUS,
         recordedAt: new Date().toISOString(),
       };
       const expectedResult = {

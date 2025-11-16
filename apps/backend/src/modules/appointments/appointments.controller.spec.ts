@@ -39,7 +39,7 @@ describe("AppointmentsController", () => {
 
   describe("findAll", () => {
     it("should return appointments without past by default", async () => {
-      const expectedResult = [];
+      const expectedResult: any[] = [];
 
       (service.findAll as jest.Mock).mockResolvedValue(expectedResult);
 
@@ -50,7 +50,7 @@ describe("AppointmentsController", () => {
     });
 
     it("should return appointments including past when includePast is true", async () => {
-      const expectedResult = [];
+      const expectedResult: any[] = [];
 
       (service.findAll as jest.Mock).mockResolvedValue(expectedResult);
 

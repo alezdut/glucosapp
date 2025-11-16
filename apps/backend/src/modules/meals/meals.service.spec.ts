@@ -43,8 +43,8 @@ describe("MealsService", () => {
       const data: CreateMealDto = {
         name: "Breakfast",
         foodItems: [
-          { name: "Bread", carbs: 30 },
-          { name: "Milk", carbs: 12 },
+          { name: "Bread", quantity: 100, carbs: 30 },
+          { name: "Milk", quantity: 200, carbs: 12 },
         ],
       };
       const createdMeal = {

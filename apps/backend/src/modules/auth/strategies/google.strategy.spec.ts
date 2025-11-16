@@ -86,11 +86,15 @@ describe("GoogleStrategy", () => {
     });
 
     it("should call done with error if email array is empty", async () => {
-      const profile: Profile = {
+      const profile = {
         id: "google-123",
         emails: [],
         displayName: "Google User",
-      } as Profile;
+        profileUrl: "",
+        provider: "google",
+        _raw: "",
+        _json: {},
+      } as unknown as Profile;
       const done: VerifyCallback = jest.fn();
 
       await strategy.validate("access-token", "refresh-token", profile, done);

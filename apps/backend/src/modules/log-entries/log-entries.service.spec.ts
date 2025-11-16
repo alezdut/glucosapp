@@ -5,6 +5,7 @@ import { EncryptionService } from "../../common/services/encryption.service";
 import { createMockPrismaService } from "../../common/test-helpers/prisma.mock";
 import { createMockConfigService } from "../../common/test-helpers/config.mock";
 import { CreateLogEntryDto } from "./dto/create-log-entry.dto";
+import { InsulinType } from "@glucosapp/types";
 
 describe("LogEntriesService", () => {
   let service: LogEntriesService;
@@ -129,9 +130,9 @@ describe("LogEntriesService", () => {
       const data: CreateLogEntryDto = {
         glucoseMgdl: 120,
         insulinUnits: 5,
-        insulinType: "BOLUS",
+        insulinType: InsulinType.BOLUS,
         carbohydrates: 50,
-        mealType: "BREAKFAST",
+        mealType: "BREAKFAST" as any,
       };
 
       (prismaService.$transaction as jest.Mock).mockImplementation(async (callback) => {
@@ -175,7 +176,7 @@ describe("LogEntriesService", () => {
       const data: CreateLogEntryDto = {
         glucoseMgdl: 120,
         insulinUnits: 0,
-        insulinType: "BOLUS",
+        insulinType: InsulinType.BOLUS,
         carbohydrates: 50,
       };
 

@@ -135,7 +135,7 @@ describe("DashboardController", () => {
   describe("getRecentAlerts", () => {
     it("should return recent alerts with default limit", async () => {
       const query: GetRecentAlertsQueryDto = {};
-      const expectedResult = [];
+      const expectedResult: any[] = [];
 
       (alertsService.getRecent as jest.Mock).mockResolvedValue(expectedResult);
 
@@ -147,7 +147,7 @@ describe("DashboardController", () => {
 
     it("should return recent alerts with custom limit", async () => {
       const query: GetRecentAlertsQueryDto = { limit: 20 };
-      const expectedResult = [];
+      const expectedResult: any[] = [];
 
       (alertsService.getRecent as jest.Mock).mockResolvedValue(expectedResult);
 

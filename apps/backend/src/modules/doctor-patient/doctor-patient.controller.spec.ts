@@ -47,7 +47,7 @@ describe("DoctorPatientController", () => {
   describe("getPatients", () => {
     it("should return patients list", async () => {
       const query: GetPatientsQueryDto = {};
-      const expectedResult = [];
+      const expectedResult: any[] = [];
 
       (service.getPatients as jest.Mock).mockResolvedValue(expectedResult);
 
@@ -61,7 +61,7 @@ describe("DoctorPatientController", () => {
   describe("searchGlobalPatients", () => {
     it("should search for patients", async () => {
       const query: SearchPatientsDto = { q: "John" };
-      const expectedResult = [];
+      const expectedResult: any[] = [];
 
       (service.searchGlobalPatients as jest.Mock).mockResolvedValue(expectedResult);
 
