@@ -23,7 +23,7 @@ Glucosapp es una aplicación completa para el seguimiento de glucosa en sangre q
 ### 1. Clonar el repositorio
 
 ```bash
-git clone <repository-url>
+git clone [<repository-url>](https://github.com/alezdut/glucosapp)
 cd glucosapp
 ```
 
