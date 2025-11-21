@@ -108,6 +108,7 @@ model User {
   mealTimeLunchEnd         Int              @default(1020) // 5:00 PM
   mealTimeDinnerStart      Int              @default(1020) // 5:00 PM
   mealTimeDinnerEnd        Int              @default(300) // 5:00 AM (next day)
+  timezone                 String           @default("UTC") // IANA timezone (e.g., "America/Argentina/Buenos_Aires")
   role                     UserRole         @default(PATIENT)
   createdAt                DateTime         @default(now())
   entries                  GlucoseEntry[]
@@ -125,6 +126,7 @@ model User {
   appointmentsAsPatient    Appointment[]    @relation("Patient")
   // Alerts
   alerts                   Alert[]
+  alertSettings            AlertSettings?
 }
 
 model Account {
@@ -288,6 +290,7 @@ model Alert {
   severity         AlertSeverity
   message          String
   glucoseReadingId String?
+  glucoseEntryId   String?
   acknowledged     Boolean       @default(false)
   acknowledgedAt   DateTime?
   createdAt        DateTime      @default(now())
@@ -297,4 +300,33 @@ model Alert {
   @@index([userId, acknowledged])
   @@index([severity])
   @@index([createdAt])
+}
+
+model AlertSettings {
+  id                                 String   @id @default(cuid())
+  userId                             String   @unique
+  alertsEnabled                      Boolean  @default(true)
+  hypoglycemiaEnabled                Boolean  @default(true)
+  hypoglycemiaThreshold              Int      @default(70)
+  severeHypoglycemiaEnabled          Boolean  @default(true)
+  severeHypoglycemiaThreshold        Int      @default(54)
+  hyperglycemiaEnabled               Boolean  @default(true)
+  hyperglycemiaThreshold             Int      @default(250)
+  persistentHyperglycemiaEnabled     Boolean  @default(true)
+  persistentHyperglycemiaThreshold   Int      @default(250)
+  persistentHyperglycemiaWindowHours Int      @default(4)
+  persistentHyperglycemiaMinReadings Int      @default(2)
+  notificationChannels               Json     @default("{\"dashboard\":true,\"email\":false,\"push\":false}")
+  dailySummaryEnabled                Boolean  @default(true)
+  dailySummaryTime                   String   @default("08:00")
+  quietHoursEnabled                  Boolean  @default(false)
+  quietHoursStart                    String?
+  quietHoursEnd                      String?
+  criticalAlertsIgnoreQuietHours     Boolean  @default(false) // If true, critical alerts (SEVERE_HYPOGLYCEMIA) ignore quiet hours
+  notificationFrequency              String   @default("IMMEDIATE")
+  createdAt                          DateTime @default(now())
+  updatedAt                          DateTime @updatedAt
+  user                               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

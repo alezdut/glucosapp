@@ -2,6 +2,7 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { PrismaService } from "../../prisma/prisma.service";
 import { LogEntriesService } from "./log-entries.service";
 import { EncryptionService } from "../../common/services/encryption.service";
+import { AlertsService } from "../alerts/alerts.service";
 import { createMockPrismaService } from "../../common/test-helpers/prisma.mock";
 import { createMockConfigService } from "../../common/test-helpers/config.mock";
 import { CreateLogEntryDto } from "./dto/create-log-entry.dto";
@@ -24,6 +25,9 @@ describe("LogEntriesService", () => {
         return match ? parseInt(match[1], 10) : 100;
       }),
     };
+    const mockAlertsService = {
+      detectAlert: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -35,6 +39,10 @@ describe("LogEntriesService", () => {
         {
           provide: EncryptionService,
           useValue: mockEncryptionService,
+        },
+        {
+          provide: AlertsService,
+          useValue: mockAlertsService,
         },
         {
           provide: "ConfigService",

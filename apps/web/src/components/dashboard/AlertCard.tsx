@@ -3,7 +3,8 @@
 import { Alert } from "@/lib/dashboard-api";
 import { acknowledgeAlert } from "@/lib/dashboard-api";
 import { useAuth } from "@/contexts/auth-context";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import {
   formatTimeAgo,
@@ -46,8 +47,14 @@ const getSeverityIconColor = (severity: string) => {
 
 export const AlertCard = ({ alert, onAcknowledge }: AlertCardProps) => {
   const { user } = useAuth();
+  const router = useRouter();
   const [isAcknowledging, setIsAcknowledging] = useState(false);
   const [isAcknowledged, setIsAcknowledged] = useState(alert.acknowledged);
+
+  // Sync local state with alert prop when it changes (e.g., after query refetch)
+  useEffect(() => {
+    setIsAcknowledged(alert.acknowledged);
+  }, [alert.acknowledged]);
 
   const handleAcknowledge = async () => {
     if (!user || isAcknowledging || isAcknowledged) return;
@@ -60,6 +67,12 @@ export const AlertCard = ({ alert, onAcknowledge }: AlertCardProps) => {
           await acknowledgeAlert(token, alert.id);
           setIsAcknowledged(true);
           onAcknowledge?.();
+
+          // Navigate to patient profile after acknowledging
+          const patientId = alert.userId || alert.patient?.id;
+          if (patientId) {
+            router.push(`/dashboard/patients/${patientId}`);
+          }
         }
       }
     } catch (error) {

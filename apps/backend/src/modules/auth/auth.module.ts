@@ -37,6 +37,6 @@ import { GoogleMobileStrategy } from "./strategies/google-mobile.strategy";
     GoogleStrategy,
     GoogleMobileStrategy,
   ],
-  exports: [AuthService],
+  exports: [AuthService, EmailService],
 })
 export class AuthModule {}

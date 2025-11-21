@@ -18,6 +18,7 @@ import {
 } from "@/hooks/useDashboard";
 import { useQueryClient } from "@tanstack/react-query";
 import { Users, AlertTriangle, Calendar } from "lucide-react";
+import { invalidateAlertQueries } from "@/lib/alert-utils";
 
 /**
  * Dashboard page showing doctor's overview
@@ -30,10 +31,11 @@ export default function DashboardPage() {
   const { data: glucoseEvolution, isLoading: glucoseLoading } = useGlucoseEvolution();
   const { data: insulinStats, isLoading: insulinLoading } = useInsulinStats(30);
   const { data: mealStats, isLoading: mealLoading } = useMealStats(30);
-  const { data: recentAlerts, isLoading: alertsLoading } = useRecentAlerts(10);
+  const { data: recentAlerts, isLoading: alertsLoading } = useRecentAlerts(3);
 
   const handleAlertUpdate = () => {
-    queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    // Use shared utility to invalidate all alert-related queries
+    invalidateAlertQueries(queryClient);
   };
 
   const doctorName = user
