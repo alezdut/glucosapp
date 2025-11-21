@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { X, Search, UserPlus, Loader2 } from "lucide-react";
-import { Snackbar, Alert } from "@mui/material";
 import { useSearchGlobalPatients, useAssignPatient } from "@/hooks/usePatients";
 import { PatientListItem } from "@/lib/dashboard-api";
 import { getDiabetesTypeLabel } from "@glucosapp/utils";
 import { DiabetesType } from "@glucosapp/types";
+import { FeedbackSnackbar } from "@/components/FeedbackSnackbar";
 
 interface AddPatientModalProps {
   isOpen: boolean;
@@ -164,16 +164,12 @@ export const AddPatientModal = ({ isOpen, onClose }: AddPatientModalProps) => {
       </div>
 
       {/* Error Toast */}
-      <Snackbar
+      <FeedbackSnackbar
         open={!!errorToast}
-        autoHideDuration={6000}
+        message={errorToast || ""}
+        severity="error"
         onClose={() => setErrorToast(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <Alert onClose={() => setErrorToast(null)} severity="error" sx={{ width: "100%" }}>
-          {errorToast}
-        </Alert>
-      </Snackbar>
+      />
     </div>
   );
 };

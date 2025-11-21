@@ -18,6 +18,122 @@ export enum Language {
   EN = "EN",
 }
 
+export enum ReminderFrequency {
+  DAILY = "DAILY",
+  WEEKLY = "WEEKLY",
+}
+
+export enum NotificationChannel {
+  DASHBOARD = "DASHBOARD",
+  EMAIL = "EMAIL",
+  PUSH = "PUSH",
+}
+
+export enum NotificationFrequency {
+  IMMEDIATE = "IMMEDIATE",
+  DAILY = "DAILY",
+  WEEKLY = "WEEKLY",
+}
+
+type Option<TValue extends string> = {
+  value: TValue;
+  label: string;
+};
+
+export const GLUCOSE_UNIT_OPTIONS = [
+  { value: GlucoseUnit.MG_DL, label: "mg/dL" },
+] as const satisfies Option<GlucoseUnit>[];
+
+export type GlucoseUnitOption = (typeof GLUCOSE_UNIT_OPTIONS)[number];
+
+export const WEIGHT_UNIT_OPTIONS = [{ value: "KG", label: "kg" }] as const;
+
+export type WeightUnit = (typeof WEIGHT_UNIT_OPTIONS)[number]["value"];
+
+export const LANGUAGE_OPTIONS = [
+  { value: Language.ES, label: "Español" },
+] as const satisfies Option<Language>[];
+
+export type LanguageOption = (typeof LANGUAGE_OPTIONS)[number];
+
+export const REMINDER_FREQUENCY_OPTIONS = [
+  { value: ReminderFrequency.DAILY, label: "Diaria" },
+  { value: ReminderFrequency.WEEKLY, label: "Semanal" },
+] as const satisfies Option<ReminderFrequency>[];
+
+export type ReminderFrequencyOption = (typeof REMINDER_FREQUENCY_OPTIONS)[number];
+
+export const NOTIFICATION_FREQUENCY_OPTIONS = [
+  { value: NotificationFrequency.IMMEDIATE, label: "Inmediatamente" },
+  { value: NotificationFrequency.DAILY, label: "Resumen diario" },
+  { value: NotificationFrequency.WEEKLY, label: "Resumen semanal" },
+] as const satisfies Option<NotificationFrequency>[];
+
+export type NotificationFrequencyOption = (typeof NOTIFICATION_FREQUENCY_OPTIONS)[number];
+
+// Alert Settings Types
+export type NotificationChannels = {
+  dashboard: boolean;
+  email: boolean;
+  push: boolean;
+};
+
+export type AlertSettings = {
+  id: string;
+  userId: string;
+  alertsEnabled: boolean;
+  hypoglycemiaEnabled: boolean;
+  hypoglycemiaThreshold: number;
+  severeHypoglycemiaEnabled: boolean;
+  severeHypoglycemiaThreshold: number;
+  hyperglycemiaEnabled: boolean;
+  hyperglycemiaThreshold: number;
+  persistentHyperglycemiaEnabled: boolean;
+  persistentHyperglycemiaThreshold: number;
+  persistentHyperglycemiaWindowHours: number;
+  persistentHyperglycemiaMinReadings: number;
+  notificationChannels: NotificationChannels;
+  dailySummaryEnabled: boolean;
+  dailySummaryTime: string;
+  quietHoursEnabled: boolean;
+  quietHoursStart?: string;
+  quietHoursEnd?: string;
+  criticalAlertsIgnoreQuietHours: boolean;
+  notificationFrequency: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type UpdateAlertSettingsPayload = {
+  alertsEnabled?: boolean;
+  hypoglycemiaEnabled?: boolean;
+  hypoglycemiaThreshold?: number;
+  severeHypoglycemiaEnabled?: boolean;
+  severeHypoglycemiaThreshold?: number;
+  hyperglycemiaEnabled?: boolean;
+  hyperglycemiaThreshold?: number;
+  persistentHyperglycemiaEnabled?: boolean;
+  persistentHyperglycemiaThreshold?: number;
+  persistentHyperglycemiaWindowHours?: number;
+  persistentHyperglycemiaMinReadings?: number;
+  notificationChannels?: NotificationChannels;
+  dailySummaryEnabled?: boolean;
+  dailySummaryTime?: string;
+  quietHoursEnabled?: boolean;
+  quietHoursStart?: string;
+  quietHoursEnd?: string;
+  criticalAlertsIgnoreQuietHours?: boolean;
+  notificationFrequency?: string;
+};
+
+// Alert Settings Constants
+export const ALERT_THRESHOLD_RANGES = {
+  HYPOGLYCEMIA: { min: 40, max: 80, default: 70 },
+  SEVERE_HYPOGLYCEMIA: { min: 30, max: 60, default: 54 }, // Must be validated to be < HYPOGLYCEMIA threshold
+  HYPERGLYCEMIA: { min: 180, max: 400, default: 250 },
+  PERSISTENT_HYPERGLYCEMIA: { min: 180, max: 400, default: 250 },
+} as const;
+
 export enum InsulinType {
   BASAL = "BASAL",
   BOLUS = "BOLUS",

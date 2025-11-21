@@ -8,6 +8,7 @@ import {
   getInsulinStats,
   getMealStats,
   getRecentAlerts,
+  getUnacknowledgedAlerts,
 } from "@/lib/dashboard-api";
 
 const getToken = () => {
@@ -84,5 +85,20 @@ export const useRecentAlerts = (limit: number = 10) => {
       return getRecentAlerts(token, limit);
     },
     enabled: !!user,
+  });
+};
+
+export const useUnacknowledgedAlerts = (limit: number = 10) => {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ["alerts", "unacknowledged", limit],
+    queryFn: async () => {
+      const token = getToken();
+      if (!token) throw new Error("Not authenticated");
+      return getUnacknowledgedAlerts(token, limit);
+    },
+    enabled: !!user,
+    refetchInterval: 30000, // Refetch every 30 seconds to keep notifications up to date
   });
 };

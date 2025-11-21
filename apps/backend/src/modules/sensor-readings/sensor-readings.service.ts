@@ -1,6 +1,7 @@
-import { Injectable, BadRequestException } from "@nestjs/common";
+import { Injectable, BadRequestException, Inject, forwardRef } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { EncryptionService } from "../../common/services/encryption.service";
+import { AlertsService } from "../alerts/alerts.service";
 import { CreateSensorReadingDto, ReadingSource } from "./dto/create-sensor-reading.dto";
 import { BatchCreateSensorReadingsDto } from "./dto/batch-create-sensor-readings.dto";
 import { ExportReadingsQueryDto, ExportFormat } from "./dto/export-readings-query.dto";
@@ -14,6 +15,8 @@ export class SensorReadingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly encryptionService: EncryptionService,
+    @Inject(forwardRef(() => AlertsService))
+    private readonly alertsService: AlertsService,
   ) {}
 
   /**
@@ -53,7 +56,7 @@ export class SensorReadingsService {
       return existing; // Return existing reading instead of creating duplicate
     }
 
-    return this.prisma.glucoseReading.create({
+    const reading = await this.prisma.glucoseReading.create({
       data: {
         userId,
         glucoseEncrypted,
@@ -62,6 +65,25 @@ export class SensorReadingsService {
         isHistorical: data.isHistorical || false,
       },
     });
+
+    // Detect and create alerts based on glucose value
+    // Use non-blocking approach to avoid slowing down the response
+    // Only detect alerts for non-historical readings
+    if (!data.isHistorical) {
+      // Ensure reading.id is available before calling detectAlert
+      if (!reading.id) {
+        console.error("[SensorReadings] Reading ID is not available after creation");
+      } else {
+        console.log(
+          `[SensorReadings] Calling detectAlert with reading.id: ${reading.id}, glucose: ${data.glucose}`,
+        );
+        this.alertsService.detectAlert(userId, data.glucose, reading.id).catch((error) => {
+          console.error("[SensorReadings] Failed to detect alert:", error);
+        });
+      }
+    }
+
+    return reading;
   }
 
   /**
@@ -93,6 +115,7 @@ export class SensorReadingsService {
     // Use transaction for atomicity
     const result = await this.prisma.$transaction(async (tx) => {
       const created = [];
+      const readingsForAlertDetection: Array<{ readingId: string; glucoseValue: number }> = [];
       let currentReadingData: CreateSensorReadingDto | null = null;
 
       for (const reading of data.readings) {
@@ -125,7 +148,16 @@ export class SensorReadingsService {
               isHistorical: reading.isHistorical || false,
             },
           });
+
           created.push(newReading);
+
+          // Track non-historical readings for alert detection after transaction
+          if (!reading.isHistorical) {
+            readingsForAlertDetection.push({
+              readingId: newReading.id,
+              glucoseValue: reading.glucose,
+            });
+          }
         }
       }
 
@@ -180,14 +212,24 @@ export class SensorReadingsService {
         }
       }
 
-      return created;
+      return { created, readingsForAlertDetection };
     });
 
+    // Detect alerts for non-historical readings after transaction completes
+    for (const { readingId, glucoseValue } of result.readingsForAlertDetection) {
+      console.log(
+        `[SensorReadings] Calling detectAlert (batch) with readingId: ${readingId}, glucose: ${glucoseValue}`,
+      );
+      this.alertsService.detectAlert(userId, glucoseValue, readingId).catch((error) => {
+        console.error("[SensorReadings] Failed to detect alert:", error);
+      });
+    }
+
     return {
-      created: result.length,
-      skipped: data.readings.length - result.length,
+      created: result.created.length,
+      skipped: data.readings.length - result.created.length,
       total: data.readings.length,
-      readings: result,
+      readings: result.created,
     };
   }
 
