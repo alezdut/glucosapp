@@ -88,11 +88,21 @@ export const createMockPrismaService = (): Partial<PrismaService> => {
     },
     alert: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
       count: jest.fn(),
+    },
+    alertSettings: {
+      findUnique: jest.fn(),
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      upsert: jest.fn(),
+      delete: jest.fn(),
     },
     doctorPatient: {
       findUnique: jest.fn(),

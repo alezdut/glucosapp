@@ -3,6 +3,7 @@ import { BadRequestException } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { SensorReadingsService } from "./sensor-readings.service";
 import { EncryptionService } from "../../common/services/encryption.service";
+import { AlertsService } from "../alerts/alerts.service";
 import { createMockPrismaService } from "../../common/test-helpers/prisma.mock";
 import { createMockConfigService } from "../../common/test-helpers/config.mock";
 import { CreateSensorReadingDto, ReadingSource } from "./dto/create-sensor-reading.dto";
@@ -26,6 +27,9 @@ describe("SensorReadingsService", () => {
         return match ? parseInt(match[1], 10) : 100;
       }),
     };
+    const mockAlertsService = {
+      detectAlert: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -37,6 +41,10 @@ describe("SensorReadingsService", () => {
         {
           provide: EncryptionService,
           useValue: mockEncryptionService,
+        },
+        {
+          provide: AlertsService,
+          useValue: mockAlertsService,
         },
         {
           provide: "ConfigService",

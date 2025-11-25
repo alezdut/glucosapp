@@ -34,6 +34,9 @@ export class AlertResponseDto {
   @ApiProperty({ required: false })
   glucoseReadingId?: string;
 
+  @ApiProperty({ required: false })
+  glucoseEntryId?: string;
+
   @ApiProperty()
   acknowledged!: boolean;
 

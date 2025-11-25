@@ -48,6 +48,21 @@ export class EmailService {
   }
 
   /**
+   * Escapes HTML special characters to prevent XSS attacks
+   * Replaces &, <, >, ", ', / with their HTML entities
+   */
+  private escapeHtml(text: string | number): string {
+    const str = String(text);
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#x27;")
+      .replace(/\//g, "&#x2F;");
+  }
+
+  /**
    * Loads email template and replaces placeholders
    */
   private loadTemplate(templateName: string, variables: Record<string, string>): string {
@@ -132,6 +147,170 @@ export class EmailService {
       this.logger.log(`Password reset email sent to ${email}`);
     } catch (error) {
       this.logger.error(`Failed to send password reset email to ${email}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Sends alert notification email to doctor
+   */
+  async sendAlertEmail(
+    email: string,
+    firstName: string | null | undefined,
+    alertType: string,
+    severity: string,
+    message: string,
+    dashboardUrl?: string,
+    patientInfo?: {
+      patientName: string;
+      patientEmail: string;
+      glucoseValue: number;
+      alertTime: string;
+      alertTimezone: string;
+    },
+  ): Promise<void> {
+    if (!this.transporter) {
+      this.logger.warn(
+        `Skipping alert email to ${email}. SMTP not configured. Alert type: ${alertType}`,
+      );
+      return;
+    }
+
+    const frontendUrl = this.configService.get<string>("FRONTEND_URL", "http://localhost:3001");
+    const alertDashboardUrl = dashboardUrl || `${frontendUrl}/dashboard`;
+
+    // Map alert types to Spanish names
+    const alertTypeNames: Record<string, string> = {
+      SEVERE_HYPOGLYCEMIA: "Hipoglucemia Severa",
+      HYPOGLYCEMIA: "Hipoglucemia",
+      HYPERGLYCEMIA: "Hiperglucemia",
+      PERSISTENT_HYPERGLYCEMIA: "Hiperglucemia Persistente",
+      OTHER: "Alerta de Glucosa",
+    };
+
+    // Map severity to colors and icons
+    const severityConfig: Record<
+      string,
+      {
+        title: string;
+        headerColor: string;
+        bgColor: string;
+        borderColor: string;
+        textColor: string;
+        icon: string;
+      }
+    > = {
+      CRITICAL: {
+        title: "🚨 Alerta Crítica",
+        headerColor: "linear-gradient(135deg, #dc3545 0%, #c82333 100%)",
+        bgColor: "#f8d7da",
+        borderColor: "#dc3545",
+        textColor: "#721c24",
+        icon: "🚨",
+      },
+      HIGH: {
+        title: "⚠️ Alerta Importante",
+        headerColor: "linear-gradient(135deg, #fd7e14 0%, #e55a00 100%)",
+        bgColor: "#fff3cd",
+        borderColor: "#ffc107",
+        textColor: "#856404",
+        icon: "⚠️",
+      },
+      MEDIUM: {
+        title: "ℹ️ Alerta",
+        headerColor: "linear-gradient(135deg, #17a2b8 0%, #138496 100%)",
+        bgColor: "#d1ecf1",
+        borderColor: "#17a2b8",
+        textColor: "#0c5460",
+        icon: "ℹ️",
+      },
+      LOW: {
+        title: "📋 Notificación",
+        headerColor: "linear-gradient(135deg, #6c757d 0%, #5a6268 100%)",
+        bgColor: "#e2e3e5",
+        borderColor: "#6c757d",
+        textColor: "#383d41",
+        icon: "📋",
+      },
+    };
+
+    const config = severityConfig[severity] || severityConfig.MEDIUM;
+    const alertTypeName = alertTypeNames[alertType] || alertTypeNames.OTHER;
+
+    // Build greeting (escape firstName to prevent XSS)
+    const greeting = firstName ? `Hola ${this.escapeHtml(firstName)},` : "Hola,";
+
+    // Critical alert notice (only for CRITICAL severity)
+    const criticalAlertNotice =
+      severity === "CRITICAL"
+        ? `<div style="margin: 30px 0; padding: 20px; background-color: #f8d7da; border-left: 4px solid #dc3545; border-radius: 4px;">
+            <p style="margin: 0; color: #721c24; font-size: 14px; font-weight: bold;">
+              🚨 ALERTA CRÍTICA - Requiere atención inmediata
+            </p>
+            <p style="margin: 10px 0 0; color: #721c24; font-size: 14px;">
+              Esta es una alerta de máxima prioridad. Por favor, revisa el dashboard y contacta con el paciente o servicios de emergencia si es necesario.
+            </p>
+          </div>`
+        : "";
+
+    // Build patient information section (escape all user-controlled values to prevent XSS)
+    const patientInfoSection = patientInfo
+      ? `<div style="margin: 30px 0; padding: 20px; background-color: #f8f9fa; border-radius: 6px; border: 1px solid #dee2e6;">
+          <p style="margin: 0 0 15px; color: #333333; font-size: 16px; font-weight: bold;">
+            👤 Información del Paciente
+          </p>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 8px 0; color: #666666; font-size: 14px; width: 160px; vertical-align: top;"><strong>Nombre del Paciente:</strong></td>
+              <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${this.escapeHtml(patientInfo.patientName)}</td>
+            </tr>
+            ${
+              patientInfo.patientEmail
+                ? `<tr>
+              <td style="padding: 8px 0; color: #666666; font-size: 14px; vertical-align: top;"><strong>Email del Paciente:</strong></td>
+              <td style="padding: 8px 0; color: #333333; font-size: 14px;">${this.escapeHtml(patientInfo.patientEmail)}</td>
+            </tr>`
+                : ""
+            }
+            <tr>
+              <td style="padding: 8px 0; color: #666666; font-size: 14px; vertical-align: top;"><strong>Valor de Glucosa:</strong></td>
+              <td style="padding: 8px 0; color: #333333; font-size: 16px; font-weight: bold;">${this.escapeHtml(patientInfo.glucoseValue)} mg/dL</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #666666; font-size: 14px; vertical-align: top;"><strong>Hora de la Alerta:</strong></td>
+              <td style="padding: 8px 0; color: #333333; font-size: 14px;">${this.escapeHtml(patientInfo.alertTime)}<br><span style="color: #999999; font-size: 12px;">Zona horaria: ${this.escapeHtml(patientInfo.alertTimezone)}</span></td>
+            </tr>
+          </table>
+        </div>`
+      : "";
+
+    const html = this.loadTemplate("alert-notification", {
+      alertTitle: config.title,
+      alertTypeName: this.escapeHtml(alertTypeName),
+      greeting,
+      message: this.escapeHtml(message),
+      alertIcon: config.icon,
+      alertBackgroundColor: config.bgColor,
+      alertBorderColor: config.borderColor,
+      alertTextColor: config.textColor,
+      headerColor: config.headerColor,
+      dashboardUrl: alertDashboardUrl,
+      criticalAlertNotice,
+      patientInfoSection,
+    });
+
+    const mailOptions = {
+      from: this.configService.get<string>("SMTP_USER"),
+      to: email,
+      subject: `${config.icon} ${alertTypeName} - Glucosapp`,
+      html,
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      this.logger.log(`Alert email sent to ${email} for ${alertType} (${severity})`);
+    } catch (error) {
+      this.logger.error(`Failed to send alert email to ${email}`, error);
       throw error;
     }
   }
