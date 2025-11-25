@@ -201,6 +201,10 @@ export interface GetPatientsFilters {
   diabetesType?: "TYPE_1" | "TYPE_2";
   activeOnly?: boolean;
   registrationDate?: string;
+  clinicalStatus?: "Riesgo" | "Estable";
+  activityStatus?: "Activo" | "Inactivo";
+  ageRange?: string;
+  weightRange?: string;
 }
 
 /**
@@ -512,4 +516,68 @@ export async function updatePatientProfile(
     throw new Error("No data returned from update patient profile endpoint");
   }
   return response.data;
+}
+
+export interface GenerateReportOptions {
+  startDate: string;
+  endDate: string;
+  reportTypes: string[];
+  format: "pdf" | "csv";
+  includeAISummary?: boolean;
+}
+
+export interface GenerateGroupReportOptions extends GenerateReportOptions {
+  filters?: GetPatientsFilters;
+}
+
+/**
+ * Generate individual patient report
+ */
+export async function generateIndividualReport(
+  accessToken: string,
+  patientId: string,
+  options: GenerateReportOptions,
+): Promise<Blob> {
+  const response = await fetch(`${apiBaseUrl}/v1/reports/individual`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      patientId,
+      ...options,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: "Failed to generate report" }));
+    throw new Error(error.message || "Failed to generate report");
+  }
+
+  return response.blob();
+}
+
+/**
+ * Generate group report for multiple patients
+ */
+export async function generateGroupReport(
+  accessToken: string,
+  options: GenerateGroupReportOptions,
+): Promise<Blob> {
+  const response = await fetch(`${apiBaseUrl}/v1/reports/group`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(options),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: "Failed to generate report" }));
+    throw new Error(error.message || "Failed to generate report");
+  }
+
+  return response.blob();
 }

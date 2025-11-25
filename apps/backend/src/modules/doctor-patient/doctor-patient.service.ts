@@ -151,6 +151,79 @@ export class DoctorPatientService {
       };
     }
 
+    // Apply age range filter
+    if (filters?.ageRange) {
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      let minAge: number | undefined;
+      let maxAge: number | undefined;
+
+      if (filters.ageRange === "18-30") {
+        minAge = 18;
+        maxAge = 30;
+      } else if (filters.ageRange === "31-50") {
+        minAge = 31;
+        maxAge = 50;
+      } else if (filters.ageRange === "51-70") {
+        minAge = 51;
+        maxAge = 70;
+      } else if (filters.ageRange === "70+") {
+        minAge = 70;
+        maxAge = undefined;
+      }
+
+      if (minAge !== undefined) {
+        // For minimum age: person must have been born ON OR BEFORE (currentYear - minAge)
+        // Example: to be at least 31 years old in 2025, must be born on or before Dec 31, 1994
+        const maxBirthYear = currentYear - minAge;
+        const maxBirthDate = new Date(maxBirthYear, 11, 31, 23, 59, 59, 999);
+
+        if (maxAge !== undefined) {
+          // For maximum age: person must have been born ON OR AFTER (currentYear - maxAge)
+          // Example: to be at most 50 years old in 2025, must be born on or after Jan 1, 1975
+          const minBirthYear = currentYear - maxAge;
+          const minBirthDate = new Date(minBirthYear, 0, 1);
+          where.birthDate = {
+            gte: minBirthDate, // Born on or after this date (to be at most maxAge)
+            lte: maxBirthDate, // Born on or before this date (to be at least minAge)
+          };
+        } else {
+          // Only minimum age specified (e.g., "70+")
+          where.birthDate = {
+            lte: maxBirthDate, // Born on or before this date (to be at least minAge)
+          };
+        }
+      }
+    }
+
+    // Apply weight range filter
+    if (filters?.weightRange) {
+      let minWeight: number | undefined;
+      let maxWeight: number | undefined;
+
+      if (filters.weightRange === "<60") {
+        maxWeight = 60;
+      } else if (filters.weightRange === "60-80") {
+        minWeight = 60;
+        maxWeight = 80;
+      } else if (filters.weightRange === "80-100") {
+        minWeight = 80;
+        maxWeight = 100;
+      } else if (filters.weightRange === "100+") {
+        minWeight = 100;
+      }
+
+      if (minWeight !== undefined || maxWeight !== undefined) {
+        where.weight = {};
+        if (minWeight !== undefined) {
+          where.weight.gte = minWeight;
+        }
+        if (maxWeight !== undefined) {
+          where.weight.lte = maxWeight;
+        }
+      }
+    }
+
     // Get patients with basic info
     const patients = await this.prisma.user.findMany({
       where,
@@ -354,8 +427,27 @@ export class DoctorPatientService {
       });
     }
 
+    // Apply clinical status and activity status filters after calculating statuses
+    let filteredPatientsData = patientsData;
+    if (filters?.clinicalStatus || filters?.activityStatus) {
+      filteredPatientsData = patientsData.filter((patientData) => {
+        const statuses = statusesMap.get(patientData.patient.id);
+        if (!statuses) return false;
+
+        if (filters?.clinicalStatus && statuses.clinicalStatus !== filters.clinicalStatus) {
+          return false;
+        }
+
+        if (filters?.activityStatus && statuses.activityStatus !== filters.activityStatus) {
+          return false;
+        }
+
+        return true;
+      });
+    }
+
     // Build final result with statuses
-    const result: PatientListItemDto[] = patientsData.map((patientData) => {
+    const result: PatientListItemDto[] = filteredPatientsData.map((patientData) => {
       const statuses = statusesMap.get(patientData.patient.id)!;
       return {
         id: patientData.patient.id,
