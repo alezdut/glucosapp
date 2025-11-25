@@ -1,6 +1,7 @@
 "use client";
 
 import { Chip, useTheme } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 
 type SeverityBadgeProps = {
   severity: "critical" | "high" | "medium" | "low";
@@ -16,22 +17,22 @@ export const SeverityBadge = ({ severity }: SeverityBadgeProps) => {
     critical: {
       label: "Crítica",
       color: theme.palette.error.main,
-      bgColor: theme.palette.error.light + "40",
+      bgColor: alpha(theme.palette.error.light, 0.25),
     },
     high: {
       label: "Alta",
       color: theme.palette.warning.main,
-      bgColor: theme.palette.warning.light + "40",
+      bgColor: alpha(theme.palette.warning.light, 0.25),
     },
     medium: {
       label: "Media",
       color: theme.palette.info.main,
-      bgColor: theme.palette.info.light + "40",
+      bgColor: alpha(theme.palette.info.light, 0.25),
     },
     low: {
       label: "Baja",
       color: theme.palette.success.main,
-      bgColor: theme.palette.success.light + "40",
+      bgColor: alpha(theme.palette.success.light, 0.25),
     },
   };
 
