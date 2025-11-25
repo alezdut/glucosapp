@@ -607,8 +607,6 @@ export default function SettingsPage() {
                             }))
                           }
                           thresholdLabel="Hipoglucemia"
-                          thresholdMin={ALERT_THRESHOLD_RANGES.HYPOGLYCEMIA.min}
-                          thresholdMax={ALERT_THRESHOLD_RANGES.HYPOGLYCEMIA.max}
                           thresholdError={validationErrors.hypoglycemiaThreshold}
                         />
                         <IndividualAlertConfig
@@ -638,8 +636,6 @@ export default function SettingsPage() {
                             }))
                           }
                           thresholdLabel="Hipoglucemia Severa"
-                          thresholdMin={ALERT_THRESHOLD_RANGES.SEVERE_HYPOGLYCEMIA.min}
-                          thresholdMax={ALERT_THRESHOLD_RANGES.SEVERE_HYPOGLYCEMIA.max}
                           thresholdError={validationErrors.severeHypoglycemiaThreshold}
                         />
                       </Box>
@@ -703,8 +699,6 @@ export default function SettingsPage() {
                             }))
                           }
                           thresholdLabel="Hiperglucemia"
-                          thresholdMin={ALERT_THRESHOLD_RANGES.HYPERGLYCEMIA.min}
-                          thresholdMax={ALERT_THRESHOLD_RANGES.HYPERGLYCEMIA.max}
                           thresholdError={validationErrors.hyperglycemiaThreshold}
                         />
                         <Box
