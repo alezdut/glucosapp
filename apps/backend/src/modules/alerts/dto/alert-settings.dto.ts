@@ -13,8 +13,10 @@ import {
   ValidatorConstraint,
   ValidatorConstraintInterface,
   Validate,
+  Matches,
 } from "class-validator";
 import { Type } from "class-transformer";
+import { parseTimeString } from "@glucosapp/utils";
 
 /**
  * Custom validator to ensure severeHypoglycemiaThreshold < hypoglycemiaThreshold
@@ -43,6 +45,47 @@ export class IsSevereHypoglycemiaLessThanHypoglycemiaConstraint
   defaultMessage(args: ValidationArguments) {
     const dto = args.object as UpdateAlertSettingsDto;
     return `El umbral de hipoglucemia severa (${args.value}) debe ser menor que el umbral de hipoglucemia (${dto.hypoglycemiaThreshold})`;
+  }
+}
+
+/**
+ * Custom validator to ensure quietHoursStart and quietHoursEnd form a valid range when both fields are present
+ * Allows midnight crossover (e.g., 22:00 to 07:00) but ensures times are not equal
+ */
+@ValidatorConstraint({ name: "validateQuietHoursRange", async: false })
+export class ValidateQuietHoursRangeConstraint implements ValidatorConstraintInterface {
+  validate(_: string, args: ValidationArguments) {
+    const dto = args.object as UpdateAlertSettingsDto;
+    const quietHoursStart = dto.quietHoursStart;
+    const quietHoursEnd = dto.quietHoursEnd;
+
+    // If either field is not provided, validation passes (they're optional)
+    if (
+      quietHoursStart === undefined ||
+      quietHoursStart === null ||
+      quietHoursEnd === undefined ||
+      quietHoursEnd === null
+    ) {
+      return true;
+    }
+
+    // Parse times to minutes for comparison using shared utility
+    const startTimeMinutes = parseTimeString(quietHoursStart || "");
+    const endTimeMinutes = parseTimeString(quietHoursEnd || "");
+
+    // If parsing fails, validation fails
+    if (startTimeMinutes === null || endTimeMinutes === null) {
+      return false;
+    }
+
+    // Allow midnight crossover (start > end is valid, e.g., 22:00 to 07:00)
+    // But disallow equal times
+    return startTimeMinutes !== endTimeMinutes;
+  }
+
+  defaultMessage(args: ValidationArguments) {
+    const dto = args.object as UpdateAlertSettingsDto;
+    return `La hora de inicio de horas silenciosas (${dto.quietHoursStart}) debe ser diferente a la hora de fin (${dto.quietHoursEnd})`;
   }
 }
 
@@ -292,11 +335,18 @@ export class UpdateAlertSettingsDto {
   @ApiProperty({ required: false, description: "Quiet hours start time (HH:mm format)" })
   @IsOptional()
   @IsString()
+  @Matches(/^\d{2}:\d{2}$/, {
+    message: "quietHoursStart must be in HH:mm format (e.g., 22:00)",
+  })
   quietHoursStart?: string;
 
   @ApiProperty({ required: false, description: "Quiet hours end time (HH:mm format)" })
   @IsOptional()
   @IsString()
+  @Matches(/^\d{2}:\d{2}$/, {
+    message: "quietHoursEnd must be in HH:mm format (e.g., 07:00)",
+  })
+  @Validate(ValidateQuietHoursRangeConstraint)
   quietHoursEnd?: string;
 
   @ApiProperty({

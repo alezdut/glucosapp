@@ -9,14 +9,21 @@ import { EncryptionService } from "../../common/services/encryption.service";
 import { EmailService } from "../auth/services/email.service";
 import { createMockPrismaService } from "../../common/test-helpers/prisma.mock";
 import { createMockConfigService } from "../../common/test-helpers/config.mock";
-import { AlertType, AlertSeverity, UserRole } from "@prisma/client";
+import { AlertType, AlertSeverity } from "@prisma/client";
 import { UpdateAlertSettingsDto } from "./dto/alert-settings.dto";
+
+// The mock service returns Partial<PrismaService> but we know all required properties exist
+type MockPrismaService = ReturnType<typeof createMockPrismaService> & {
+  alertSettings: NonNullable<ReturnType<typeof createMockPrismaService>["alertSettings"]>;
+  glucoseEntry: NonNullable<ReturnType<typeof createMockPrismaService>["glucoseEntry"]>;
+  glucoseReading: NonNullable<ReturnType<typeof createMockPrismaService>["glucoseReading"]>;
+  alert: NonNullable<ReturnType<typeof createMockPrismaService>["alert"]>;
+};
 
 describe("AlertsService", () => {
   let service: AlertsService;
-  let prismaService: any;
+  let prismaService: MockPrismaService;
   let doctorUtilsService: DoctorUtilsService;
-  let patientUtilsService: PatientUtilsService;
   let encryptionService: EncryptionService;
 
   const doctorId = "doctor-123";
@@ -78,9 +85,8 @@ describe("AlertsService", () => {
     }).compile();
 
     service = module.get<AlertsService>(AlertsService);
-    prismaService = module.get<PrismaService>(PrismaService) as any;
+    prismaService = module.get<PrismaService>(PrismaService) as MockPrismaService;
     doctorUtilsService = module.get<DoctorUtilsService>(DoctorUtilsService);
-    patientUtilsService = module.get<PatientUtilsService>(PatientUtilsService);
     encryptionService = module.get<EncryptionService>(EncryptionService);
   });
 
@@ -201,7 +207,7 @@ describe("AlertsService", () => {
         { mgdlEncrypted: "encrypted-260" },
         { mgdlEncrypted: "encrypted-270" },
       ];
-      const recentReadings: any[] = [];
+      const recentReadings: Array<{ glucoseEncrypted: string }> = [];
 
       (prismaService.glucoseEntry.findMany as jest.Mock).mockResolvedValue(recentEntries);
       (prismaService.glucoseReading.findMany as jest.Mock).mockResolvedValue(recentReadings);
@@ -517,7 +523,7 @@ describe("AlertsService", () => {
         { mgdlEncrypted: "encrypted-250" },
         { mgdlEncrypted: "encrypted-260" },
       ];
-      const recentReadings: any[] = [];
+      const recentReadings: Array<{ glucoseEncrypted: string }> = [];
 
       (prismaService.alertSettings.upsert as jest.Mock).mockResolvedValue(customSettings);
       (prismaService.glucoseEntry.findMany as jest.Mock).mockResolvedValue(recentEntries);
@@ -559,7 +565,7 @@ describe("AlertsService", () => {
         { mgdlEncrypted: "encrypted-260" },
         { mgdlEncrypted: "encrypted-270" },
       ];
-      const recentReadings: any[] = [];
+      const recentReadings: Array<{ glucoseEncrypted: string }> = [];
 
       (prismaService.alertSettings.upsert as jest.Mock).mockResolvedValue(
         disabledPersistentSettings,
@@ -605,7 +611,7 @@ describe("AlertsService", () => {
         { mgdlEncrypted: "encrypted-270" },
         // Only 2 high readings, need 3
       ];
-      const recentReadings: any[] = [];
+      const recentReadings: Array<{ glucoseEncrypted: string }> = [];
 
       (prismaService.alertSettings.upsert as jest.Mock).mockResolvedValue(customSettings);
       (prismaService.glucoseEntry.findMany as jest.Mock).mockResolvedValue(recentEntries);
@@ -635,8 +641,8 @@ describe("AlertsService", () => {
 
     it("should not create persistent hyperglycemia with only one reading (should create regular hyperglycemia)", async () => {
       const glucoseMgdl = 280;
-      const recentEntries: any[] = []; // No previous entries
-      const recentReadings: any[] = []; // No previous readings
+      const recentEntries: Array<{ mgdlEncrypted: string }> = []; // No previous entries
+      const recentReadings: Array<{ glucoseEncrypted: string }> = []; // No previous readings
 
       (prismaService.glucoseEntry.findMany as jest.Mock).mockResolvedValue(recentEntries);
       (prismaService.glucoseReading.findMany as jest.Mock).mockResolvedValue(recentReadings);
@@ -719,7 +725,7 @@ describe("AlertsService", () => {
         { mgdlEncrypted: "encrypted-260" },
         { mgdlEncrypted: "encrypted-270" },
       ];
-      const recentReadings: any[] = [];
+      const recentReadings: Array<{ glucoseEncrypted: string }> = [];
       const existingAlert = {
         id: "existing-alert-123",
         userId: patientId,
@@ -758,7 +764,7 @@ describe("AlertsService", () => {
         { mgdlEncrypted: "encrypted-260" },
         { mgdlEncrypted: "encrypted-270" },
       ];
-      const recentReadings: any[] = [];
+      const recentReadings: Array<{ glucoseEncrypted: string }> = [];
 
       (prismaService.glucoseEntry.findMany as jest.Mock).mockResolvedValue(recentEntries);
       (prismaService.glucoseReading.findMany as jest.Mock).mockResolvedValue(recentReadings);
@@ -792,7 +798,7 @@ describe("AlertsService", () => {
         { mgdlEncrypted: "encrypted-260" },
         { mgdlEncrypted: "encrypted-270" },
       ];
-      const recentReadings: any[] = [];
+      const recentReadings: Array<{ glucoseEncrypted: string }> = [];
       const existingAlert = {
         id: "existing-alert-123",
         userId: patientId,
@@ -829,8 +835,8 @@ describe("AlertsService", () => {
 
     it("should search glucoseReading table with isHistorical: false filter", async () => {
       const glucoseMgdl = 280;
-      const recentEntries: any[] = [];
-      const recentReadings: any[] = [];
+      const recentEntries: Array<{ mgdlEncrypted: string }> = [];
+      const recentReadings: Array<{ glucoseEncrypted: string }> = [];
 
       (prismaService.glucoseEntry.findMany as jest.Mock).mockResolvedValue(recentEntries);
       (prismaService.glucoseReading.findMany as jest.Mock).mockResolvedValue(recentReadings);

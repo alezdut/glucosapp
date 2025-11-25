@@ -9,11 +9,10 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Typography,
 } from "@mui/material";
 import { InputAdornment } from "@mui/material";
 import { SeverityBadge } from "./SeverityBadge";
-import { NotificationFrequency, NOTIFICATION_FREQUENCY_OPTIONS } from "@glucosapp/types";
+import { NOTIFICATION_FREQUENCY_OPTIONS } from "@glucosapp/types";
 
 type IndividualAlertConfigProps = {
   enabled: boolean;
@@ -25,8 +24,6 @@ type IndividualAlertConfigProps = {
   onFrequencyChange: (frequency: string) => void;
   thresholdLabel: string;
   thresholdUnit?: string;
-  thresholdMin?: number;
-  thresholdMax?: number;
   thresholdError?: string;
   showFrequency?: boolean;
 };
@@ -44,8 +41,6 @@ export const IndividualAlertConfig = ({
   onFrequencyChange,
   thresholdLabel,
   thresholdUnit = "mg/dL",
-  thresholdMin,
-  thresholdMax,
   thresholdError,
   showFrequency = true,
 }: IndividualAlertConfigProps) => {

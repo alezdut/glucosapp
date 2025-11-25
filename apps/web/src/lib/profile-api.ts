@@ -1,13 +1,30 @@
 import { makeApiClient } from "@glucosapp/api-client";
-import type { GlucoseUnit, Language, UserProfile } from "@glucosapp/types";
+import type { DiabetesType, GlucoseUnit, Language, Theme, UserProfile } from "@glucosapp/types";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
 const { client } = makeApiClient(`${apiBaseUrl}/v1`);
 
 export type UpdateProfilePayload = {
-  glucoseUnit?: GlucoseUnit;
-  language?: Language;
+  birthDate?: string; // ISO date string
   weight?: number;
+  diabetesType?: DiabetesType;
+  glucoseUnit?: GlucoseUnit;
+  theme?: Theme;
+  language?: Language;
+  icRatioBreakfast?: number;
+  icRatioLunch?: number;
+  icRatioDinner?: number;
+  insulinSensitivityFactor?: number;
+  diaHours?: number;
+  targetGlucose?: number;
+  minTargetGlucose?: number;
+  maxTargetGlucose?: number;
+  mealTimeBreakfastStart?: number; // minutes from midnight (0-1439)
+  mealTimeBreakfastEnd?: number; // minutes from midnight (0-1439)
+  mealTimeLunchStart?: number; // minutes from midnight (0-1439)
+  mealTimeLunchEnd?: number; // minutes from midnight (0-1439)
+  mealTimeDinnerStart?: number; // minutes from midnight (0-1439)
+  mealTimeDinnerEnd?: number; // minutes from midnight (0-1439)
 };
 
 export async function updateProfile(

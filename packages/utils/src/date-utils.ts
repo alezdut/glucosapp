@@ -177,3 +177,144 @@ export const formatTimeFromMinutes = (minutes: number): string => {
   const mins = minutes % 60;
   return `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`;
 };
+
+/**
+ * Validate time string format (HH:mm)
+ *
+ * @param timeStr - Time string to validate
+ * @returns true if format is valid HH:mm, false otherwise
+ */
+export const validateTimeFormat = (timeStr: string): boolean => {
+  if (!timeStr || typeof timeStr !== "string") {
+    return false;
+  }
+  return /^\d{2}:\d{2}$/.test(timeStr);
+};
+
+/**
+ * Parse time string (HH:mm) to minutes since midnight
+ * Validates format and hour/minute ranges
+ *
+ * @param timeStr - Time string in HH:mm format
+ * @returns Minutes since midnight (0-1439), or null if invalid
+ */
+export const parseTimeString = (timeStr: string): number | null => {
+  if (!timeStr || typeof timeStr !== "string") {
+    return null;
+  }
+
+  // Validate format matches HH:mm
+  if (!validateTimeFormat(timeStr)) {
+    return null;
+  }
+
+  const parts = timeStr.split(":");
+  if (parts.length !== 2 || !parts[0] || !parts[1]) {
+    return null;
+  }
+
+  const hour = parseInt(parts[0], 10);
+  const minute = parseInt(parts[1], 10);
+
+  // Validate hour and minute ranges
+  if (isNaN(hour) || isNaN(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return null;
+  }
+
+  return hour * 60 + minute;
+};
+
+/**
+ * Get current time in a specific timezone
+ *
+ * @param timezone - IANA timezone string (e.g., "America/Argentina/Buenos_Aires")
+ * @returns Object with hour, minute, and totalMinutes, or null if timezone is invalid
+ */
+export const getCurrentTimeInTimezone = (
+  timezone: string,
+): { hour: number; minute: number; totalMinutes: number } | null => {
+  try {
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+
+    const parts = formatter.formatToParts(now);
+    const hour = parseInt(parts.find((p) => p.type === "hour")?.value || "0", 10);
+    const minute = parseInt(parts.find((p) => p.type === "minute")?.value || "0", 10);
+    const totalMinutes = hour * 60 + minute;
+
+    return { hour, minute, totalMinutes };
+  } catch (error) {
+    return null;
+  }
+};
+
+/**
+ * Check if a time (in minutes) is within a range, handling midnight crossover
+ *
+ * @param currentMinutes - Current time in minutes since midnight (0-1439)
+ * @param startMinutes - Range start in minutes since midnight (0-1439)
+ * @param endMinutes - Range end in minutes since midnight (0-1439)
+ * @returns true if current time is within the range, false otherwise
+ *
+ * @example
+ * // Normal range: 09:00 to 17:00
+ * isTimeInRange(600, 540, 1020) // 10:00 is within 09:00-17:00 -> true
+ *
+ * // Midnight crossover: 22:00 to 07:00
+ * isTimeInRange(300, 1320, 420) // 05:00 is within 22:00-07:00 -> true
+ */
+export const isTimeInRange = (
+  currentMinutes: number,
+  startMinutes: number,
+  endMinutes: number,
+): boolean => {
+  // Handle midnight crossover (e.g., 22:00 to 07:00)
+  if (startMinutes <= endMinutes) {
+    // Normal case: start < end (e.g., 09:00 to 17:00)
+    return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+  } else {
+    // Midnight crossover: start > end (e.g., 22:00 to 07:00)
+    return currentMinutes >= startMinutes || currentMinutes < endMinutes;
+  }
+};
+
+/**
+ * Format a date in a specific timezone with locale
+ *
+ * @param date - Date to format
+ * @param timezone - IANA timezone string (e.g., "America/Argentina/Buenos_Aires")
+ * @param locale - Locale string (e.g., "es-ES", "en-US")
+ * @param options - Intl.DateTimeFormatOptions
+ * @returns Formatted date string, or null if timezone is invalid
+ */
+export const formatDateInTimezone = (
+  date: Date,
+  timezone: string | undefined,
+  locale: string = "en-US",
+  options: Intl.DateTimeFormatOptions = {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  },
+): string | null => {
+  if (!timezone) {
+    return null;
+  }
+  try {
+    const formatter = new Intl.DateTimeFormat(locale, {
+      ...options,
+      timeZone: timezone,
+    });
+    return formatter.format(date);
+  } catch (error) {
+    return null;
+  }
+};

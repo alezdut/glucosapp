@@ -1,7 +1,6 @@
 "use client";
 
 import { Chip, useTheme } from "@mui/material";
-import { colors } from "@glucosapp/theme";
 
 type SeverityBadgeProps = {
   severity: "critical" | "high" | "medium" | "low";

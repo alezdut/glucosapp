@@ -72,7 +72,7 @@ export default function SettingsPage() {
   } | null>(null);
 
   // Local state for alert settings (initialized from API)
-  const [localAlertSettings, setLocalAlertSettings] = useState<Partial<AlertSettings>>({});
+  const [localAlertSettings, setLocalAlertSettings] = useState<Partial<AlertSettings> | null>(null);
   const previousAlertSettingsRef = useRef<string | null>(null);
 
   // State for validation errors (debounced)
@@ -94,6 +94,9 @@ export default function SettingsPage() {
 
   // Debounced validation - runs 500ms after user stops typing
   useEffect(() => {
+    if (localAlertSettings == null) {
+      return;
+    }
     const timeoutId = setTimeout(() => {
       const errors: Record<string, string> = {};
       const settings = localAlertSettings;
@@ -167,7 +170,11 @@ export default function SettingsPage() {
     key: K,
     defaultValue?: AlertSettings[K],
   ): AlertSettings[K] | undefined => {
-    if (localAlertSettings && key in localAlertSettings && localAlertSettings[key] !== undefined) {
+    if (
+      localAlertSettings != null &&
+      key in localAlertSettings &&
+      localAlertSettings[key] !== undefined
+    ) {
       return localAlertSettings[key] as AlertSettings[K];
     }
     if (alertSettings && key in alertSettings) {
@@ -234,6 +241,11 @@ export default function SettingsPage() {
   };
 
   const handleUpdateAlertSettings = async () => {
+    // Prevent submitting while loading or if alertSettings is missing
+    if (isLoadingAlertSettings || alertSettings == null) {
+      return;
+    }
+
     if (Object.keys(validationErrors).length > 0) {
       setAlertFeedback({
         type: "error",
@@ -510,7 +522,7 @@ export default function SettingsPage() {
                       checked={getSetting("alertsEnabled", true) ?? true}
                       onChange={(e) =>
                         setLocalAlertSettings((prev) => ({
-                          ...prev,
+                          ...(prev ?? {}),
                           alertsEnabled: e.target.checked,
                         }))
                       }
@@ -520,7 +532,7 @@ export default function SettingsPage() {
                   )}
                 </Box>
 
-                {isLoadingAlertSettings && !alertSettings && !localAlertSettings ? (
+                {isLoadingAlertSettings || localAlertSettings == null ? (
                   <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
                     <Typography variant="body2" color="text.secondary">
                       Cargando configuración...
@@ -821,12 +833,14 @@ export default function SettingsPage() {
                                 <Select
                                   label="Frecuencia de Notificación"
                                   value={
-                                    localAlertSettings.notificationFrequency ??
-                                    NotificationFrequency.IMMEDIATE
+                                    getSetting(
+                                      "notificationFrequency",
+                                      NotificationFrequency.IMMEDIATE,
+                                    ) ?? NotificationFrequency.IMMEDIATE
                                   }
                                   onChange={(e) =>
                                     setLocalAlertSettings((prev) => ({
-                                      ...prev,
+                                      ...(prev ?? {}),
                                       notificationFrequency: e.target.value,
                                     }))
                                   }
@@ -875,26 +889,38 @@ export default function SettingsPage() {
                         }
                         dailySummaryTime={getSetting("dailySummaryTime", "08:00") ?? "08:00"}
                         onDailySummaryTimeChange={(time) =>
-                          setLocalAlertSettings((prev) => ({ ...prev, dailySummaryTime: time }))
+                          setLocalAlertSettings((prev) => ({
+                            ...(prev ?? {}),
+                            dailySummaryTime: time,
+                          }))
                         }
                         quietHoursEnabled={getSetting("quietHoursEnabled", false) ?? false}
                         onQuietHoursChange={(enabled) =>
-                          setLocalAlertSettings((prev) => ({ ...prev, quietHoursEnabled: enabled }))
+                          setLocalAlertSettings((prev) => ({
+                            ...(prev ?? {}),
+                            quietHoursEnabled: enabled,
+                          }))
                         }
                         quietHoursStart={getSetting("quietHoursStart", "22:00") ?? "22:00"}
                         onQuietHoursStartChange={(time) =>
-                          setLocalAlertSettings((prev) => ({ ...prev, quietHoursStart: time }))
+                          setLocalAlertSettings((prev) => ({
+                            ...(prev ?? {}),
+                            quietHoursStart: time,
+                          }))
                         }
                         quietHoursEnd={getSetting("quietHoursEnd", "07:00") ?? "07:00"}
                         onQuietHoursEndChange={(time) =>
-                          setLocalAlertSettings((prev) => ({ ...prev, quietHoursEnd: time }))
+                          setLocalAlertSettings((prev) => ({
+                            ...(prev ?? {}),
+                            quietHoursEnd: time,
+                          }))
                         }
                         criticalAlertsIgnoreQuietHours={
                           getSetting("criticalAlertsIgnoreQuietHours", false) ?? false
                         }
                         onCriticalAlertsIgnoreQuietHoursChange={(enabled) =>
                           setLocalAlertSettings((prev) => ({
-                            ...prev,
+                            ...(prev ?? {}),
                             criticalAlertsIgnoreQuietHours: enabled,
                           }))
                         }
@@ -907,6 +933,8 @@ export default function SettingsPage() {
                         variant="contained"
                         onClick={handleUpdateAlertSettings}
                         disabled={
+                          isLoadingAlertSettings ||
+                          alertSettings == null ||
                           updateAlertSettingsMutation.isPending ||
                           Object.keys(validationErrors).length > 0
                         }

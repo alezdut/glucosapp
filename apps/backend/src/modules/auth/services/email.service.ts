@@ -48,6 +48,21 @@ export class EmailService {
   }
 
   /**
+   * Escapes HTML special characters to prevent XSS attacks
+   * Replaces &, <, >, ", ', / with their HTML entities
+   */
+  private escapeHtml(text: string | number): string {
+    const str = String(text);
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#x27;")
+      .replace(/\//g, "&#x2F;");
+  }
+
+  /**
    * Loads email template and replaces placeholders
    */
   private loadTemplate(templateName: string, variables: Record<string, string>): string {
@@ -222,8 +237,8 @@ export class EmailService {
     const config = severityConfig[severity] || severityConfig.MEDIUM;
     const alertTypeName = alertTypeNames[alertType] || alertTypeNames.OTHER;
 
-    // Build greeting
-    const greeting = firstName ? `Hola ${firstName},` : "Hola,";
+    // Build greeting (escape firstName to prevent XSS)
+    const greeting = firstName ? `Hola ${this.escapeHtml(firstName)},` : "Hola,";
 
     // Critical alert notice (only for CRITICAL severity)
     const criticalAlertNotice =
@@ -238,7 +253,7 @@ export class EmailService {
           </div>`
         : "";
 
-    // Build patient information section
+    // Build patient information section (escape all user-controlled values to prevent XSS)
     const patientInfoSection = patientInfo
       ? `<div style="margin: 30px 0; padding: 20px; background-color: #f8f9fa; border-radius: 6px; border: 1px solid #dee2e6;">
           <p style="margin: 0 0 15px; color: #333333; font-size: 16px; font-weight: bold;">
@@ -247,23 +262,23 @@ export class EmailService {
           <table style="width: 100%; border-collapse: collapse;">
             <tr>
               <td style="padding: 8px 0; color: #666666; font-size: 14px; width: 160px; vertical-align: top;"><strong>Nombre del Paciente:</strong></td>
-              <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${patientInfo.patientName}</td>
+              <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${this.escapeHtml(patientInfo.patientName)}</td>
             </tr>
             ${
               patientInfo.patientEmail
                 ? `<tr>
               <td style="padding: 8px 0; color: #666666; font-size: 14px; vertical-align: top;"><strong>Email del Paciente:</strong></td>
-              <td style="padding: 8px 0; color: #333333; font-size: 14px;">${patientInfo.patientEmail}</td>
+              <td style="padding: 8px 0; color: #333333; font-size: 14px;">${this.escapeHtml(patientInfo.patientEmail)}</td>
             </tr>`
                 : ""
             }
             <tr>
               <td style="padding: 8px 0; color: #666666; font-size: 14px; vertical-align: top;"><strong>Valor de Glucosa:</strong></td>
-              <td style="padding: 8px 0; color: #333333; font-size: 16px; font-weight: bold;">${patientInfo.glucoseValue} mg/dL</td>
+              <td style="padding: 8px 0; color: #333333; font-size: 16px; font-weight: bold;">${this.escapeHtml(patientInfo.glucoseValue)} mg/dL</td>
             </tr>
             <tr>
               <td style="padding: 8px 0; color: #666666; font-size: 14px; vertical-align: top;"><strong>Hora de la Alerta:</strong></td>
-              <td style="padding: 8px 0; color: #333333; font-size: 14px;">${patientInfo.alertTime}<br><span style="color: #999999; font-size: 12px;">Zona horaria: ${patientInfo.alertTimezone}</span></td>
+              <td style="padding: 8px 0; color: #333333; font-size: 14px;">${this.escapeHtml(patientInfo.alertTime)}<br><span style="color: #999999; font-size: 12px;">Zona horaria: ${this.escapeHtml(patientInfo.alertTimezone)}</span></td>
             </tr>
           </table>
         </div>`
@@ -271,9 +286,9 @@ export class EmailService {
 
     const html = this.loadTemplate("alert-notification", {
       alertTitle: config.title,
-      alertTypeName,
+      alertTypeName: this.escapeHtml(alertTypeName),
       greeting,
-      message,
+      message: this.escapeHtml(message),
       alertIcon: config.icon,
       alertBackgroundColor: config.bgColor,
       alertBorderColor: config.borderColor,

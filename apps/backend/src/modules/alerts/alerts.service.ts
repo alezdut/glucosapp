@@ -9,6 +9,12 @@ import { EncryptionService } from "../../common/services/encryption.service";
 import { EmailService } from "../auth/services/email.service";
 import { AlertResponseDto } from "./dto/alert-response.dto";
 import { AlertSettingsResponseDto, UpdateAlertSettingsDto } from "./dto/alert-settings.dto";
+import {
+  parseTimeString,
+  getCurrentTimeInTimezone,
+  isTimeInRange,
+  formatDateInTimezone,
+} from "@glucosapp/utils";
 
 type AlertWithUser = Alert & {
   user: Pick<User, "id" | "email" | "firstName" | "lastName">;
@@ -254,6 +260,7 @@ export class AlertsService {
   /**
    * Check if current time is within quiet hours for a user
    * Handles midnight crossover correctly using user's timezone
+   * Safely parses time strings with fallback handling for invalid input
    */
   private isInQuietHours(
     quietHoursStart: string,
@@ -261,34 +268,32 @@ export class AlertsService {
     userTimezone: string = "UTC",
   ): boolean {
     try {
-      // Get current time in user's timezone
-      const now = new Date();
-      const formatter = new Intl.DateTimeFormat("en-US", {
-        timeZone: userTimezone,
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      });
+      // Parse quiet hours using shared utility
+      const startTimeMinutes = parseTimeString(quietHoursStart);
+      const endTimeMinutes = parseTimeString(quietHoursEnd);
 
-      const parts = formatter.formatToParts(now);
-      const currentHour = parseInt(parts.find((p) => p.type === "hour")?.value || "0", 10);
-      const currentMinute = parseInt(parts.find((p) => p.type === "minute")?.value || "0", 10);
-      const currentTimeMinutes = currentHour * 60 + currentMinute;
-
-      // Parse quiet hours
-      const [startHour, startMin] = quietHoursStart.split(":").map(Number);
-      const [endHour, endMin] = quietHoursEnd.split(":").map(Number);
-      const startTimeMinutes = startHour * 60 + startMin;
-      const endTimeMinutes = endHour * 60 + endMin;
-
-      // Handle midnight crossover (e.g., 22:00 to 07:00)
-      if (startTimeMinutes <= endTimeMinutes) {
-        // Normal case: start < end (e.g., 09:00 to 17:00)
-        return currentTimeMinutes >= startTimeMinutes && currentTimeMinutes < endTimeMinutes;
-      } else {
-        // Midnight crossover: start > end (e.g., 22:00 to 07:00)
-        return currentTimeMinutes >= startTimeMinutes || currentTimeMinutes < endTimeMinutes;
+      // If parsing fails, return false (don't block notifications)
+      if (startTimeMinutes === null || endTimeMinutes === null) {
+        this.logger.warn(
+          `Failed to parse quiet hours: start=${quietHoursStart}, end=${quietHoursEnd}, defaulting to false`,
+        );
+        return false;
       }
+
+      // Get current time in user's timezone using shared utility
+      const currentTime = getCurrentTimeInTimezone(userTimezone);
+      if (currentTime === null) {
+        // If timezone is invalid, fallback to UTC calculation without recursion
+        if (userTimezone !== "UTC") {
+          return this.isInQuietHours(quietHoursStart, quietHoursEnd, "UTC");
+        }
+        // If UTC also fails, return false (don't block notifications)
+        this.logger.warn("Failed to get current time even with UTC, defaulting to false");
+        return false;
+      }
+
+      // Check if current time is within range using shared utility
+      return isTimeInRange(currentTime.totalMinutes, startTimeMinutes, endTimeMinutes);
     } catch (error) {
       this.logger.error(`Failed to check quiet hours for timezone ${userTimezone}`, error);
       // If timezone is invalid, fallback to UTC calculation without recursion
@@ -386,18 +391,10 @@ export class AlertsService {
       : "Paciente";
     const patientEmail = patient?.email || "";
 
-    // Format alert time in doctor's timezone
+    // Format alert time in doctor's timezone using shared utility
     const doctorTimezone = doctor.timezone || "UTC";
-    const alertTimeFormatter = new Intl.DateTimeFormat("es-ES", {
-      timeZone: doctorTimezone,
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-    const alertTimeFormatted = alertTimeFormatter.format(alertCreatedAt);
+    const alertTimeFormatted =
+      formatDateInTimezone(alertCreatedAt, doctorTimezone, "es-ES") || alertCreatedAt.toISOString();
 
     // Build dashboard URL with patient filter
     const frontendUrl = this.configService.get<string>("FRONTEND_URL", "http://localhost:3001");
