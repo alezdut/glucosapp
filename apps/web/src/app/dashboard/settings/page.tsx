@@ -392,7 +392,7 @@ export default function SettingsPage() {
     }
 
     const selectedTypes = Object.entries(reportTypes)
-      .filter(([_, selected]) => selected)
+      .filter(([, selected]) => selected)
       .map(([type]) => type);
 
     if (selectedTypes.length === 0) {
@@ -454,7 +454,7 @@ export default function SettingsPage() {
     }
 
     const selectedTypes = Object.entries(reportTypes)
-      .filter(([_, selected]) => selected)
+      .filter(([, selected]) => selected)
       .map(([type]) => type);
 
     if (selectedTypes.length === 0) {
@@ -508,7 +508,7 @@ export default function SettingsPage() {
 
   const handleGenerateGroupPDF = async () => {
     const selectedTypes = Object.entries(groupReportTypes)
-      .filter(([_, selected]) => selected)
+      .filter(([, selected]) => selected)
       .map(([type]) => {
         // Map frontend types to backend types
         const typeMap: Record<string, string> = {
@@ -593,7 +593,7 @@ export default function SettingsPage() {
 
   const handleGenerateGroupCSV = async () => {
     const selectedTypes = Object.entries(groupReportTypes)
-      .filter(([_, selected]) => selected)
+      .filter(([, selected]) => selected)
       .map(([type]) => {
         // Map frontend types to backend types
         const typeMap: Record<string, string> = {
