@@ -24,6 +24,9 @@ import {
   FormControl,
   InputLabel,
   Select,
+  Autocomplete,
+  Chip,
+  CircularProgress,
 } from "@mui/material";
 import { Droplet, Scale, Globe, Download, User, TrendingUp, Bell } from "lucide-react";
 import { colors } from "@glucosapp/theme";
@@ -41,6 +44,12 @@ import {
   type UpdateAlertSettingsPayload,
 } from "@glucosapp/types";
 import { useAlertSettings, useUpdateAlertSettings } from "@/hooks/useAlertSettings";
+import { usePatients } from "@/hooks/usePatients";
+import {
+  generateIndividualReport,
+  generateGroupReport,
+  type GetPatientsFilters,
+} from "@/lib/dashboard-api";
 
 /**
  * Settings page for application configuration and report generation
@@ -184,26 +193,69 @@ export default function SettingsPage() {
   };
 
   // Individual Patient Report State
-  const [selectedPatient, setSelectedPatient] = useState("");
-  const [individualStartDate, setIndividualStartDate] = useState("2023-01-01");
-  const [individualEndDate, setIndividualEndDate] = useState("2023-12-31");
+  const [selectedPatient, setSelectedPatient] = useState<{ id: string; label: string } | null>(
+    null,
+  );
+  const [patientSearchQuery, setPatientSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+
+  // Debounce search query - wait 500ms after user stops typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(patientSearchQuery);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [patientSearchQuery]);
+
+  // Search assigned patients only when query has at least 3 characters
+  const shouldSearch = debouncedSearchQuery.trim().length >= 3;
+  const { data: patientSearchResults, isLoading: isSearchingPatients } = usePatients(
+    shouldSearch ? { search: debouncedSearchQuery.trim() } : undefined,
+  );
+  // Calculate last month's first and last day
+  const getLastMonthDateRange = () => {
+    const now = new Date();
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastDayOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+
+    const startDate = lastMonth.toISOString().split("T")[0];
+    const endDate = lastDayOfLastMonth.toISOString().split("T")[0];
+
+    return { startDate, endDate };
+  };
+
+  const { startDate: defaultStartDate, endDate: defaultEndDate } = getLastMonthDateRange();
+
+  const [individualStartDate, setIndividualStartDate] = useState(defaultStartDate);
+  const [individualEndDate, setIndividualEndDate] = useState(defaultEndDate);
   const [reportTypes, setReportTypes] = useState({
     glucosa: true,
+    lecturas_sensor: false,
     insulina: false,
     comidas: true,
-    actividad: false,
   });
+  const [includeAISummary, setIncludeAISummary] = useState(false);
+  const [isGeneratingIndividualReport, setIsGeneratingIndividualReport] = useState(false);
+  const [reportFeedback, setReportFeedback] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   // Group Patient Report State
-  const [filterCriteria, setFilterCriteria] = useState("Diabetes Tipo 2, Rango de Edad...");
-  const [groupStartDate, setGroupStartDate] = useState("2023-01-01");
-  const [groupEndDate, setGroupEndDate] = useState("2023-12-31");
+  const [groupFilters, setGroupFilters] = useState<Array<{ type: string; value: string }>>([]);
+  const [availableFilterType, setAvailableFilterType] = useState("");
+  const [availableFilterValue, setAvailableFilterValue] = useState("");
+  const [groupStartDate, setGroupStartDate] = useState(defaultStartDate);
+  const [groupEndDate, setGroupEndDate] = useState(defaultEndDate);
   const [groupReportTypes, setGroupReportTypes] = useState({
     glucosa: true,
+    lecturas_sensor: false,
     insulina: false,
     comidas: true,
-    actividad: false,
   });
+  const [includeGroupAISummary, setIncludeGroupAISummary] = useState(false);
+  const [isGeneratingGroupReport, setIsGeneratingGroupReport] = useState(false);
 
   const handleSaveGeneralSettings = async () => {
     const accessToken = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
@@ -330,24 +382,298 @@ export default function SettingsPage() {
     }
   };
 
-  const handleGenerateIndividualPDF = () => {
-    // TODO: Implement PDF generation
-    console.log("Generating individual PDF");
+  const handleGenerateIndividualPDF = async () => {
+    if (!selectedPatient) {
+      setReportFeedback({
+        type: "error",
+        message: "Por favor selecciona un paciente",
+      });
+      return;
+    }
+
+    const selectedTypes = Object.entries(reportTypes)
+      .filter(([, selected]) => selected)
+      .map(([type]) => type);
+
+    if (selectedTypes.length === 0) {
+      setReportFeedback({
+        type: "error",
+        message: "Por favor selecciona al menos un tipo de reporte",
+      });
+      return;
+    }
+
+    try {
+      setIsGeneratingIndividualReport(true);
+      setReportFeedback(null);
+
+      const accessToken =
+        typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+      if (!accessToken) {
+        throw new Error("No hay una sesión activa");
+      }
+
+      const blob = await generateIndividualReport(accessToken, selectedPatient.id, {
+        startDate: individualStartDate,
+        endDate: individualEndDate,
+        reportTypes: selectedTypes,
+        format: "pdf",
+        includeAISummary,
+      });
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `reporte_paciente_${selectedPatient.id}_${new Date().toISOString().split("T")[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      setReportFeedback({
+        type: "success",
+        message: "Reporte PDF generado correctamente",
+      });
+    } catch (error) {
+      setReportFeedback({
+        type: "error",
+        message: error instanceof Error ? error.message : "Error al generar el reporte PDF",
+      });
+    } finally {
+      setIsGeneratingIndividualReport(false);
+    }
   };
 
-  const handleGenerateIndividualCSV = () => {
-    // TODO: Implement CSV generation
-    console.log("Generating individual CSV");
+  const handleGenerateIndividualCSV = async () => {
+    if (!selectedPatient) {
+      setReportFeedback({
+        type: "error",
+        message: "Por favor selecciona un paciente",
+      });
+      return;
+    }
+
+    const selectedTypes = Object.entries(reportTypes)
+      .filter(([, selected]) => selected)
+      .map(([type]) => type);
+
+    if (selectedTypes.length === 0) {
+      setReportFeedback({
+        type: "error",
+        message: "Por favor selecciona al menos un tipo de reporte",
+      });
+      return;
+    }
+
+    try {
+      setIsGeneratingIndividualReport(true);
+      setReportFeedback(null);
+
+      const accessToken =
+        typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+      if (!accessToken) {
+        throw new Error("No hay una sesión activa");
+      }
+
+      const blob = await generateIndividualReport(accessToken, selectedPatient.id, {
+        startDate: individualStartDate,
+        endDate: individualEndDate,
+        reportTypes: selectedTypes,
+        format: "csv",
+        includeAISummary,
+      });
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `reporte_paciente_${selectedPatient.id}_${new Date().toISOString().split("T")[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      setReportFeedback({
+        type: "success",
+        message: "Reporte CSV generado correctamente",
+      });
+    } catch (error) {
+      setReportFeedback({
+        type: "error",
+        message: error instanceof Error ? error.message : "Error al generar el reporte CSV",
+      });
+    } finally {
+      setIsGeneratingIndividualReport(false);
+    }
   };
 
-  const handleGenerateGroupPDF = () => {
-    // TODO: Implement PDF generation
-    console.log("Generating group PDF");
+  const handleGenerateGroupPDF = async () => {
+    const selectedTypes = Object.entries(groupReportTypes)
+      .filter(([, selected]) => selected)
+      .map(([type]) => {
+        // Map frontend types to backend types
+        const typeMap: Record<string, string> = {
+          glucosa: "glucosa",
+          lecturas_sensor: "lecturas_sensor",
+          insulina: "insulina",
+          comidas: "comidas",
+        };
+        return typeMap[type] || type;
+      });
+
+    if (selectedTypes.length === 0) {
+      setReportFeedback({
+        type: "error",
+        message: "Por favor selecciona al menos un tipo de reporte",
+      });
+      return;
+    }
+
+    try {
+      setIsGeneratingGroupReport(true);
+      setReportFeedback(null);
+
+      const accessToken =
+        typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+      if (!accessToken) {
+        throw new Error("No hay una sesión activa");
+      }
+
+      const filters: GetPatientsFilters = {};
+      for (const filter of groupFilters) {
+        if (filter.type === "diabetesType") {
+          filters.diabetesType = filter.value as "TYPE_1" | "TYPE_2";
+        } else if (filter.type === "clinicalStatus") {
+          filters.clinicalStatus = filter.value as "Riesgo" | "Estable";
+        } else if (filter.type === "activityStatus") {
+          filters.activityStatus = filter.value as "Activo" | "Inactivo";
+        } else if (filter.type === "activeOnly") {
+          filters.activeOnly = filter.value === "true";
+        } else if (filter.type === "registrationDate") {
+          filters.registrationDate = filter.value;
+        } else if (filter.type === "ageRange") {
+          filters.ageRange = filter.value;
+        } else if (filter.type === "weightRange") {
+          filters.weightRange = filter.value;
+        } else if (filter.type === "search") {
+          filters.search = filter.value;
+        }
+      }
+
+      const blob = await generateGroupReport(accessToken, {
+        startDate: groupStartDate,
+        endDate: groupEndDate,
+        reportTypes: selectedTypes,
+        format: "pdf",
+        filters: Object.keys(filters).length > 0 ? filters : undefined,
+        includeAISummary: includeGroupAISummary,
+      });
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `reporte_grupal_${new Date().toISOString().split("T")[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      setReportFeedback({
+        type: "success",
+        message: "Reporte PDF grupal generado correctamente",
+      });
+    } catch (error) {
+      setReportFeedback({
+        type: "error",
+        message: error instanceof Error ? error.message : "Error al generar el reporte PDF grupal",
+      });
+    } finally {
+      setIsGeneratingGroupReport(false);
+    }
   };
 
-  const handleGenerateGroupCSV = () => {
-    // TODO: Implement CSV generation
-    console.log("Generating group CSV");
+  const handleGenerateGroupCSV = async () => {
+    const selectedTypes = Object.entries(groupReportTypes)
+      .filter(([, selected]) => selected)
+      .map(([type]) => {
+        // Map frontend types to backend types
+        const typeMap: Record<string, string> = {
+          glucosa: "glucosa",
+          lecturas_sensor: "lecturas_sensor",
+          insulina: "insulina",
+          comidas: "comidas",
+        };
+        return typeMap[type] || type;
+      });
+
+    if (selectedTypes.length === 0) {
+      setReportFeedback({
+        type: "error",
+        message: "Por favor selecciona al menos un tipo de reporte",
+      });
+      return;
+    }
+
+    try {
+      setIsGeneratingGroupReport(true);
+      setReportFeedback(null);
+
+      const accessToken =
+        typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+      if (!accessToken) {
+        throw new Error("No hay una sesión activa");
+      }
+
+      const filters: GetPatientsFilters = {};
+      for (const filter of groupFilters) {
+        if (filter.type === "diabetesType") {
+          filters.diabetesType = filter.value as "TYPE_1" | "TYPE_2";
+        } else if (filter.type === "clinicalStatus") {
+          filters.clinicalStatus = filter.value as "Riesgo" | "Estable";
+        } else if (filter.type === "activityStatus") {
+          filters.activityStatus = filter.value as "Activo" | "Inactivo";
+        } else if (filter.type === "activeOnly") {
+          filters.activeOnly = filter.value === "true";
+        } else if (filter.type === "registrationDate") {
+          filters.registrationDate = filter.value;
+        } else if (filter.type === "ageRange") {
+          filters.ageRange = filter.value;
+        } else if (filter.type === "weightRange") {
+          filters.weightRange = filter.value;
+        } else if (filter.type === "search") {
+          filters.search = filter.value;
+        }
+      }
+
+      const blob = await generateGroupReport(accessToken, {
+        startDate: groupStartDate,
+        endDate: groupEndDate,
+        reportTypes: selectedTypes,
+        format: "csv",
+        filters: Object.keys(filters).length > 0 ? filters : undefined,
+        includeAISummary: includeGroupAISummary,
+      });
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `reporte_grupal_${new Date().toISOString().split("T")[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      setReportFeedback({
+        type: "success",
+        message: "Reporte CSV grupal generado correctamente",
+      });
+    } catch (error) {
+      setReportFeedback({
+        type: "error",
+        message: error instanceof Error ? error.message : "Error al generar el reporte CSV grupal",
+      });
+    } finally {
+      setIsGeneratingGroupReport(false);
+    }
   };
 
   const handleReportTypeChange = (type: keyof typeof reportTypes) => {
@@ -362,6 +688,99 @@ export default function SettingsPage() {
       ...prev,
       [type]: !prev[type],
     }));
+  };
+
+  // Helper functions for filters
+  const getFilterTypeLabel = (type: string): string => {
+    const labels: Record<string, string> = {
+      diabetesType: "Tipo de Diabetes",
+      clinicalStatus: "Estado Clínico",
+      activityStatus: "Estado de Actividad",
+      activeOnly: "Solo Activos",
+      registrationDate: "Fecha de Registro",
+      ageRange: "Rango de Edad",
+      weightRange: "Rango de Peso",
+      search: "Búsqueda",
+    };
+    return labels[type] || type;
+  };
+
+  const getFilterValueLabel = (type: string, value: string): string => {
+    if (type === "diabetesType") {
+      return value === "TYPE_1" ? "Tipo 1" : "Tipo 2";
+    }
+    if (type === "clinicalStatus") {
+      return value;
+    }
+    if (type === "activityStatus") {
+      return value;
+    }
+    if (type === "activeOnly") {
+      return value === "true" ? "Sí" : "No";
+    }
+    if (type === "ageRange") {
+      const labels: Record<string, string> = {
+        "18-30": "18-30 años",
+        "31-50": "31-50 años",
+        "51-70": "51-70 años",
+        "70+": "70+ años",
+      };
+      return labels[value] || value;
+    }
+    if (type === "weightRange") {
+      const labels: Record<string, string> = {
+        "<60": "<60 kg",
+        "60-80": "60-80 kg",
+        "80-100": "80-100 kg",
+        "100+": "100+ kg",
+      };
+      return labels[value] || value;
+    }
+    return value;
+  };
+
+  const getFilterOptions = (type: string): Array<{ value: string; label: string }> => {
+    if (type === "diabetesType") {
+      return [
+        { value: "TYPE_1", label: "Tipo 1" },
+        { value: "TYPE_2", label: "Tipo 2" },
+      ];
+    }
+    if (type === "clinicalStatus") {
+      return [
+        { value: "Riesgo", label: "Riesgo" },
+        { value: "Estable", label: "Estable" },
+      ];
+    }
+    if (type === "activityStatus") {
+      return [
+        { value: "Activo", label: "Activo" },
+        { value: "Inactivo", label: "Inactivo" },
+      ];
+    }
+    if (type === "activeOnly") {
+      return [
+        { value: "true", label: "Sí" },
+        { value: "false", label: "No" },
+      ];
+    }
+    if (type === "ageRange") {
+      return [
+        { value: "18-30", label: "18-30 años" },
+        { value: "31-50", label: "31-50 años" },
+        { value: "51-70", label: "51-70 años" },
+        { value: "70+", label: "70+ años" },
+      ];
+    }
+    if (type === "weightRange") {
+      return [
+        { value: "<60", label: "<60 kg" },
+        { value: "60-80", label: "60-80 kg" },
+        { value: "80-100", label: "80-100 kg" },
+        { value: "100+", label: "100+ kg" },
+      ];
+    }
+    return [];
   };
 
   return (
@@ -993,20 +1412,53 @@ export default function SettingsPage() {
 
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
                   {/* Patient Search */}
-                  <TextField
-                    label="Seleccionar Paciente"
-                    placeholder="Buscar paciente..."
+                  <Autocomplete
+                    options={
+                      shouldSearch && patientSearchResults
+                        ? patientSearchResults.map((p) => ({
+                            id: p.id,
+                            label: `${p.firstName || ""} ${p.lastName || ""}`.trim() || p.email,
+                          }))
+                        : []
+                    }
                     value={selectedPatient}
-                    onChange={(e) => setSelectedPatient(e.target.value)}
-                    fullWidth
-                    variant="outlined"
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <User className="w-5 h-5 text-gray-500" />
-                        </InputAdornment>
-                      ),
-                    }}
+                    onChange={(_, newValue) => setSelectedPatient(newValue)}
+                    onInputChange={(_, newInputValue) => setPatientSearchQuery(newInputValue)}
+                    loading={isSearchingPatients && shouldSearch}
+                    noOptionsText={
+                      patientSearchQuery.trim().length > 0 && patientSearchQuery.trim().length < 3
+                        ? "Escribe al menos 3 caracteres para buscar"
+                        : shouldSearch && !isSearchingPatients
+                          ? "No se encontraron pacientes"
+                          : "Escribe para buscar pacientes asignados"
+                    }
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Seleccionar Paciente"
+                        placeholder="Buscar paciente asignado (mín. 3 caracteres)..."
+                        variant="outlined"
+                        InputProps={{
+                          ...params.InputProps,
+                          startAdornment: (
+                            <>
+                              <InputAdornment position="start">
+                                <User className="w-5 h-5 text-gray-500" />
+                              </InputAdornment>
+                              {params.InputProps.startAdornment}
+                            </>
+                          ),
+                          endAdornment: (
+                            <>
+                              {isSearchingPatients && shouldSearch ? (
+                                <CircularProgress color="inherit" size={20} />
+                              ) : null}
+                              {params.InputProps.endAdornment}
+                            </>
+                          ),
+                        }}
+                      />
+                    )}
                   />
 
                   {/* Date Range */}
@@ -1049,7 +1501,17 @@ export default function SettingsPage() {
                             color="primary"
                           />
                         }
-                        label="Glucosa"
+                        label="Glucosa (Manual)"
+                      />
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={reportTypes.lecturas_sensor}
+                            onChange={() => handleReportTypeChange("lecturas_sensor")}
+                            color="primary"
+                          />
+                        }
+                        label="Lecturas del Sensor"
                       />
                       <FormControlLabel
                         control={
@@ -1074,12 +1536,12 @@ export default function SettingsPage() {
                       <FormControlLabel
                         control={
                           <Checkbox
-                            checked={reportTypes.actividad}
-                            onChange={() => handleReportTypeChange("actividad")}
+                            checked={includeAISummary}
+                            onChange={() => setIncludeAISummary(!includeAISummary)}
                             color="primary"
                           />
                         }
-                        label="Actividad"
+                        label="Resumen por IA"
                       />
                     </Box>
                   </Box>
@@ -1089,7 +1551,14 @@ export default function SettingsPage() {
                     <Button
                       variant="contained"
                       onClick={handleGenerateIndividualPDF}
-                      startIcon={<Download className="w-4 h-4" />}
+                      disabled={isGeneratingIndividualReport}
+                      startIcon={
+                        isGeneratingIndividualReport ? (
+                          <CircularProgress size={16} color="inherit" />
+                        ) : (
+                          <Download className="w-4 h-4" />
+                        )
+                      }
                       sx={{
                         flex: 1,
                         bgcolor: colors.success,
@@ -1098,12 +1567,19 @@ export default function SettingsPage() {
                         },
                       }}
                     >
-                      Generar PDF
+                      {isGeneratingIndividualReport ? "Generando..." : "Generar PDF"}
                     </Button>
                     <Button
                       variant="outlined"
                       onClick={handleGenerateIndividualCSV}
-                      startIcon={<Download className="w-4 h-4" />}
+                      disabled={isGeneratingIndividualReport}
+                      startIcon={
+                        isGeneratingIndividualReport ? (
+                          <CircularProgress size={16} color="inherit" />
+                        ) : (
+                          <Download className="w-4 h-4" />
+                        )
+                      }
                       sx={{
                         flex: 1,
                         borderColor: colors.border,
@@ -1114,7 +1590,7 @@ export default function SettingsPage() {
                         },
                       }}
                     >
-                      Generar CSV
+                      {isGeneratingIndividualReport ? "Generando..." : "Generar CSV"}
                     </Button>
                   </Box>
                 </Box>
@@ -1139,14 +1615,117 @@ export default function SettingsPage() {
 
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
                   {/* Filter Criteria */}
-                  <TextField
-                    label="Criterios de Filtrado"
-                    value={filterCriteria}
-                    onChange={(e) => setFilterCriteria(e.target.value)}
-                    fullWidth
-                    variant="outlined"
-                    placeholder="Diabetes Tipo 2, Rango de Edad..."
-                  />
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600 }}>
+                      Criterios de Filtrado
+                    </Typography>
+
+                    {/* Existing filters as chips */}
+                    {groupFilters.length > 0 && (
+                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 2 }}>
+                        {groupFilters.map((filter, index) => (
+                          <Chip
+                            key={index}
+                            label={`${getFilterTypeLabel(filter.type)}: ${getFilterValueLabel(filter.type, filter.value)}`}
+                            onDelete={() => {
+                              setGroupFilters(groupFilters.filter((_, i) => i !== index));
+                            }}
+                            color="primary"
+                            variant="outlined"
+                          />
+                        ))}
+                      </Box>
+                    )}
+
+                    {/* Add new filter */}
+                    <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>Criterio</InputLabel>
+                        <Select
+                          value={availableFilterType}
+                          onChange={(e) => {
+                            setAvailableFilterType(e.target.value);
+                            setAvailableFilterValue("");
+                          }}
+                          label="Criterio"
+                        >
+                          <MenuItem value="diabetesType">Tipo de Diabetes</MenuItem>
+                          <MenuItem value="clinicalStatus">Estado Clínico</MenuItem>
+                          <MenuItem value="activityStatus">Estado de Actividad</MenuItem>
+                          <MenuItem value="activeOnly">Solo Activos</MenuItem>
+                          <MenuItem value="registrationDate">Fecha de Registro</MenuItem>
+                          <MenuItem value="ageRange">Rango de Edad</MenuItem>
+                          <MenuItem value="weightRange">Rango de Peso</MenuItem>
+                          <MenuItem value="search">Búsqueda por Nombre/Email</MenuItem>
+                        </Select>
+                      </FormControl>
+
+                      {availableFilterType && (
+                        <FormControl fullWidth size="small">
+                          {availableFilterType === "search" ? (
+                            <TextField
+                              label="Valor"
+                              value={availableFilterValue}
+                              onChange={(e) => setAvailableFilterValue(e.target.value)}
+                              size="small"
+                              onKeyPress={(e) => {
+                                if (e.key === "Enter" && availableFilterValue.trim()) {
+                                  setGroupFilters([
+                                    ...groupFilters,
+                                    {
+                                      type: availableFilterType,
+                                      value: availableFilterValue.trim(),
+                                    },
+                                  ]);
+                                  setAvailableFilterType("");
+                                  setAvailableFilterValue("");
+                                }
+                              }}
+                            />
+                          ) : availableFilterType === "registrationDate" ? (
+                            <TextField
+                              label="Fecha"
+                              type="date"
+                              value={availableFilterValue}
+                              onChange={(e) => setAvailableFilterValue(e.target.value)}
+                              size="small"
+                              InputLabelProps={{ shrink: true }}
+                            />
+                          ) : (
+                            <Select
+                              value={availableFilterValue}
+                              onChange={(e) => setAvailableFilterValue(e.target.value)}
+                              label="Valor"
+                            >
+                              {getFilterOptions(availableFilterType).map((option) => (
+                                <MenuItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          )}
+                        </FormControl>
+                      )}
+
+                      <Button
+                        variant="outlined"
+                        onClick={() => {
+                          if (availableFilterType && availableFilterValue) {
+                            setGroupFilters([
+                              ...groupFilters,
+                              { type: availableFilterType, value: availableFilterValue },
+                            ]);
+                            setAvailableFilterType("");
+                            setAvailableFilterValue("");
+                          }
+                        }}
+                        disabled={!availableFilterType || !availableFilterValue}
+                        sx={{ minWidth: 120 }}
+                      >
+                        Agregar
+                      </Button>
+                    </Box>
+                  </Box>
 
                   {/* Date Range */}
                   <Box sx={{ display: "flex", gap: 2 }}>
@@ -1213,12 +1792,12 @@ export default function SettingsPage() {
                       <FormControlLabel
                         control={
                           <Checkbox
-                            checked={groupReportTypes.actividad}
-                            onChange={() => handleGroupReportTypeChange("actividad")}
+                            checked={includeGroupAISummary}
+                            onChange={() => setIncludeGroupAISummary(!includeGroupAISummary)}
                             color="primary"
                           />
                         }
-                        label="Actividad"
+                        label="Resumen por IA"
                       />
                     </Box>
                   </Box>
@@ -1228,7 +1807,14 @@ export default function SettingsPage() {
                     <Button
                       variant="contained"
                       onClick={handleGenerateGroupPDF}
-                      startIcon={<Download className="w-4 h-4" />}
+                      disabled={isGeneratingGroupReport}
+                      startIcon={
+                        isGeneratingGroupReport ? (
+                          <CircularProgress size={16} color="inherit" />
+                        ) : (
+                          <Download className="w-4 h-4" />
+                        )
+                      }
                       sx={{
                         flex: 1,
                         bgcolor: colors.success,
@@ -1237,12 +1823,19 @@ export default function SettingsPage() {
                         },
                       }}
                     >
-                      Generar PDF
+                      {isGeneratingGroupReport ? "Generando..." : "Generar PDF"}
                     </Button>
                     <Button
                       variant="outlined"
                       onClick={handleGenerateGroupCSV}
-                      startIcon={<Download className="w-4 h-4" />}
+                      disabled={isGeneratingGroupReport}
+                      startIcon={
+                        isGeneratingGroupReport ? (
+                          <CircularProgress size={16} color="inherit" />
+                        ) : (
+                          <Download className="w-4 h-4" />
+                        )
+                      }
                       sx={{
                         flex: 1,
                         borderColor: colors.border,
@@ -1253,7 +1846,7 @@ export default function SettingsPage() {
                         },
                       }}
                     >
-                      Generar CSV
+                      {isGeneratingGroupReport ? "Generando..." : "Generar CSV"}
                     </Button>
                   </Box>
                 </Box>
@@ -1277,6 +1870,15 @@ export default function SettingsPage() {
             message={alertFeedback.message}
             severity={alertFeedback.type}
             onClose={() => setAlertFeedback(null)}
+          />
+        )}
+
+        {reportFeedback && (
+          <FeedbackSnackbar
+            open
+            message={reportFeedback.message}
+            severity={reportFeedback.type}
+            onClose={() => setReportFeedback(null)}
           />
         )}
       </div>
