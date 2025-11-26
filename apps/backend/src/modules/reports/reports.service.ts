@@ -166,25 +166,26 @@ export class ReportsService {
       filters: filters,
     };
 
+    // Batch fetch all patient data in a single query
+    const patientIds = patients.map((p) => p.id);
+    const fullPatients = await this.prisma.user.findMany({
+      where: { id: { in: patientIds } },
+      select: {
+        id: true,
+        birthDate: true,
+        weight: true,
+        minTargetGlucose: true,
+        maxTargetGlucose: true,
+      },
+    });
+
+    // Create a map for quick lookup
+    const patientDataMap = new Map((fullPatients || []).map((p) => [p.id, p]));
+
     // Collect patient demographics for aggregation
     const patientDemographics: any[] = [];
-    const allGlucoseData: any[] = [];
-    const allInsulinData: any[] = [];
-    const allMealsData: any[] = [];
-
     for (const patient of patients) {
-      // Get full patient data for additional fields
-      const fullPatient = await this.prisma.user.findUnique({
-        where: { id: patient.id },
-        select: {
-          birthDate: true,
-          weight: true,
-          minTargetGlucose: true,
-          maxTargetGlucose: true,
-        },
-      });
-
-      // Collect demographics
+      const fullPatient = patientDataMap.get(patient.id);
       patientDemographics.push({
         diabetesType: patient.diabetesType,
         birthDate: fullPatient?.birthDate,
@@ -192,36 +193,41 @@ export class ReportsService {
         minTargetGlucose: fullPatient?.minTargetGlucose,
         maxTargetGlucose: fullPatient?.maxTargetGlucose,
       });
-
-      // Collect glucose data
-      if (
-        dto.reportTypes.includes(ReportType.GLUCOSE) ||
-        dto.reportTypes.includes(ReportType.SENSOR_READINGS)
-      ) {
-        const includeManual = dto.reportTypes.includes(ReportType.GLUCOSE);
-        const includeSensor = dto.reportTypes.includes(ReportType.SENSOR_READINGS);
-        const glucoseData = await this.getGlucoseData(
-          patient.id,
-          startDate,
-          endDate,
-          includeManual,
-          includeSensor,
-        );
-        allGlucoseData.push(...glucoseData);
-      }
-
-      // Collect insulin data
-      if (dto.reportTypes.includes(ReportType.INSULIN)) {
-        const insulinData = await this.getInsulinData(patient.id, startDate, endDate);
-        allInsulinData.push(...insulinData);
-      }
-
-      // Collect meals data
-      if (dto.reportTypes.includes(ReportType.MEALS)) {
-        const mealsData = await this.getMealsData(patient.id, startDate, endDate);
-        allMealsData.push(...mealsData);
-      }
     }
+
+    // Batch fetch all data in parallel
+    const dataPromises: Promise<any>[] = [];
+
+    // Collect glucose data
+    if (
+      dto.reportTypes.includes(ReportType.GLUCOSE) ||
+      dto.reportTypes.includes(ReportType.SENSOR_READINGS)
+    ) {
+      const includeManual = dto.reportTypes.includes(ReportType.GLUCOSE);
+      const includeSensor = dto.reportTypes.includes(ReportType.SENSOR_READINGS);
+      dataPromises.push(
+        this.getBatchGlucoseData(patientIds, startDate, endDate, includeManual, includeSensor),
+      );
+    } else {
+      dataPromises.push(Promise.resolve([]));
+    }
+
+    // Collect insulin data
+    if (dto.reportTypes.includes(ReportType.INSULIN)) {
+      dataPromises.push(this.getBatchInsulinData(patientIds, startDate, endDate));
+    } else {
+      dataPromises.push(Promise.resolve([]));
+    }
+
+    // Collect meals data
+    if (dto.reportTypes.includes(ReportType.MEALS)) {
+      dataPromises.push(this.getBatchMealsData(patientIds, startDate, endDate));
+    } else {
+      dataPromises.push(Promise.resolve([]));
+    }
+
+    // Execute all batch queries in parallel
+    const [allGlucoseData, allInsulinData, allMealsData] = await Promise.all(dataPromises);
 
     // Aggregate demographics
     const diabetesTypeCounts = patientDemographics.reduce((acc: any, p: any) => {
@@ -458,9 +464,6 @@ export class ReportsService {
 
     // Process entries (manual - only from GlucoseEntry)
     if (includeManual) {
-      console.log(
-        `[Reports] Found ${entries.length} manual glucose entries for patient ${patientId} between ${startDate.toISOString()} and ${endDate.toISOString()}`,
-      );
       for (const entry of entries) {
         try {
           const value = this.encryptionService.decryptGlucoseValue(entry.mgdlEncrypted);
@@ -470,7 +473,7 @@ export class ReportsService {
             source: "manual",
           });
         } catch (error) {
-          console.error(`Failed to decrypt glucose entry ${entry.id}:`, error);
+          this.logger.error(`Failed to decrypt glucose entry ${entry.id}`, error);
         }
       }
     }
@@ -486,12 +489,114 @@ export class ReportsService {
             source: reading.source,
           });
         } catch (error) {
-          console.error(`Failed to decrypt glucose reading ${reading.id}:`, error);
+          this.logger.error(`Failed to decrypt glucose reading ${reading.id}`, error);
         }
       }
     }
 
     return glucoseData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }
+
+  /**
+   * Get batch glucose data for multiple patients in date range
+   */
+  private async getBatchGlucoseData(
+    patientIds: string[],
+    startDate: Date,
+    endDate: Date,
+    includeManual: boolean = true,
+    includeSensor: boolean = true,
+  ) {
+    const promises: Promise<any>[] = [];
+    const startOfDay = new Date(startDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(endDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    if (includeManual) {
+      promises.push(
+        this.prisma.glucoseEntry.findMany({
+          where: {
+            userId: { in: patientIds },
+            recordedAt: { gte: startOfDay, lte: endOfDay },
+          },
+          orderBy: { recordedAt: "asc" },
+        }),
+      );
+    } else {
+      promises.push(Promise.resolve([]));
+    }
+
+    if (includeSensor) {
+      promises.push(
+        this.prisma.glucoseReading.findMany({
+          where: {
+            userId: { in: patientIds },
+            recordedAt: { gte: startOfDay, lte: endOfDay },
+          },
+          orderBy: { recordedAt: "asc" },
+        }),
+      );
+    } else {
+      promises.push(Promise.resolve([]));
+    }
+
+    const [entries, readings] = await Promise.all(promises);
+
+    const glucoseData = [];
+
+    // Process entries (manual - only from GlucoseEntry)
+    if (includeManual) {
+      for (const entry of entries) {
+        try {
+          const value = this.encryptionService.decryptGlucoseValue(entry.mgdlEncrypted);
+          glucoseData.push({
+            date: entry.recordedAt.toISOString(),
+            value,
+            source: "manual",
+          });
+        } catch (error) {
+          this.logger.error(`Failed to decrypt glucose entry ${entry.id}`, error);
+        }
+      }
+    }
+
+    // Process all sensor readings (LIBRE_NFC, DEXCOM, OTHER_CGM, etc.)
+    if (includeSensor) {
+      for (const reading of readings) {
+        try {
+          const value = this.encryptionService.decryptGlucoseValue(reading.glucoseEncrypted);
+          glucoseData.push({
+            date: reading.recordedAt.toISOString(),
+            value,
+            source: reading.source,
+          });
+        } catch (error) {
+          this.logger.error(`Failed to decrypt glucose reading ${reading.id}`, error);
+        }
+      }
+    }
+
+    return glucoseData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }
+
+  /**
+   * Get batch insulin data for multiple patients in date range
+   */
+  private async getBatchInsulinData(patientIds: string[], startDate: Date, endDate: Date) {
+    const doses = await this.prisma.insulinDose.findMany({
+      where: {
+        userId: { in: patientIds },
+        recordedAt: { gte: startDate, lte: endDate },
+      },
+      orderBy: { recordedAt: "asc" },
+    });
+
+    return doses.map((dose) => ({
+      date: dose.recordedAt.toISOString(),
+      units: dose.units,
+      type: dose.type,
+    }));
   }
 
   /**
@@ -510,6 +615,39 @@ export class ReportsService {
       date: dose.recordedAt.toISOString(),
       units: dose.units,
       type: dose.type,
+    }));
+  }
+
+  /**
+   * Get batch meals data for multiple patients in date range
+   */
+  private async getBatchMealsData(patientIds: string[], startDate: Date, endDate: Date) {
+    const logEntries = await this.prisma.logEntry.findMany({
+      where: {
+        userId: { in: patientIds },
+        recordedAt: { gte: startDate, lte: endDate },
+        mealTemplateId: { not: null },
+      },
+      include: {
+        mealTemplate: {
+          include: {
+            foodItems: true,
+          },
+        },
+      },
+      orderBy: { recordedAt: "asc" },
+    });
+
+    return logEntries.map((entry) => ({
+      date: entry.recordedAt.toISOString(),
+      mealType: (entry.mealTemplate as any)?.mealType,
+      carbohydrates: entry.mealTemplate?.carbohydrates,
+      name: entry.mealTemplate?.name,
+      foodItems: entry.mealTemplate?.foodItems.map((item) => ({
+        name: item.name,
+        quantity: item.quantity,
+        carbs: item.carbs,
+      })),
     }));
   }
 
@@ -829,6 +967,24 @@ export class ReportsService {
   }
 
   /**
+   * Escape CSV value to prevent injection and handle special characters
+   */
+  private escapeCSVValue(value: string | number | null | undefined): string {
+    if (value === null || value === undefined) {
+      return "";
+    }
+
+    const str = String(value);
+
+    // If value contains comma, quote, or newline, wrap in quotes and escape internal quotes
+    if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+
+    return str;
+  }
+
+  /**
    * Generate CSV for individual report
    */
   private generateCSV(data: any, reportTypes: ReportType[]): string {
@@ -845,21 +1001,45 @@ export class ReportsService {
     ) {
       for (const item of data.glucose) {
         const type = item.source === "manual" ? "Glucosa Manual" : "Lectura Sensor";
-        rows.push(`${type},${item.date},${item.value},mg/dL,${item.source}`);
+        rows.push(
+          [
+            this.escapeCSVValue(type),
+            this.escapeCSVValue(item.date),
+            this.escapeCSVValue(item.value),
+            this.escapeCSVValue("mg/dL"),
+            this.escapeCSVValue(item.source),
+          ].join(","),
+        );
       }
     }
 
     // Insulin data
     if (reportTypes.includes(ReportType.INSULIN) && data.insulin) {
       for (const item of data.insulin) {
-        rows.push(`Insulina,${item.date},${item.units},Unidades,${item.type}`);
+        rows.push(
+          [
+            this.escapeCSVValue("Insulina"),
+            this.escapeCSVValue(item.date),
+            this.escapeCSVValue(item.units),
+            this.escapeCSVValue("Unidades"),
+            this.escapeCSVValue(item.type),
+          ].join(","),
+        );
       }
     }
 
     // Meals data
     if (reportTypes.includes(ReportType.MEALS) && data.meals) {
       for (const item of data.meals) {
-        rows.push(`Comida,${item.date},${item.carbohydrates || 0},g,${item.name || ""}`);
+        rows.push(
+          [
+            this.escapeCSVValue("Comida"),
+            this.escapeCSVValue(item.date),
+            this.escapeCSVValue(item.carbohydrates || 0),
+            this.escapeCSVValue("g"),
+            this.escapeCSVValue(item.name || ""),
+          ].join(","),
+        );
       }
     }
 
@@ -1093,9 +1273,30 @@ export class ReportsService {
 
     // Header with aggregated statistics
     rows.push("Tipo,Métrica,Valor,Unidad");
-    rows.push("Grupo,Total de pacientes," + data.totalPatients + ",pacientes");
-    rows.push("Período,Inicio," + data.startDate + ",");
-    rows.push("Período,Fin," + data.endDate + ",");
+    rows.push(
+      [
+        this.escapeCSVValue("Grupo"),
+        this.escapeCSVValue("Total de pacientes"),
+        this.escapeCSVValue(data.totalPatients),
+        this.escapeCSVValue("pacientes"),
+      ].join(","),
+    );
+    rows.push(
+      [
+        this.escapeCSVValue("Período"),
+        this.escapeCSVValue("Inicio"),
+        this.escapeCSVValue(data.startDate),
+        this.escapeCSVValue(""),
+      ].join(","),
+    );
+    rows.push(
+      [
+        this.escapeCSVValue("Período"),
+        this.escapeCSVValue("Fin"),
+        this.escapeCSVValue(data.endDate),
+        this.escapeCSVValue(""),
+      ].join(","),
+    );
 
     // Demographics
     if (data.demographics) {
@@ -1103,27 +1304,82 @@ export class ReportsService {
         Object.entries(data.demographics.diabetesTypeDistribution).forEach(
           ([type, count]: [string, any]) => {
             rows.push(
-              `Demografía,Tipo de Diabetes ${getDiabetesTypeLabel(type as any)},${count},pacientes`,
+              [
+                this.escapeCSVValue("Demografía"),
+                this.escapeCSVValue(`Tipo de Diabetes ${getDiabetesTypeLabel(type as any)}`),
+                this.escapeCSVValue(count),
+                this.escapeCSVValue("pacientes"),
+              ].join(","),
             );
           },
         );
       }
       if (data.demographics.ageStats) {
         rows.push(
-          "Demografía,Edad promedio," + data.demographics.ageStats.average.toFixed(1) + ",años",
+          [
+            this.escapeCSVValue("Demografía"),
+            this.escapeCSVValue("Edad promedio"),
+            this.escapeCSVValue(data.demographics.ageStats.average.toFixed(1)),
+            this.escapeCSVValue("años"),
+          ].join(","),
         );
-        rows.push("Demografía,Edad mínima," + data.demographics.ageStats.min + ",años");
-        rows.push("Demografía,Edad máxima," + data.demographics.ageStats.max + ",años");
-        rows.push("Demografía,Mediana de edad," + data.demographics.ageStats.median + ",años");
+        rows.push(
+          [
+            this.escapeCSVValue("Demografía"),
+            this.escapeCSVValue("Edad mínima"),
+            this.escapeCSVValue(data.demographics.ageStats.min),
+            this.escapeCSVValue("años"),
+          ].join(","),
+        );
+        rows.push(
+          [
+            this.escapeCSVValue("Demografía"),
+            this.escapeCSVValue("Edad máxima"),
+            this.escapeCSVValue(data.demographics.ageStats.max),
+            this.escapeCSVValue("años"),
+          ].join(","),
+        );
+        rows.push(
+          [
+            this.escapeCSVValue("Demografía"),
+            this.escapeCSVValue("Mediana de edad"),
+            this.escapeCSVValue(data.demographics.ageStats.median),
+            this.escapeCSVValue("años"),
+          ].join(","),
+        );
       }
       if (data.demographics.weightStats) {
         rows.push(
-          "Demografía,Peso promedio," + data.demographics.weightStats.average.toFixed(1) + ",kg",
+          [
+            this.escapeCSVValue("Demografía"),
+            this.escapeCSVValue("Peso promedio"),
+            this.escapeCSVValue(data.demographics.weightStats.average.toFixed(1)),
+            this.escapeCSVValue("kg"),
+          ].join(","),
         );
-        rows.push("Demografía,Peso mínimo," + data.demographics.weightStats.min + ",kg");
-        rows.push("Demografía,Peso máximo," + data.demographics.weightStats.max + ",kg");
         rows.push(
-          "Demografía,Mediana de peso," + data.demographics.weightStats.median.toFixed(1) + ",kg",
+          [
+            this.escapeCSVValue("Demografía"),
+            this.escapeCSVValue("Peso mínimo"),
+            this.escapeCSVValue(data.demographics.weightStats.min),
+            this.escapeCSVValue("kg"),
+          ].join(","),
+        );
+        rows.push(
+          [
+            this.escapeCSVValue("Demografía"),
+            this.escapeCSVValue("Peso máximo"),
+            this.escapeCSVValue(data.demographics.weightStats.max),
+            this.escapeCSVValue("kg"),
+          ].join(","),
+        );
+        rows.push(
+          [
+            this.escapeCSVValue("Demografía"),
+            this.escapeCSVValue("Mediana de peso"),
+            this.escapeCSVValue(data.demographics.weightStats.median.toFixed(1)),
+            this.escapeCSVValue("kg"),
+          ].join(","),
         );
       }
     }
@@ -1134,66 +1390,261 @@ export class ReportsService {
         reportTypes.includes(ReportType.SENSOR_READINGS)) &&
       data.glucose
     ) {
-      rows.push("Glucosa,Total de lecturas," + data.glucose.totalReadings + ",lecturas");
-      rows.push("Glucosa,Promedio," + data.glucose.average.toFixed(1) + ",mg/dL");
-      rows.push("Glucosa,Mediana," + data.glucose.median.toFixed(1) + ",mg/dL");
-      rows.push("Glucosa,Mínimo," + data.glucose.min + ",mg/dL");
-      rows.push("Glucosa,Máximo," + data.glucose.max + ",mg/dL");
-      rows.push("Glucosa,Percentil 25," + data.glucose.p25 + ",mg/dL");
-      rows.push("Glucosa,Percentil 75," + data.glucose.p75 + ",mg/dL");
-      rows.push("Glucosa,Coeficiente de Variación," + data.glucose.cv.toFixed(1) + ",%");
-      rows.push("Glucosa,Tiempo en rango," + data.glucose.inRangePercent.toFixed(1) + ",%");
-      rows.push("Glucosa,Hipoglucemias," + data.glucose.hypoglycemia + ",eventos");
-      rows.push("Glucosa,Hipoglucemias %," + data.glucose.hypoglycemiaPercent.toFixed(1) + ",%");
-      rows.push("Glucosa,Hipoglucemias severas," + data.glucose.severeHypoglycemia + ",eventos");
       rows.push(
-        "Glucosa,Hipoglucemias severas %," +
-          data.glucose.severeHypoglycemiaPercent.toFixed(1) +
-          ",%",
+        [
+          this.escapeCSVValue("Glucosa"),
+          this.escapeCSVValue("Total de lecturas"),
+          this.escapeCSVValue(data.glucose.totalReadings),
+          this.escapeCSVValue("lecturas"),
+        ].join(","),
       );
-      rows.push("Glucosa,Hiperglucemias," + data.glucose.hyperglycemia + ",eventos");
-      rows.push("Glucosa,Hiperglucemias %," + data.glucose.hyperglycemiaPercent.toFixed(1) + ",%");
-      rows.push("Glucosa,Hiperglucemias severas," + data.glucose.severeHyperglycemia + ",eventos");
       rows.push(
-        "Glucosa,Hiperglucemias severas %," +
-          data.glucose.severeHyperglycemiaPercent.toFixed(1) +
-          ",%",
+        [
+          this.escapeCSVValue("Glucosa"),
+          this.escapeCSVValue("Promedio"),
+          this.escapeCSVValue(data.glucose.average.toFixed(1)),
+          this.escapeCSVValue("mg/dL"),
+        ].join(","),
+      );
+      rows.push(
+        [
+          this.escapeCSVValue("Glucosa"),
+          this.escapeCSVValue("Mediana"),
+          this.escapeCSVValue(data.glucose.median.toFixed(1)),
+          this.escapeCSVValue("mg/dL"),
+        ].join(","),
+      );
+      rows.push(
+        [
+          this.escapeCSVValue("Glucosa"),
+          this.escapeCSVValue("Mínimo"),
+          this.escapeCSVValue(data.glucose.min),
+          this.escapeCSVValue("mg/dL"),
+        ].join(","),
+      );
+      rows.push(
+        [
+          this.escapeCSVValue("Glucosa"),
+          this.escapeCSVValue("Máximo"),
+          this.escapeCSVValue(data.glucose.max),
+          this.escapeCSVValue("mg/dL"),
+        ].join(","),
+      );
+      rows.push(
+        [
+          this.escapeCSVValue("Glucosa"),
+          this.escapeCSVValue("Percentil 25"),
+          this.escapeCSVValue(data.glucose.p25),
+          this.escapeCSVValue("mg/dL"),
+        ].join(","),
+      );
+      rows.push(
+        [
+          this.escapeCSVValue("Glucosa"),
+          this.escapeCSVValue("Percentil 75"),
+          this.escapeCSVValue(data.glucose.p75),
+          this.escapeCSVValue("mg/dL"),
+        ].join(","),
+      );
+      rows.push(
+        [
+          this.escapeCSVValue("Glucosa"),
+          this.escapeCSVValue("Coeficiente de Variación"),
+          this.escapeCSVValue(data.glucose.cv.toFixed(1)),
+          this.escapeCSVValue("%"),
+        ].join(","),
+      );
+      rows.push(
+        [
+          this.escapeCSVValue("Glucosa"),
+          this.escapeCSVValue("Tiempo en rango"),
+          this.escapeCSVValue(data.glucose.inRangePercent.toFixed(1)),
+          this.escapeCSVValue("%"),
+        ].join(","),
+      );
+      rows.push(
+        [
+          this.escapeCSVValue("Glucosa"),
+          this.escapeCSVValue("Hipoglucemias"),
+          this.escapeCSVValue(data.glucose.hypoglycemia),
+          this.escapeCSVValue("eventos"),
+        ].join(","),
+      );
+      rows.push(
+        [
+          this.escapeCSVValue("Glucosa"),
+          this.escapeCSVValue("Hipoglucemias %"),
+          this.escapeCSVValue(data.glucose.hypoglycemiaPercent.toFixed(1)),
+          this.escapeCSVValue("%"),
+        ].join(","),
+      );
+      rows.push(
+        [
+          this.escapeCSVValue("Glucosa"),
+          this.escapeCSVValue("Hipoglucemias severas"),
+          this.escapeCSVValue(data.glucose.severeHypoglycemia),
+          this.escapeCSVValue("eventos"),
+        ].join(","),
+      );
+      rows.push(
+        [
+          this.escapeCSVValue("Glucosa"),
+          this.escapeCSVValue("Hipoglucemias severas %"),
+          this.escapeCSVValue(data.glucose.severeHypoglycemiaPercent.toFixed(1)),
+          this.escapeCSVValue("%"),
+        ].join(","),
+      );
+      rows.push(
+        [
+          this.escapeCSVValue("Glucosa"),
+          this.escapeCSVValue("Hiperglucemias"),
+          this.escapeCSVValue(data.glucose.hyperglycemia),
+          this.escapeCSVValue("eventos"),
+        ].join(","),
+      );
+      rows.push(
+        [
+          this.escapeCSVValue("Glucosa"),
+          this.escapeCSVValue("Hiperglucemias %"),
+          this.escapeCSVValue(data.glucose.hyperglycemiaPercent.toFixed(1)),
+          this.escapeCSVValue("%"),
+        ].join(","),
+      );
+      rows.push(
+        [
+          this.escapeCSVValue("Glucosa"),
+          this.escapeCSVValue("Hiperglucemias severas"),
+          this.escapeCSVValue(data.glucose.severeHyperglycemia),
+          this.escapeCSVValue("eventos"),
+        ].join(","),
+      );
+      rows.push(
+        [
+          this.escapeCSVValue("Glucosa"),
+          this.escapeCSVValue("Hiperglucemias severas %"),
+          this.escapeCSVValue(data.glucose.severeHyperglycemiaPercent.toFixed(1)),
+          this.escapeCSVValue("%"),
+        ].join(","),
       );
     }
 
     // Aggregated Insulin Statistics
     if (reportTypes.includes(ReportType.INSULIN) && data.insulin) {
-      rows.push("Insulina,Total de dosis," + data.insulin.totalDoses + ",dosis");
-      rows.push("Insulina,Total de unidades," + data.insulin.totalUnits.toFixed(1) + ",U");
-      rows.push("Insulina,Promedio por dosis," + data.insulin.averageDose.toFixed(1) + ",U");
       rows.push(
-        "Insulina,Promedio diario total," + data.insulin.averageDailyUnits.toFixed(1) + ",U/día",
+        [
+          this.escapeCSVValue("Insulina"),
+          this.escapeCSVValue("Total de dosis"),
+          this.escapeCSVValue(data.insulin.totalDoses),
+          this.escapeCSVValue("dosis"),
+        ].join(","),
       );
       rows.push(
-        "Insulina,Promedio diario por paciente," +
-          data.insulin.averageDailyUnitsPerPatient.toFixed(1) +
-          ",U/día/paciente",
+        [
+          this.escapeCSVValue("Insulina"),
+          this.escapeCSVValue("Total de unidades"),
+          this.escapeCSVValue(data.insulin.totalUnits.toFixed(1)),
+          this.escapeCSVValue("U"),
+        ].join(","),
       );
-      rows.push("Insulina,Dosis basal," + data.insulin.basalDoses + ",dosis");
-      rows.push("Insulina,Unidades basal," + data.insulin.basalUnits.toFixed(1) + ",U");
-      rows.push("Insulina,Dosis bolus," + data.insulin.bolusDoses + ",dosis");
-      rows.push("Insulina,Unidades bolus," + data.insulin.bolusUnits.toFixed(1) + ",U");
+      rows.push(
+        [
+          this.escapeCSVValue("Insulina"),
+          this.escapeCSVValue("Promedio por dosis"),
+          this.escapeCSVValue(data.insulin.averageDose.toFixed(1)),
+          this.escapeCSVValue("U"),
+        ].join(","),
+      );
+      rows.push(
+        [
+          this.escapeCSVValue("Insulina"),
+          this.escapeCSVValue("Promedio diario total"),
+          this.escapeCSVValue(data.insulin.averageDailyUnits.toFixed(1)),
+          this.escapeCSVValue("U/día"),
+        ].join(","),
+      );
+      rows.push(
+        [
+          this.escapeCSVValue("Insulina"),
+          this.escapeCSVValue("Promedio diario por paciente"),
+          this.escapeCSVValue(data.insulin.averageDailyUnitsPerPatient.toFixed(1)),
+          this.escapeCSVValue("U/día/paciente"),
+        ].join(","),
+      );
+      rows.push(
+        [
+          this.escapeCSVValue("Insulina"),
+          this.escapeCSVValue("Dosis basal"),
+          this.escapeCSVValue(data.insulin.basalDoses),
+          this.escapeCSVValue("dosis"),
+        ].join(","),
+      );
+      rows.push(
+        [
+          this.escapeCSVValue("Insulina"),
+          this.escapeCSVValue("Unidades basal"),
+          this.escapeCSVValue(data.insulin.basalUnits.toFixed(1)),
+          this.escapeCSVValue("U"),
+        ].join(","),
+      );
+      rows.push(
+        [
+          this.escapeCSVValue("Insulina"),
+          this.escapeCSVValue("Dosis bolus"),
+          this.escapeCSVValue(data.insulin.bolusDoses),
+          this.escapeCSVValue("dosis"),
+        ].join(","),
+      );
+      rows.push(
+        [
+          this.escapeCSVValue("Insulina"),
+          this.escapeCSVValue("Unidades bolus"),
+          this.escapeCSVValue(data.insulin.bolusUnits.toFixed(1)),
+          this.escapeCSVValue("U"),
+        ].join(","),
+      );
     }
 
     // Aggregated Meals Statistics
     if (reportTypes.includes(ReportType.MEALS) && data.meals) {
-      rows.push("Comidas,Total de comidas," + data.meals.totalMeals + ",comidas");
       rows.push(
-        "Comidas,Total de carbohidratos," + data.meals.totalCarbohydrates.toFixed(1) + ",g",
+        [
+          this.escapeCSVValue("Comidas"),
+          this.escapeCSVValue("Total de comidas"),
+          this.escapeCSVValue(data.meals.totalMeals),
+          this.escapeCSVValue("comidas"),
+        ].join(","),
       );
-      rows.push("Comidas,Promedio por comida," + data.meals.averageCarbsPerMeal.toFixed(1) + ",g");
       rows.push(
-        "Comidas,Promedio diario total," + data.meals.averageDailyCarbs.toFixed(1) + ",g/día",
+        [
+          this.escapeCSVValue("Comidas"),
+          this.escapeCSVValue("Total de carbohidratos"),
+          this.escapeCSVValue(data.meals.totalCarbohydrates.toFixed(1)),
+          this.escapeCSVValue("g"),
+        ].join(","),
       );
       rows.push(
-        "Comidas,Promedio diario por paciente," +
-          data.meals.averageDailyCarbsPerPatient.toFixed(1) +
-          ",g/día/paciente",
+        [
+          this.escapeCSVValue("Comidas"),
+          this.escapeCSVValue("Promedio por comida"),
+          this.escapeCSVValue(data.meals.averageCarbsPerMeal.toFixed(1)),
+          this.escapeCSVValue("g"),
+        ].join(","),
+      );
+      rows.push(
+        [
+          this.escapeCSVValue("Comidas"),
+          this.escapeCSVValue("Promedio diario total"),
+          this.escapeCSVValue(data.meals.averageDailyCarbs.toFixed(1)),
+          this.escapeCSVValue("g/día"),
+        ].join(","),
+      );
+      rows.push(
+        [
+          this.escapeCSVValue("Comidas"),
+          this.escapeCSVValue("Promedio diario por paciente"),
+          this.escapeCSVValue(data.meals.averageDailyCarbsPerPatient.toFixed(1)),
+          this.escapeCSVValue("g/día/paciente"),
+        ].join(","),
       );
     }
 

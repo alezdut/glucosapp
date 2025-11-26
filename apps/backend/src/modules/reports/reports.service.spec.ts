@@ -14,21 +14,35 @@ import { DiabetesType, UserRole } from "@prisma/client";
 // Mock PDFKit
 jest.mock("pdfkit", () => {
   return jest.fn().mockImplementation(() => {
-    const mockDoc = {
-      fontSize: jest.fn().mockReturnThis(),
-      text: jest.fn().mockReturnThis(),
-      moveDown: jest.fn().mockReturnThis(),
-      fillColor: jest.fn().mockReturnThis(),
-      font: jest.fn().mockReturnThis(),
-      addPage: jest.fn().mockReturnThis(),
-      on: jest.fn((event: string, callback: () => void) => {
-        if (event === "end") {
-          setTimeout(callback, 0);
-        }
-        return mockDoc;
-      }),
-      end: jest.fn(),
-    };
+    // Declare mockDoc with explicit type to avoid self-reference issues
+    const mockDoc: any = {};
+
+    // Initialize methods
+    mockDoc.fontSize = jest.fn();
+    mockDoc.text = jest.fn();
+    mockDoc.moveDown = jest.fn();
+    mockDoc.fillColor = jest.fn();
+    mockDoc.font = jest.fn();
+    mockDoc.addPage = jest.fn();
+    mockDoc.on = jest.fn();
+    mockDoc.end = jest.fn();
+
+    // Set up method chaining
+    mockDoc.fontSize.mockReturnValue(mockDoc);
+    mockDoc.text.mockReturnValue(mockDoc);
+    mockDoc.moveDown.mockReturnValue(mockDoc);
+    mockDoc.fillColor.mockReturnValue(mockDoc);
+    mockDoc.font.mockReturnValue(mockDoc);
+    mockDoc.addPage.mockReturnValue(mockDoc);
+
+    // Set up on method to handle events and return mockDoc for chaining
+    mockDoc.on.mockImplementation((event: string, callback: () => void): any => {
+      if (event === "end") {
+        setTimeout(callback, 0);
+      }
+      return mockDoc;
+    });
+
     return mockDoc;
   });
 });
@@ -237,7 +251,35 @@ describe("ReportsService", () => {
     beforeEach(() => {
       (doctorPatientService.getPatients as jest.Mock).mockResolvedValue(mockPatients);
 
-      // Mock patient details
+      // Mock batch patient details query
+      (prismaService.user.findMany as jest.Mock).mockImplementation((args: any) => {
+        if (args.where.id?.in) {
+          const patientIds = args.where.id.in;
+          const results: any[] = [];
+          if (patientIds.includes("patient-1")) {
+            results.push({
+              id: "patient-1",
+              birthDate: new Date("1985-05-15"), // ~39 years old
+              weight: 70,
+              minTargetGlucose: 80,
+              maxTargetGlucose: 140,
+            });
+          }
+          if (patientIds.includes("patient-2")) {
+            results.push({
+              id: "patient-2",
+              birthDate: new Date("1980-03-20"), // ~44 years old
+              weight: 80,
+              minTargetGlucose: 70,
+              maxTargetGlucose: 180,
+            });
+          }
+          return Promise.resolve(results);
+        }
+        return Promise.resolve([]);
+      });
+
+      // Keep findUnique for individual reports
       (prismaService.user.findUnique as jest.Mock).mockImplementation((args: any) => {
         if (args.where.id === "patient-1") {
           return Promise.resolve({
@@ -259,7 +301,59 @@ describe("ReportsService", () => {
       });
 
       // Mock glucose data - Patient 1: [100, 110, 120], Patient 2: [130, 140, 150]
+      // Now using batch queries with userId: { in: [...] }
       (prismaService.glucoseEntry.findMany as jest.Mock).mockImplementation((args: any) => {
+        if (args.where.userId?.in) {
+          // Batch query - return all entries for all patients
+          const patientIds = args.where.userId.in;
+          const allEntries: any[] = [];
+          if (patientIds.includes("patient-1")) {
+            allEntries.push(
+              {
+                id: "e1",
+                mgdlEncrypted: "encrypted-100",
+                recordedAt: new Date("2024-01-10"),
+                userId: "patient-1",
+              },
+              {
+                id: "e2",
+                mgdlEncrypted: "encrypted-110",
+                recordedAt: new Date("2024-01-11"),
+                userId: "patient-1",
+              },
+              {
+                id: "e3",
+                mgdlEncrypted: "encrypted-120",
+                recordedAt: new Date("2024-01-12"),
+                userId: "patient-1",
+              },
+            );
+          }
+          if (patientIds.includes("patient-2")) {
+            allEntries.push(
+              {
+                id: "e4",
+                mgdlEncrypted: "encrypted-130",
+                recordedAt: new Date("2024-01-10"),
+                userId: "patient-2",
+              },
+              {
+                id: "e5",
+                mgdlEncrypted: "encrypted-140",
+                recordedAt: new Date("2024-01-11"),
+                userId: "patient-2",
+              },
+              {
+                id: "e6",
+                mgdlEncrypted: "encrypted-150",
+                recordedAt: new Date("2024-01-12"),
+                userId: "patient-2",
+              },
+            );
+          }
+          return Promise.resolve(allEntries);
+        }
+        // Fallback for single patient queries (individual reports)
         if (args.where.userId === "patient-1") {
           return Promise.resolve([
             { id: "e1", mgdlEncrypted: "encrypted-100", recordedAt: new Date("2024-01-10") },
@@ -279,6 +373,49 @@ describe("ReportsService", () => {
 
       // Mock insulin data
       (prismaService.insulinDose.findMany as jest.Mock).mockImplementation((args: any) => {
+        if (args.where.userId?.in) {
+          // Batch query - return all doses for all patients
+          const patientIds = args.where.userId.in;
+          const allDoses: any[] = [];
+          if (patientIds.includes("patient-1")) {
+            allDoses.push(
+              {
+                id: "i1",
+                units: 5,
+                type: "BASAL",
+                recordedAt: new Date("2024-01-10"),
+                userId: "patient-1",
+              },
+              {
+                id: "i2",
+                units: 3,
+                type: "BOLUS",
+                recordedAt: new Date("2024-01-11"),
+                userId: "patient-1",
+              },
+            );
+          }
+          if (patientIds.includes("patient-2")) {
+            allDoses.push(
+              {
+                id: "i3",
+                units: 6,
+                type: "BASAL",
+                recordedAt: new Date("2024-01-10"),
+                userId: "patient-2",
+              },
+              {
+                id: "i4",
+                units: 4,
+                type: "BOLUS",
+                recordedAt: new Date("2024-01-11"),
+                userId: "patient-2",
+              },
+            );
+          }
+          return Promise.resolve(allDoses);
+        }
+        // Fallback for single patient queries (individual reports)
         if (args.where.userId === "patient-1") {
           return Promise.resolve([
             { id: "i1", units: 5, type: "BASAL", recordedAt: new Date("2024-01-10") },
@@ -312,8 +449,12 @@ describe("ReportsService", () => {
       const result = await service.generateGroupReport(doctorId, dto);
 
       expect(result).toBeInstanceOf(Buffer);
-      // Verify demographics aggregation was called
-      expect(prismaService.user.findUnique).toHaveBeenCalledTimes(2);
+      // Verify batch query was used instead of individual queries
+      expect(prismaService.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: { in: ["patient-1", "patient-2"] } },
+        }),
+      );
     });
 
     it("should calculate correct aggregated glucose statistics", async () => {
@@ -473,13 +614,20 @@ describe("ReportsService", () => {
       });
 
       const glucoseValues = [80, 90, 100, 110, 120, 130, 140, 150, 200, 250];
-      (prismaService.glucoseEntry.findMany as jest.Mock).mockResolvedValue(
-        glucoseValues.map((val, idx) => ({
-          id: `e${idx}`,
-          mgdlEncrypted: `encrypted-${val}`,
-          recordedAt: new Date(`2024-01-${idx + 1}`),
-        })),
-      );
+      (prismaService.glucoseEntry.findMany as jest.Mock).mockImplementation((args: any) => {
+        if (args.where.userId?.in) {
+          // Batch query
+          return Promise.resolve(
+            glucoseValues.map((val, idx) => ({
+              id: `e${idx}`,
+              mgdlEncrypted: `encrypted-${val}`,
+              recordedAt: new Date(`2024-01-${idx + 1}`),
+              userId: "patient-1",
+            })),
+          );
+        }
+        return Promise.resolve([]);
+      });
 
       const result = await service.generateGroupReport(doctorId, dto);
 
@@ -521,21 +669,31 @@ describe("ReportsService", () => {
       ];
 
       (doctorPatientService.getPatients as jest.Mock).mockResolvedValue(mockPatients);
-      (prismaService.user.findUnique as jest.Mock).mockResolvedValue({
-        birthDate: new Date("1985-01-01"),
-        weight: 70,
-        minTargetGlucose: 80,
-        maxTargetGlucose: 140,
-      });
+      (prismaService.user.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "patient-test",
+          birthDate: new Date("1985-01-01"),
+          weight: 70,
+          minTargetGlucose: 80,
+          maxTargetGlucose: 140,
+        },
+      ]);
 
       const testValues = [70, 80, 90, 100, 110, 120, 130, 140, 150, 180, 200, 250];
-      (prismaService.glucoseEntry.findMany as jest.Mock).mockResolvedValue(
-        testValues.map((val, idx) => ({
-          id: `e${idx}`,
-          mgdlEncrypted: `encrypted-${val}`,
-          recordedAt: new Date(`2024-01-${String(idx + 1).padStart(2, "0")}`),
-        })),
-      );
+      (prismaService.glucoseEntry.findMany as jest.Mock).mockImplementation((args: any) => {
+        if (args.where.userId?.in) {
+          // Batch query
+          return Promise.resolve(
+            testValues.map((val, idx) => ({
+              id: `e${idx}`,
+              mgdlEncrypted: `encrypted-${val}`,
+              recordedAt: new Date(`2024-01-${String(idx + 1).padStart(2, "0")}`),
+              userId: "patient-test",
+            })),
+          );
+        }
+        return Promise.resolve([]);
+      });
 
       const result = await service.generateGroupReport(doctorId, dto);
 
@@ -602,12 +760,29 @@ describe("ReportsService", () => {
       ];
 
       (doctorPatientService.getPatients as jest.Mock).mockResolvedValue(mockPatients);
-      (prismaService.user.findUnique as jest.Mock).mockResolvedValue({
-        birthDate: new Date("1985-01-01"),
-        weight: 70,
-        minTargetGlucose: 80,
-        maxTargetGlucose: 140,
-      });
+      (prismaService.user.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "p1",
+          birthDate: new Date("1985-01-01"),
+          weight: 70,
+          minTargetGlucose: 80,
+          maxTargetGlucose: 140,
+        },
+        {
+          id: "p2",
+          birthDate: new Date("1985-01-01"),
+          weight: 70,
+          minTargetGlucose: 80,
+          maxTargetGlucose: 140,
+        },
+        {
+          id: "p3",
+          birthDate: new Date("1985-01-01"),
+          weight: 70,
+          minTargetGlucose: 80,
+          maxTargetGlucose: 140,
+        },
+      ]);
 
       const result = await service.generateGroupReport(doctorId, dto);
 
@@ -617,7 +792,12 @@ describe("ReportsService", () => {
       // Should have 2 TYPE_1 and 1 TYPE_2 (66.7% and 33.3%)
       expect(csv).toContain("Demografía,Tipo de Diabetes Tipo 1,2,pacientes");
       expect(csv).toContain("Demografía,Tipo de Diabetes Tipo 2,1,pacientes");
-      expect(prismaService.user.findUnique).toHaveBeenCalledTimes(3);
+      // Verify batch query was used
+      expect(prismaService.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: { in: ["p1", "p2", "p3"] } },
+        }),
+      );
     });
 
     it("should correctly calculate age statistics", async () => {
@@ -660,25 +840,29 @@ describe("ReportsService", () => {
       ];
 
       (doctorPatientService.getPatients as jest.Mock).mockResolvedValue(mockPatients);
-      (prismaService.user.findUnique as jest.Mock)
-        .mockResolvedValueOnce({
+      (prismaService.user.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "p1",
           birthDate: birthDate1,
           weight: 70,
           minTargetGlucose: 80,
           maxTargetGlucose: 140,
-        })
-        .mockResolvedValueOnce({
+        },
+        {
+          id: "p2",
           birthDate: birthDate2,
           weight: 75,
           minTargetGlucose: 80,
           maxTargetGlucose: 140,
-        })
-        .mockResolvedValueOnce({
+        },
+        {
+          id: "p3",
           birthDate: birthDate3,
           weight: 80,
           minTargetGlucose: 80,
           maxTargetGlucose: 140,
-        });
+        },
+      ]);
 
       const result = await service.generateGroupReport(doctorId, dto);
 
@@ -691,7 +875,8 @@ describe("ReportsService", () => {
       expect(csv).toContain("Demografía,Edad mínima,30,años");
       expect(csv).toContain("Demografía,Edad máxima,50,años");
       expect(csv).toContain("Demografía,Mediana de edad,40,años");
-      expect(prismaService.user.findUnique).toHaveBeenCalledTimes(3);
+      // Verify batch query was used
+      expect(prismaService.user.findMany).toHaveBeenCalled();
     });
 
     it("should correctly calculate weight statistics", async () => {
@@ -729,25 +914,29 @@ describe("ReportsService", () => {
       ];
 
       (doctorPatientService.getPatients as jest.Mock).mockResolvedValue(mockPatients);
-      (prismaService.user.findUnique as jest.Mock)
-        .mockResolvedValueOnce({
+      (prismaService.user.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "p1",
           birthDate: new Date("1985-01-01"),
           weight: 60,
           minTargetGlucose: 80,
           maxTargetGlucose: 140,
-        })
-        .mockResolvedValueOnce({
+        },
+        {
+          id: "p2",
           birthDate: new Date("1985-01-01"),
           weight: 70,
           minTargetGlucose: 80,
           maxTargetGlucose: 140,
-        })
-        .mockResolvedValueOnce({
+        },
+        {
+          id: "p3",
           birthDate: new Date("1985-01-01"),
           weight: 80,
           minTargetGlucose: 80,
           maxTargetGlucose: 140,
-        });
+        },
+      ]);
 
       const result = await service.generateGroupReport(doctorId, dto);
 
@@ -760,7 +949,8 @@ describe("ReportsService", () => {
       expect(csv).toContain("Demografía,Peso mínimo,60,kg");
       expect(csv).toContain("Demografía,Peso máximo,80,kg");
       expect(csv).toContain("Demografía,Mediana de peso,70.0,kg");
-      expect(prismaService.user.findUnique).toHaveBeenCalledTimes(3);
+      // Verify batch query was used
+      expect(prismaService.user.findMany).toHaveBeenCalled();
     });
   });
 
@@ -793,27 +983,40 @@ describe("ReportsService", () => {
       ];
 
       (doctorPatientService.getPatients as jest.Mock).mockResolvedValue(mockPatients);
-      (prismaService.user.findUnique as jest.Mock).mockResolvedValue({
-        birthDate: new Date("1985-01-01"),
-        weight: 70,
-        minTargetGlucose: 80,
-        maxTargetGlucose: 140,
-      });
+      (prismaService.user.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "p1",
+          birthDate: new Date("1985-01-01"),
+          weight: 70,
+          minTargetGlucose: 80,
+          maxTargetGlucose: 140,
+        },
+        {
+          id: "p2",
+          birthDate: new Date("1985-01-01"),
+          weight: 70,
+          minTargetGlucose: 80,
+          maxTargetGlucose: 140,
+        },
+      ]);
 
       // Patient 1: 2 basal (5+6=11), 1 bolus (3)
       // Patient 2: 1 basal (4), 2 bolus (2+3=5)
       // Total: 3 basal (15 units), 3 bolus (8 units), 6 doses, 23 units
-      (prismaService.insulinDose.findMany as jest.Mock)
-        .mockResolvedValueOnce([
-          { id: "i1", units: 5, type: "BASAL", recordedAt: new Date("2024-01-10") },
-          { id: "i2", units: 6, type: "BASAL", recordedAt: new Date("2024-01-11") },
-          { id: "i3", units: 3, type: "BOLUS", recordedAt: new Date("2024-01-12") },
-        ])
-        .mockResolvedValueOnce([
-          { id: "i4", units: 4, type: "BASAL", recordedAt: new Date("2024-01-10") },
-          { id: "i5", units: 2, type: "BOLUS", recordedAt: new Date("2024-01-11") },
-          { id: "i6", units: 3, type: "BOLUS", recordedAt: new Date("2024-01-12") },
-        ]);
+      (prismaService.insulinDose.findMany as jest.Mock).mockImplementation((args: any) => {
+        if (args.where.userId?.in) {
+          // Batch query - return all doses for all patients
+          return Promise.resolve([
+            { id: "i1", units: 5, type: "BASAL", recordedAt: new Date("2024-01-10"), userId: "p1" },
+            { id: "i2", units: 6, type: "BASAL", recordedAt: new Date("2024-01-11"), userId: "p1" },
+            { id: "i3", units: 3, type: "BOLUS", recordedAt: new Date("2024-01-12"), userId: "p1" },
+            { id: "i4", units: 4, type: "BASAL", recordedAt: new Date("2024-01-10"), userId: "p2" },
+            { id: "i5", units: 2, type: "BOLUS", recordedAt: new Date("2024-01-11"), userId: "p2" },
+            { id: "i6", units: 3, type: "BOLUS", recordedAt: new Date("2024-01-12"), userId: "p2" },
+          ]);
+        }
+        return Promise.resolve([]);
+      });
 
       const result = await service.generateGroupReport(doctorId, dto);
 
@@ -835,7 +1038,8 @@ describe("ReportsService", () => {
       expect(csv).toContain("Insulina,Unidades basal,15.0,U");
       expect(csv).toContain("Insulina,Dosis bolus,3,dosis");
       expect(csv).toContain("Insulina,Unidades bolus,8.0,U");
-      expect(prismaService.insulinDose.findMany).toHaveBeenCalledTimes(2);
+      // Verify batch query was used (single call instead of per-patient calls)
+      expect(prismaService.insulinDose.findMany).toHaveBeenCalled();
     });
   });
 
@@ -868,12 +1072,22 @@ describe("ReportsService", () => {
       ];
 
       (doctorPatientService.getPatients as jest.Mock).mockResolvedValue(mockPatients);
-      (prismaService.user.findUnique as jest.Mock).mockResolvedValue({
-        birthDate: new Date("1985-01-01"),
-        weight: 70,
-        minTargetGlucose: 80,
-        maxTargetGlucose: 140,
-      });
+      (prismaService.user.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "p1",
+          birthDate: new Date("1985-01-01"),
+          weight: 70,
+          minTargetGlucose: 80,
+          maxTargetGlucose: 140,
+        },
+        {
+          id: "p2",
+          birthDate: new Date("1985-01-01"),
+          weight: 70,
+          minTargetGlucose: 80,
+          maxTargetGlucose: 140,
+        },
+      ]);
 
       // Mock meal templates
       const mockMealTemplate = {
@@ -886,36 +1100,44 @@ describe("ReportsService", () => {
       // Patient 1: 2 meals (50+60=110g carbs)
       // Patient 2: 3 meals (40+50+30=120g carbs)
       // Total: 5 meals, 230g carbs
-      (prismaService.logEntry.findMany as jest.Mock)
-        .mockResolvedValueOnce([
-          {
-            id: "l1",
-            recordedAt: new Date("2024-01-10"),
-            mealTemplate: { ...mockMealTemplate, carbohydrates: 50 },
-          },
-          {
-            id: "l2",
-            recordedAt: new Date("2024-01-11"),
-            mealTemplate: { ...mockMealTemplate, carbohydrates: 60 },
-          },
-        ])
-        .mockResolvedValueOnce([
-          {
-            id: "l3",
-            recordedAt: new Date("2024-01-10"),
-            mealTemplate: { ...mockMealTemplate, carbohydrates: 40 },
-          },
-          {
-            id: "l4",
-            recordedAt: new Date("2024-01-11"),
-            mealTemplate: { ...mockMealTemplate, carbohydrates: 50 },
-          },
-          {
-            id: "l5",
-            recordedAt: new Date("2024-01-12"),
-            mealTemplate: { ...mockMealTemplate, carbohydrates: 30 },
-          },
-        ]);
+      (prismaService.logEntry.findMany as jest.Mock).mockImplementation((args: any) => {
+        if (args.where.userId?.in) {
+          // Batch query - return all meals for all patients
+          return Promise.resolve([
+            {
+              id: "l1",
+              recordedAt: new Date("2024-01-10"),
+              userId: "p1",
+              mealTemplate: { ...mockMealTemplate, carbohydrates: 50 },
+            },
+            {
+              id: "l2",
+              recordedAt: new Date("2024-01-11"),
+              userId: "p1",
+              mealTemplate: { ...mockMealTemplate, carbohydrates: 60 },
+            },
+            {
+              id: "l3",
+              recordedAt: new Date("2024-01-10"),
+              userId: "p2",
+              mealTemplate: { ...mockMealTemplate, carbohydrates: 40 },
+            },
+            {
+              id: "l4",
+              recordedAt: new Date("2024-01-11"),
+              userId: "p2",
+              mealTemplate: { ...mockMealTemplate, carbohydrates: 50 },
+            },
+            {
+              id: "l5",
+              recordedAt: new Date("2024-01-12"),
+              userId: "p2",
+              mealTemplate: { ...mockMealTemplate, carbohydrates: 30 },
+            },
+          ]);
+        }
+        return Promise.resolve([]);
+      });
 
       const result = await service.generateGroupReport(doctorId, dto);
 
@@ -931,7 +1153,8 @@ describe("ReportsService", () => {
       expect(csv).toContain("Comidas,Total de comidas,5,comidas");
       expect(csv).toContain("Comidas,Total de carbohidratos,230.0,g");
       expect(csv).toContain("Comidas,Promedio por comida,46.0,g");
-      expect(prismaService.logEntry.findMany).toHaveBeenCalledTimes(2);
+      // Verify batch query was used (single call instead of per-patient calls)
+      expect(prismaService.logEntry.findMany).toHaveBeenCalled();
     });
   });
 
@@ -957,28 +1180,41 @@ describe("ReportsService", () => {
       ];
 
       (doctorPatientService.getPatients as jest.Mock).mockResolvedValue(mockPatients);
-      (prismaService.user.findUnique as jest.Mock).mockResolvedValue({
-        birthDate: new Date("1985-01-01"),
-        weight: 70,
-        minTargetGlucose: 80,
-        maxTargetGlucose: 140,
-      });
+      (prismaService.user.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "p1",
+          birthDate: new Date("1985-01-01"),
+          weight: 70,
+          minTargetGlucose: 80,
+          maxTargetGlucose: 140,
+        },
+      ]);
 
       // Test values: [60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 180, 200, 250, 300]
-      // Expected: avg=140, median=120, min=60, max=300, p25=90, p75=180
-      // In range (80-140): 7 values (80,90,100,110,120,130,140) = 50%
-      // Hypoglycemia (<70): 2 values (60,70) = 14.3%
+      // Expected: avg=141.43 rounded to 141.4
+      // Sorted: [60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 180, 200, 250, 300]
+      // Median: index 7 = 130
+      // P25: index 3 = 90, P75: index 10 = 180
+      // In range (80-140): 7 values = 50%
+      // Hypoglycemia (<70): 1 value (60) = 7.1%
       // Severe hypo (<54): 0 = 0%
-      // Hyperglycemia (>180): 3 values (200,250,300) = 21.4%
-      // Severe hyper (>250): 2 values (250,300) = 14.3%
+      // Hyperglycemia (>180): 3 values (200, 250, 300) = 21.4%
+      // Severe hyper (>250): 1 value (300) = 7.1%
       const testValues = [60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 180, 200, 250, 300];
-      (prismaService.glucoseEntry.findMany as jest.Mock).mockResolvedValue(
-        testValues.map((val, idx) => ({
-          id: `e${idx}`,
-          mgdlEncrypted: `encrypted-${val}`,
-          recordedAt: new Date(`2024-01-${String(idx + 1).padStart(2, "0")}`),
-        })),
-      );
+      (prismaService.glucoseEntry.findMany as jest.Mock).mockImplementation((args: any) => {
+        if (args.where.userId?.in) {
+          // Batch query
+          return Promise.resolve(
+            testValues.map((val, idx) => ({
+              id: `e${idx}`,
+              mgdlEncrypted: `encrypted-${val}`,
+              recordedAt: new Date(`2024-01-${String(idx + 1).padStart(2, "0")}`),
+              userId: "p1",
+            })),
+          );
+        }
+        return Promise.resolve([]);
+      });
 
       const result = await service.generateGroupReport(doctorId, dto);
 
