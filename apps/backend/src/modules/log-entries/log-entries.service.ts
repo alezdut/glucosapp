@@ -1,7 +1,8 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Inject, forwardRef } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { EncryptionService } from "../../common/services/encryption.service";
+import { AlertsService } from "../alerts/alerts.service";
 import { CreateLogEntryDto } from "./dto/create-log-entry.dto";
 
 /**
@@ -38,6 +39,8 @@ export class LogEntriesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly encryptionService: EncryptionService,
+    @Inject(forwardRef(() => AlertsService))
+    private readonly alertsService: AlertsService,
   ) {}
 
   /**
@@ -179,6 +182,14 @@ export class LogEntriesService {
           insulinDose: insulinDose ? true : false,
         },
       });
+
+      // Detect and create alerts based on glucose value
+      // Use non-blocking approach to avoid slowing down the response
+      this.alertsService
+        .detectAlert(userId, data.glucoseMgdl, undefined, glucoseEntry.id)
+        .catch((error) => {
+          this.logger.error("Failed to detect alert:", error);
+        });
 
       return logEntry;
     });

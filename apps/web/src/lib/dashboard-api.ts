@@ -131,6 +131,41 @@ export async function getRecentAlerts(accessToken: string, limit?: number): Prom
 }
 
 /**
+ * Get critical alerts (unacknowledged, severity CRITICAL or HIGH)
+ */
+export async function getCriticalAlerts(accessToken: string): Promise<Alert[]> {
+  const response = await client.GET<Alert[]>(`/alerts/critical`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  if (response.error) {
+    throw new Error(response.error.message || "Failed to fetch critical alerts");
+  }
+  return response.data!;
+}
+
+/**
+ * Get unacknowledged alerts
+ */
+export async function getUnacknowledgedAlerts(
+  accessToken: string,
+  limit?: number,
+): Promise<Alert[]> {
+  const queryParams = limit ? `?limit=${limit}` : "";
+  const response = await client.GET<Alert[]>(`/alerts${queryParams}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  if (response.error) {
+    throw new Error(response.error.message || "Failed to fetch alerts");
+  }
+  // Filter to only return unacknowledged alerts
+  return (response.data || []).filter((alert) => !alert.acknowledged);
+}
+
+/**
  * Acknowledge an alert
  */
 export async function acknowledgeAlert(accessToken: string, alertId: string): Promise<Alert> {
@@ -166,6 +201,10 @@ export interface GetPatientsFilters {
   diabetesType?: "TYPE_1" | "TYPE_2";
   activeOnly?: boolean;
   registrationDate?: string;
+  clinicalStatus?: "Riesgo" | "Estable";
+  activityStatus?: "Activo" | "Inactivo";
+  ageRange?: string;
+  weightRange?: string;
 }
 
 /**
@@ -477,4 +516,68 @@ export async function updatePatientProfile(
     throw new Error("No data returned from update patient profile endpoint");
   }
   return response.data;
+}
+
+export interface GenerateReportOptions {
+  startDate: string;
+  endDate: string;
+  reportTypes: string[];
+  format: "pdf" | "csv";
+  includeAISummary?: boolean;
+}
+
+export interface GenerateGroupReportOptions extends GenerateReportOptions {
+  filters?: GetPatientsFilters;
+}
+
+/**
+ * Generate individual patient report
+ */
+export async function generateIndividualReport(
+  accessToken: string,
+  patientId: string,
+  options: GenerateReportOptions,
+): Promise<Blob> {
+  const response = await fetch(`${apiBaseUrl}/v1/reports/individual`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      patientId,
+      ...options,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: "Failed to generate report" }));
+    throw new Error(error.message || "Failed to generate report");
+  }
+
+  return response.blob();
+}
+
+/**
+ * Generate group report for multiple patients
+ */
+export async function generateGroupReport(
+  accessToken: string,
+  options: GenerateGroupReportOptions,
+): Promise<Blob> {
+  const response = await fetch(`${apiBaseUrl}/v1/reports/group`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(options),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: "Failed to generate report" }));
+    throw new Error(error.message || "Failed to generate report");
+  }
+
+  return response.blob();
 }

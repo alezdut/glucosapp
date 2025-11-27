@@ -1,8 +1,9 @@
 "use client";
 
 import { useAuth } from "@/contexts/auth-context";
-import { Search, Bell, User } from "lucide-react";
+import { Search, User } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { NotificationDropdown } from "./NotificationDropdown";
 
 export const Header = () => {
   const { user } = useAuth();
@@ -31,9 +32,7 @@ export const Header = () => {
       )}
 
       <div className="flex items-center gap-4 ml-auto">
-        <button className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors">
-          <Bell className="w-5 h-5" />
-        </button>
+        <NotificationDropdown />
         <button className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors">
           <User className="w-5 h-5" />
         </button>

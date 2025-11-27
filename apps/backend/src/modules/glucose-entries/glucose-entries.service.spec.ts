@@ -1,6 +1,7 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { PrismaService } from "../../prisma/prisma.service";
 import { EncryptionService } from "../../common/services/encryption.service";
+import { AlertsService } from "../alerts/alerts.service";
 import { GlucoseEntriesService } from "./glucose-entries.service";
 import { createMockPrismaService } from "../../common/test-helpers/prisma.mock";
 import { createMockGlucoseEntry } from "../../common/test-helpers/fixtures";
@@ -15,6 +16,9 @@ describe("GlucoseEntriesService", () => {
     const mockEncryption = {
       encryptGlucoseValue: jest.fn(),
     };
+    const mockAlertsService = {
+      detectAlert: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -26,6 +30,10 @@ describe("GlucoseEntriesService", () => {
         {
           provide: EncryptionService,
           useValue: mockEncryption,
+        },
+        {
+          provide: AlertsService,
+          useValue: mockAlertsService,
         },
       ],
     }).compile();

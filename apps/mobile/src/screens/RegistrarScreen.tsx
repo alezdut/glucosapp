@@ -210,6 +210,11 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
     if (isFasting) {
       setTargetGlucose(undefined);
       setIsTargetGlucoseEdited(false);
+      // Clear insulin values when switching to fasting mode
+      // This ensures we don't carry over calculated values from meal mode
+      setAppliedInsulin(undefined);
+      setCalculatedDose(null);
+      setWasManuallyEdited(false);
     }
   }, [isFasting]);
 
@@ -471,19 +476,30 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
       }
 
       const client = createApiClient();
+
+      // In fasting mode, only include insulin if user has edited target glucose
+      // (meaning they want to correct glucose)
+      const shouldIncludeInsulin = isFasting
+        ? targetGlucose !== undefined && isTargetGlucoseEdited
+        : true;
+
+      const insulinToSend = shouldIncludeInsulin ? appliedInsulin || 0 : 0;
+      const calculatedInsulinToSend = shouldIncludeInsulin ? calculatedInsulin || 0 : 0;
+
       const response = await client.POST("/log-entries", {
         glucoseMgdl: Math.round(glucoseLevel),
-        insulinUnits: appliedInsulin || 0,
-        calculatedInsulinUnits: calculatedInsulin || 0,
-        wasManuallyEdited: wasManuallyEdited,
+        insulinUnits: insulinToSend,
+        calculatedInsulinUnits: calculatedInsulinToSend,
+        wasManuallyEdited: wasManuallyEdited && shouldIncludeInsulin,
         insulinType: InsulinType.BOLUS,
         carbohydrates: isFasting ? undefined : carbsNum > 0 ? carbsNum : undefined,
         mealType: isFasting ? MealCategory.CORRECTION : mealType,
         recordedAt: recordedAt.toISOString(),
-        // Calculation breakdown for transparency
-        carbInsulin: prandialInsulin > 0 ? prandialInsulin : undefined,
-        correctionInsulin: correctionInsulin > 0 ? correctionInsulin : undefined,
-        iobSubtracted: iobInsulin > 0 ? iobInsulin : undefined,
+        // Calculation breakdown for transparency - only include if insulin is being sent
+        carbInsulin: shouldIncludeInsulin && prandialInsulin > 0 ? prandialInsulin : undefined,
+        correctionInsulin:
+          shouldIncludeInsulin && correctionInsulin > 0 ? correctionInsulin : undefined,
+        iobSubtracted: shouldIncludeInsulin && iobInsulin > 0 ? iobInsulin : undefined,
         // Context factors
         recentExercise,
         alcohol,
