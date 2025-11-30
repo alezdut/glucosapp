@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -39,9 +39,7 @@ export default function CommunicationScreen() {
   const { user } = useAuth();
   const [messageContent, setMessageContent] = useState("");
   const flatListRef = useRef<FlatList>(null);
-  const hasInitialScrolledRef = useRef(false);
-  const previousMessagesLengthRef = useRef(0);
-  const [isListReady, setIsListReady] = useState(false);
+  const hasScrolledToEndRef = useRef(false);
 
   const { data: messages = [], isLoading } = useConversationWithDoctor();
   const { data: assignedDoctor } = useAssignedDoctor();
@@ -54,31 +52,21 @@ export default function CommunicationScreen() {
     navigation.navigate("MainTabs", { screen: "Médico" });
   };
 
-  // Scroll to end on initial load and when new messages arrive
+  // Scroll to end for new messages only
   useEffect(() => {
-    if (messages.length === 0) {
-      return;
+    // Only scroll for new messages (not initial load, handled by onContentSizeChange)
+    if (messages.length > 0 && hasScrolledToEndRef.current) {
+      flatListRef.current?.scrollToEnd({ animated: true });
     }
-
-    const currentLength = messages.length;
-    const previousLength = previousMessagesLengthRef.current;
-
-    // Initial load: mark as needing scroll, but let onContentSizeChange handle it
-    if (!hasInitialScrolledRef.current) {
-      hasInitialScrolledRef.current = true;
-      previousMessagesLengthRef.current = currentLength;
-      return;
-    }
-
-    // Only auto-scroll if new messages were added
-    if (currentLength > previousLength) {
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-    }
-
-    previousMessagesLengthRef.current = currentLength;
   }, [messages.length]);
+
+  // Reset scroll state when component unmounts or conversation changes
+  useEffect(() => {
+    hasScrolledToEndRef.current = false;
+    return () => {
+      hasScrolledToEndRef.current = false;
+    };
+  }, []);
 
   // Mark unread messages as read when screen is focused (user is viewing)
   useFocusEffect(
@@ -106,7 +94,7 @@ export default function CommunicationScreen() {
     const content = messageContent.trim();
 
     try {
-      const result = await sendMessageMutation.mutateAsync({
+      await sendMessageMutation.mutateAsync({
         receiverId,
         content,
       });
@@ -144,11 +132,8 @@ export default function CommunicationScreen() {
     return message.sender.email;
   };
 
-  const renderMessage = ({ item: message }: { item: Message }) => {
-    if (!user) return null;
-
-    // Determine if this is the current user's message
-    const isOwnMessage = message.senderId === user.id;
+  const MessageItem = React.memo(({ message }: { message: Message }) => {
+    const isOwnMessage = message.senderId === user?.id;
     const senderName = getMessageSenderName(message);
 
     return (
@@ -187,6 +172,11 @@ export default function CommunicationScreen() {
         </View>
       </View>
     );
+  });
+
+  const renderMessage = ({ item: message }: { item: Message }) => {
+    if (!user) return null;
+    return <MessageItem message={message} />;
   };
 
   if (isLoading && messages.length === 0) {
@@ -229,28 +219,23 @@ export default function CommunicationScreen() {
             <Text style={styles.emptySubtext}>Comienza una conversación enviando un mensaje</Text>
           </View>
         ) : (
-          <View style={{ flex: 1, opacity: isListReady ? 1 : 0 }}>
-            <FlatList
-              ref={flatListRef}
-              data={messages}
-              renderItem={renderMessage}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.messagesList}
-              onContentSizeChange={() => {
-                // On initial load, scroll to end and show list
-                if (!isListReady && messages.length > 0 && flatListRef.current) {
-                  flatListRef.current.scrollToEnd({ animated: false });
-                  setIsListReady(true);
-                } else if (
-                  hasInitialScrolledRef.current &&
-                  messages.length > previousMessagesLengthRef.current
-                ) {
-                  // Only auto-scroll if we've already done initial scroll and new messages arrived
-                  flatListRef.current?.scrollToEnd({ animated: true });
-                }
-              }}
-            />
-          </View>
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            renderItem={renderMessage}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.messagesList}
+            onContentSizeChange={() => {
+              // Scroll to end when content size changes (messages loaded/changed)
+              if (messages.length > 0 && !hasScrolledToEndRef.current) {
+                // Small delay to ensure layout is complete
+                setTimeout(() => {
+                  flatListRef.current?.scrollToEnd({ animated: false });
+                  hasScrolledToEndRef.current = true;
+                }, 100);
+              }
+            }}
+          />
         )}
       </View>
       <View style={[styles.inputContainer, { paddingBottom: insets.bottom + theme.spacing.md }]}>
@@ -322,9 +307,19 @@ const styles = StyleSheet.create({
   },
   messageBubbleOwn: {
     backgroundColor: theme.colors.primary,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   messageBubbleOther: {
     backgroundColor: theme.colors.card,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   messageText: {
     fontSize: theme.fontSize.md,
