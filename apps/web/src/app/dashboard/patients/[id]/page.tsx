@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ProtectedRoute } from "@/components/protected-route";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { Header } from "@/components/dashboard/Header";
@@ -17,7 +17,7 @@ import { PatientGlucoseChart } from "@/components/dashboard/PatientGlucoseChart"
 import { PatientInsulinChart } from "@/components/dashboard/PatientInsulinChart";
 import { PatientLogs } from "@/components/dashboard/PatientLogs";
 import { PatientParameters } from "@/components/dashboard/PatientParameters";
-import { PatientNotesMessages } from "@/components/dashboard/PatientNotesMessages";
+import { PatientChat } from "@/components/dashboard/PatientChat";
 import { PatientAvatar } from "@/components/dashboard/PatientAvatar";
 import { Loader2, User, MessageSquare } from "lucide-react";
 import { calculateAge, formatTimeAgo, getDiabetesTypeLabel } from "@glucosapp/utils";
@@ -39,8 +39,20 @@ const formatDate = (dateString: string) => {
 export default function PatientDetailsPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const patientId = params.id as string;
-  const [activeTab, setActiveTab] = useState("glucose-insulin");
+
+  // Get initial tab from URL query parameter, default to "glucose-insulin"
+  const initialTab = searchParams.get("tab") || "glucose-insulin";
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  // Update activeTab when URL query parameter changes
+  useEffect(() => {
+    const tabFromUrl = searchParams.get("tab");
+    if (tabFromUrl && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [searchParams, activeTab]);
 
   const { data: patient, isLoading, error } = usePatientDetails(patientId);
   const {
@@ -196,7 +208,10 @@ export default function PatientDetailsPage() {
                   <User className="w-4 h-4" />
                   Editar Perfil
                 </button>
-                <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2">
+                <button
+                  onClick={() => router.push(`/dashboard/communication?patientId=${patientId}`)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
+                >
                   <MessageSquare className="w-4 h-4" />
                   Contactar
                 </button>
@@ -253,7 +268,7 @@ export default function PatientDetailsPage() {
 
           {activeTab === "meals" && <PatientLogs patientId={patientId} />}
 
-          {activeTab === "notes" && <PatientNotesMessages />}
+          {activeTab === "notes" && <PatientChat patientId={patientId} />}
 
           {activeTab === "parameters" && profile && (
             <PatientParameters profile={profile} patientId={patientId} />

@@ -31,6 +31,7 @@ export const createMockUserResponse = (overrides?: Partial<UserResponseDto>): Us
     firstName: "Test",
     lastName: "User",
     emailVerified: true,
+    role: UserRole.PATIENT,
     createdAt: "2024-01-01T00:00:00.000Z",
     ...overrides,
   };
@@ -67,6 +68,33 @@ export const createMockAccount = (overrides?: Partial<any>): any => {
     userId: "user-123",
     createdAt: new Date("2024-01-01"),
     user: createMockUser(),
+    ...overrides,
+  };
+};
+
+export const createMockMessage = (overrides?: Partial<any>): any => {
+  return {
+    id: "message-123",
+    senderId: "user-123",
+    receiverId: "user-456",
+    content: "Test message",
+    read: false,
+    readAt: null,
+    createdAt: new Date("2024-01-01T12:00:00.000Z"),
+    sender: {
+      id: "user-123",
+      email: "sender@example.com",
+      firstName: "Sender",
+      lastName: "User",
+      avatarUrl: null,
+    },
+    receiver: {
+      id: "user-456",
+      email: "receiver@example.com",
+      firstName: "Receiver",
+      lastName: "User",
+      avatarUrl: null,
+    },
     ...overrides,
   };
 };

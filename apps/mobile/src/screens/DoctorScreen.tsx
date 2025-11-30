@@ -9,12 +9,15 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Droplet, Syringe, Stethoscope, Mail, Info } from "lucide-react-native";
 import { theme } from "../theme";
 import { createApiClient } from "../lib/api";
 import { GlucoseChart, type GlucoseDataPoint } from "../components/GlucoseChart";
 import { formatTimeFromMinutes } from "@glucosapp/utils";
 import { type UserProfile } from "@glucosapp/types";
+import type { RootStackParamList } from "../navigation/types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -47,11 +50,14 @@ type GlucoseTrend = {
   }>;
 };
 
+type DoctorScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
 /**
  * DoctorScreen component - Display doctor information, reports, and treatment parameters
  */
 export default function DoctorScreen() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<DoctorScreenNavigationProp>();
 
   // Fetch doctor information
   const { data: doctorInfo, isLoading: isLoadingDoctor } = useQuery<DoctorInfo | null>({
@@ -436,7 +442,12 @@ export default function DoctorScreen() {
       {hasDoctor && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Comunicación</Text>
-          <TouchableOpacity style={styles.communicationButton} disabled={true}>
+          <TouchableOpacity
+            style={styles.communicationButton}
+            onPress={() => {
+              navigation.navigate("Communication");
+            }}
+          >
             <Mail size={20} color={theme.colors.primary} />
             <Text style={styles.communicationButtonText}>Enviar mensaje al doctor</Text>
           </TouchableOpacity>
@@ -679,7 +690,6 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
     borderWidth: 1,
     borderColor: theme.colors.primary,
-    opacity: 0.6,
   },
   communicationButtonText: {
     fontSize: theme.fontSize.md,

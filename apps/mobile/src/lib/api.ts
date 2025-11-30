@@ -86,14 +86,24 @@ export async function refreshAccessToken(): Promise<{
   refreshPromise = (async () => {
     try {
       const currentRefreshToken = await getRefreshToken();
+      console.log("Attempting token refresh, has refresh token:", !!currentRefreshToken);
       if (!currentRefreshToken) {
+        console.log("No refresh token available");
         return null;
       }
 
+      console.log("Making refresh request to server");
       const { client } = makeApiClient(`${API_BASE_URL}/v1`);
       const response = await client.POST("/auth/refresh", {
         refreshToken: currentRefreshToken,
       });
+
+      console.log(
+        "Refresh response received, has data:",
+        !!response.data,
+        "has error:",
+        !!response.error,
+      );
 
       if (response.data) {
         const { accessToken, refreshToken } = response.data;
@@ -101,16 +111,29 @@ export async function refreshAccessToken(): Promise<{
         return { accessToken, refreshToken };
       }
 
-      // If refresh fails, clear tokens
+      // If refresh fails, clear tokens only for certain errors
       if (response.error) {
         console.error("Token refresh failed:", response.error);
-        await clearTokens();
+        // Only clear tokens for 401/403 errors (invalid token), not for network/server errors
+        const status = (response.error as any)?.status;
+        if (status === 401 || status === 403) {
+          console.log("Invalid refresh token, clearing tokens");
+          await clearTokens();
+        } else {
+          console.log("Refresh failed due to server/network error, keeping tokens");
+        }
       }
 
       return null;
     } catch (error) {
       console.error("Failed to refresh token:", error);
-      await clearTokens();
+      // Don't clear tokens on network/server errors, only on auth errors
+      if (error instanceof Error && error.message.includes("401")) {
+        console.log("Network error with 401, clearing tokens");
+        await clearTokens();
+      } else {
+        console.log("Network/server error, keeping tokens for retry");
+      }
       return null;
     } finally {
       isRefreshing = false;
@@ -189,12 +212,13 @@ export function createApiClient() {
       const refreshResult = await refreshAccessToken();
 
       if (refreshResult) {
+        console.log("Token refresh successful, retrying request");
         // Retry the request with the new token
         response = await retryFn();
       } else {
-        // Refresh failed, clear tokens
-        console.error("Token refresh failed, clearing tokens");
-        await clearTokens();
+        console.log("Token refresh failed, keeping existing tokens for manual re-auth");
+        // Don't clear tokens here, let user re-authenticate manually
+        // await clearTokens(); // Commented out to prevent aggressive token clearing
       }
     }
 
@@ -276,4 +300,28 @@ export function createApiClient() {
   };
 
   return authenticatedClient;
+}
+
+/**
+ * Get doctor assigned to the current patient
+ */
+export interface AssignedDoctor {
+  doctor: {
+    id: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    avatarUrl?: string;
+  };
+}
+
+export async function getAssignedDoctor(): Promise<AssignedDoctor | null> {
+  const client = createApiClient();
+  const response = await client.GET<AssignedDoctor>("/profile/doctor");
+
+  if (response.error) {
+    throw new Error(response.error.message || "Failed to fetch assigned doctor");
+  }
+
+  return response.data ?? null;
 }

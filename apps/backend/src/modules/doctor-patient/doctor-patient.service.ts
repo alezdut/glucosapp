@@ -154,7 +154,6 @@ export class DoctorPatientService {
     // Apply age range filter
     if (filters?.ageRange) {
       const now = new Date();
-      const currentYear = now.getFullYear();
       let minAge: number | undefined;
       let maxAge: number | undefined;
 
@@ -173,16 +172,18 @@ export class DoctorPatientService {
       }
 
       if (minAge !== undefined) {
-        // For minimum age: person must have been born ON OR BEFORE (currentYear - minAge)
-        // Example: to be at least 31 years old in 2025, must be born on or before Dec 31, 1994
-        const maxBirthYear = currentYear - minAge;
-        const maxBirthDate = new Date(maxBirthYear, 11, 31, 23, 59, 59, 999);
+        // For minimum age: person must have been born ON OR BEFORE (now - minAge years)
+        // Clone now, subtract minAge years, set to end-of-day for lte comparison
+        const maxBirthDate = new Date(now);
+        maxBirthDate.setFullYear(now.getFullYear() - minAge);
+        maxBirthDate.setHours(23, 59, 59, 999);
 
         if (maxAge !== undefined) {
-          // For maximum age: person must have been born ON OR AFTER (currentYear - maxAge)
-          // Example: to be at most 50 years old in 2025, must be born on or after Jan 1, 1975
-          const minBirthYear = currentYear - maxAge;
-          const minBirthDate = new Date(minBirthYear, 0, 1);
+          // For maximum age: person must have been born ON OR AFTER (now - maxAge years)
+          // Clone now, subtract maxAge years, set to start-of-day for gte comparison
+          const minBirthDate = new Date(now);
+          minBirthDate.setFullYear(now.getFullYear() - maxAge);
+          minBirthDate.setHours(0, 0, 0, 0);
           where.birthDate = {
             gte: minBirthDate, // Born on or after this date (to be at most maxAge)
             lte: maxBirthDate, // Born on or before this date (to be at least minAge)

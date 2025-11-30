@@ -4,6 +4,7 @@ import {
   UnauthorizedException,
   BadRequestException,
   NotFoundException,
+  Logger,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { UserRole } from "@prisma/client";
@@ -20,6 +21,8 @@ import { AuthResponseDto, UserResponseDto } from "../dto/auth-response.dto";
  */
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokenService: TokenService,
@@ -66,24 +69,75 @@ export class AuthService {
    * Validates user credentials for local strategy
    */
   async validateLocalUser(email: string, password: string): Promise<UserResponseDto> {
+    this.logger.log("🔍 [BACKEND] AuthService.validateLocalUser - START", {
+      email,
+      passwordLength: password.length,
+      hasPassword: !!password,
+    });
+
     const user = await this.prisma.user.findUnique({
       where: { email },
     });
 
+    this.logger.log("🔍 [BACKEND] AuthService.validateLocalUser - User lookup", {
+      email,
+      userFound: !!user,
+      hasPassword: !!user?.password,
+      emailVerified: user?.emailVerified,
+      userId: user?.id,
+      storedPasswordHash: user?.password ? user.password.substring(0, 20) + "..." : null,
+      storedPasswordLength: user?.password?.length,
+    });
+
     if (!user || !user.password) {
+      this.logger.warn(
+        "🔍 [BACKEND] AuthService.validateLocalUser - User not found or no password",
+        {
+          email,
+          userFound: !!user,
+          hasPassword: !!user?.password,
+        },
+      );
       throw new UnauthorizedException("Invalid credentials");
     }
 
+    this.logger.log("🔍 [BACKEND] AuthService.validateLocalUser - Comparing password", {
+      email,
+      inputPasswordLength: password.length,
+      storedHashPrefix: user.password.substring(0, 20),
+      storedHashLength: user.password.length,
+      storedHashStartsWith: user.password.startsWith("$2"),
+    });
     const isPasswordValid = await bcrypt.compare(password, user.password);
+    this.logger.log("🔍 [BACKEND] AuthService.validateLocalUser - Password comparison result", {
+      email,
+      isPasswordValid,
+      inputPasswordFirstChar: password.substring(0, 1),
+      inputPasswordLastChar: password.substring(password.length - 1),
+    });
+
     if (!isPasswordValid) {
+      this.logger.warn("🔍 [BACKEND] AuthService.validateLocalUser - Invalid password", {
+        email,
+      });
       throw new UnauthorizedException("Invalid credentials");
     }
 
     if (!user.emailVerified) {
+      this.logger.warn("🔍 [BACKEND] AuthService.validateLocalUser - Email not verified", {
+        email,
+        emailVerified: user.emailVerified,
+      });
       throw new UnauthorizedException(
         "Email not verified. Please verify your email before logging in.",
       );
     }
+
+    this.logger.log("🔍 [BACKEND] AuthService.validateLocalUser - Validation successful", {
+      email,
+      userId: user.id,
+      userRole: user.role,
+    });
 
     return this.mapUserToDto(user);
   }
@@ -421,6 +475,7 @@ export class AuthService {
     lastName: string | null;
     avatarUrl: string | null;
     emailVerified: boolean;
+    role: string;
     createdAt: Date;
   }): UserResponseDto {
     return {
@@ -430,6 +485,7 @@ export class AuthService {
       lastName: user.lastName ?? undefined,
       avatarUrl: user.avatarUrl ?? undefined,
       emailVerified: user.emailVerified,
+      role: user.role as UserRole,
       createdAt: user.createdAt.toISOString(),
     };
   }

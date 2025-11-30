@@ -105,7 +105,7 @@ describe("AuthController", () => {
 
       (authService.login as jest.Mock).mockResolvedValue(expectedResponse);
 
-      const result = await controller.login(mockRequest);
+      const result = await controller.login(mockRequest, loginDto);
 
       expect(result).toEqual(expectedResponse);
       expect(authService.login).toHaveBeenCalledWith(mockUser);
@@ -117,16 +117,15 @@ describe("AuthController", () => {
         password: "WrongPassword",
       };
       const mockRequest = {
-        user: null,
+        user: mockUser,
       } as any;
 
-      // LocalAuthGuard would throw before reaching controller
       // This test assumes guard passes but service throws
       (authService.login as jest.Mock).mockRejectedValue(
         new UnauthorizedException("Invalid credentials"),
       );
 
-      await expect(controller.login(mockRequest)).rejects.toThrow(UnauthorizedException);
+      await expect(controller.login(mockRequest, loginDto)).rejects.toThrow(UnauthorizedException);
     });
   });
 

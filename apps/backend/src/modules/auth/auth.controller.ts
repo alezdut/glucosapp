@@ -8,6 +8,7 @@ import {
   HttpCode,
   HttpStatus,
   Res,
+  Logger,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from "@nestjs/swagger";
 import { AuthService } from "./services/auth.service";
@@ -31,6 +32,8 @@ import { Request, Response } from "express";
 @ApiTags("auth")
 @Controller({ path: "auth", version: "1" })
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(private readonly authService: AuthService) {}
 
   /**
@@ -62,9 +65,42 @@ export class AuthController {
     type: AuthResponseDto,
   })
   @ApiResponse({ status: 401, description: "Invalid credentials or email not verified" })
-  async login(@Req() req: Request): Promise<AuthResponseDto> {
-    const user = req.user as UserResponseDto;
-    return this.authService.login(user);
+  async login(@Req() req: Request, @Body() loginDto: LoginDto): Promise<AuthResponseDto> {
+    this.logger.log(`🔍 [BACKEND] POST /auth/login - Request received`, {
+      email: loginDto.email,
+      hasPassword: !!loginDto.password,
+      passwordLength: loginDto.password?.length,
+    });
+
+    try {
+      const user = req.user as UserResponseDto;
+      this.logger.log(`🔍 [BACKEND] POST /auth/login - User validated, generating tokens`, {
+        userId: user.id,
+        userEmail: user.email,
+        userRole: user.role,
+      });
+
+      const result = await this.authService.login(user);
+      this.logger.log(`🔍 [BACKEND] POST /auth/login - Login successful`, {
+        userId: result.user.id,
+        hasAccessToken: !!result.accessToken,
+        hasRefreshToken: !!result.refreshToken,
+      });
+      return result;
+    } catch (error) {
+      this.logger.error(`🔍 [BACKEND] POST /auth/login - Login failed`, {
+        email: loginDto.email,
+        error:
+          error instanceof Error
+            ? {
+                message: error.message,
+                name: error.name,
+                stack: error.stack,
+              }
+            : error,
+      });
+      throw error;
+    }
   }
 
   /**

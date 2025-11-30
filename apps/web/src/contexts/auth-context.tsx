@@ -23,6 +23,7 @@ export function useAuth() {
   if (!context) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
+
   return context;
 }
 
@@ -52,6 +53,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
    * Store tokens in localStorage
    */
   const setTokens = (accessToken: string, refreshToken: string) => {
+    if (typeof window === "undefined") return;
     localStorage.setItem("accessToken", accessToken);
     localStorage.setItem("refreshToken", refreshToken);
   };
@@ -81,10 +83,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
    */
   const refreshTokenIfNeeded = async () => {
     const { accessToken, refreshToken } = getTokens();
-    if (!accessToken || !refreshToken) return false;
+
+    if (!accessToken || !refreshToken) {
+      return false;
+    }
 
     const expiration = getTokenExpiration(accessToken);
-    if (!expiration) return false;
+
+    if (!expiration) {
+      return false;
+    }
 
     const now = Date.now();
     const timeUntilExpiry = expiration - now;
@@ -97,11 +105,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setTokens(tokens.accessToken, tokens.refreshToken);
         return true;
       } catch (error) {
+        console.error("Token refresh failed:", error);
         clearTokens();
         setUser(null);
         return false;
       }
     }
+
     return true;
   };
 
@@ -109,7 +119,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
    * Fetch current user from API
    */
   const fetchCurrentUser = async () => {
+    if (typeof window === "undefined") {
+      setIsLoading(false);
+      return;
+    }
+
     let { accessToken } = getTokens();
+
     if (!accessToken) {
       setIsLoading(false);
       return;
@@ -130,6 +146,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const currentUser = await authApi.getCurrentUser(accessToken);
       setUser(currentUser);
     } catch (error) {
+      console.error("Error fetching user:", error);
       clearTokens();
       setUser(null);
     } finally {
@@ -141,9 +158,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
    * Login user
    */
   const login = async (email: string, password: string) => {
-    const response = await authApi.login({ email, password });
-    setTokens(response.accessToken, response.refreshToken);
-    setUser(response.user);
+    try {
+      const response = await authApi.login({ email, password });
+      setTokens(response.accessToken, response.refreshToken);
+      setUser(response.user);
+      setIsLoading(false);
+    } catch (error) {
+      console.error("Login failed:", error);
+      setIsLoading(false);
+      throw error;
+    }
   };
 
   /**
@@ -176,8 +200,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     await fetchCurrentUser();
   };
 
-  // Initialize auth state on mount
+  // Initialize auth state on mount (client-side only)
   useEffect(() => {
+    if (typeof window === "undefined") {
+      // Server-side render, skip
+      setIsLoading(false);
+      return;
+    }
+
     fetchCurrentUser();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -1,9 +1,12 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Home, BookOpen, PlusCircle, Stethoscope, User } from "lucide-react-native";
 
 import { getTabBarScreenOptions } from "./screenOptions";
-import { RootTabParamList } from "./types";
+import { RootTabParamList, RootStackParamList } from "./types";
+import { useUnreadMessagesFromDoctor } from "../hooks/useMessages";
 
 // Import navigators and screens
 import HomeStackNavigator from "./HomeStackNavigator";
@@ -15,6 +18,18 @@ import ProfileScreen from "../screens/ProfileScreen";
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
 export default function TabNavigator() {
+  const rootNavigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { data: unreadCount = 0 } = useUnreadMessagesFromDoctor();
+
+  const handleDoctorTabPress = (e: any) => {
+    // If there are unread messages, navigate to Communication screen
+    if (unreadCount > 0) {
+      e.preventDefault();
+      rootNavigation.navigate("Communication");
+    }
+    // Otherwise, let the default behavior happen (navigate to DoctorScreen)
+  };
+
   return (
     <Tab.Navigator screenOptions={getTabBarScreenOptions()}>
       <Tab.Screen
@@ -44,6 +59,10 @@ export default function TabNavigator() {
         component={DoctorScreen}
         options={{
           tabBarIcon: ({ color, size }) => <Stethoscope size={size} color={color} />,
+          tabBarBadge: unreadCount > 0 ? (unreadCount > 9 ? "9+" : unreadCount) : undefined,
+        }}
+        listeners={{
+          tabPress: handleDoctorTabPress,
         }}
       />
       <Tab.Screen
