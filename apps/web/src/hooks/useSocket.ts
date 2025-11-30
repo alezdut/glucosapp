@@ -74,14 +74,48 @@ export const useSocket = (): UseSocketReturn => {
       setError(null);
     };
 
-    const handleDisconnect = () => {
+    const handleDisconnect = (reason: string) => {
       setIsConnected(false);
+
+      // If disconnected due to authentication error, try to reconnect with fresh token
+      if (reason === "io server disconnect") {
+        const freshToken =
+          typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+        if (freshToken) {
+          // Try to reconnect with fresh token after a delay
+          setTimeout(() => {
+            const newSocket = getSocket(freshToken);
+            if (newSocket && newSocket !== socketInstance) {
+              socketRef.current = newSocket;
+              setSocket(newSocket);
+              setIsConnected(newSocket.connected);
+            }
+          }, 1000);
+        }
+      }
     };
 
     const handleError = (err: Error) => {
       console.error("Socket connection error:", err.message);
       setError(err);
       setIsConnected(false);
+
+      // If token expired, try to reconnect with fresh token
+      if (err.message.includes("expired") || err.message.includes("jwt")) {
+        const freshToken =
+          typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+        if (freshToken && freshToken !== token) {
+          // Token was refreshed, reconnect with new token
+          setTimeout(() => {
+            const newSocket = getSocket(freshToken);
+            if (newSocket && newSocket !== socketInstance) {
+              socketRef.current = newSocket;
+              setSocket(newSocket);
+              setIsConnected(newSocket.connected);
+            }
+          }, 1000);
+        }
+      }
     };
 
     // Remove old listeners before adding new ones
@@ -103,20 +137,49 @@ export const useSocket = (): UseSocketReturn => {
     };
   }, [isAuthenticated, user?.id]);
 
-  // Poll for token changes (token refresh happens in same tab, so storage event won't fire)
+  // Poll for token changes and handle reconnection (token refresh happens in same tab, so storage event won't fire)
   useEffect(() => {
     if (!isAuthenticated || !user) return;
 
     const checkTokenChange = () => {
       const currentToken =
         typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
-      if (currentToken && currentToken !== tokenRef.current) {
+
+      if (!currentToken) {
+        return;
+      }
+
+      // If token changed, reconnect socket
+      if (currentToken !== tokenRef.current) {
+        const oldToken = tokenRef.current;
         tokenRef.current = currentToken;
+
+        // Get new socket with fresh token
         const socketInstance = getSocket(currentToken);
         if (socketInstance && socketInstance !== socketRef.current) {
+          // Update socket reference
           socketRef.current = socketInstance;
           setSocket(socketInstance);
           setIsConnected(socketInstance.connected);
+        }
+      } else if (socketRef.current && !socketRef.current.connected) {
+        // If socket exists but is disconnected, check if token changed
+        // This handles cases where socket disconnected due to expired token
+        const currentSocketToken = socketRef.current.io.opts.query?.token as string | undefined;
+        if (currentSocketToken !== currentToken) {
+          // Token changed, get new socket with fresh token
+          const socketInstance = getSocket(currentToken);
+          if (socketInstance && socketInstance !== socketRef.current) {
+            socketRef.current = socketInstance;
+            setSocket(socketInstance);
+            setIsConnected(socketInstance.connected);
+          }
+        } else {
+          // Same token but disconnected, re-enable reconnection
+          if (socketRef.current.io.opts.reconnection === false) {
+            socketRef.current.io.opts.reconnection = true;
+            socketRef.current.connect();
+          }
         }
       }
     };
