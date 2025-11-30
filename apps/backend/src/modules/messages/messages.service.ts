@@ -154,13 +154,6 @@ export class MessagesService {
       });
 
       if (relations.length === 0) {
-        this.logger.warn(
-          "🔍 [BACKEND] MessagesService.getConversation - No doctor-patient relation found",
-          {
-            userId,
-            userRole,
-          },
-        );
         return [];
       }
 

@@ -38,14 +38,6 @@ export const getSocket = (token: string | null): Socket | null => {
     const cleanSocketUrl = socketUrl.replace(/\/$/, "");
     const socketUrlWithNamespace = `${cleanSocketUrl}/messages`;
 
-    console.log("🔌 [WEB] Creating socket connection", {
-      url: socketUrlWithNamespace,
-      baseUrl: socketUrl,
-      cleanSocketUrl,
-      hasToken: !!token,
-      tokenLength: token?.length || 0,
-    });
-
     socket = io(socketUrlWithNamespace, {
       query: {
         token,
@@ -59,23 +51,8 @@ export const getSocket = (token: string | null): Socket | null => {
       path: "/socket.io/",
     });
 
-    socket.on("connect", () => {
-      console.log("🔌 [WEB] Socket connected", {
-        socketId: socket?.id,
-        url: socketUrlWithNamespace,
-      });
-    });
-
-    socket.on("disconnect", (reason) => {
-      console.log("🔌 [WEB] Socket disconnected", { reason });
-    });
-
     socket.on("connect_error", (error) => {
-      console.error("🔌 [WEB] Socket connection error", {
-        error: error.message,
-        url: socketUrlWithNamespace,
-        token: token ? `${token.substring(0, 20)}...` : "no token",
-      });
+      console.error("Socket connection error:", error.message);
     });
   }
 

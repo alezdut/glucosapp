@@ -17,6 +17,9 @@ export const PatientChat = ({ patientId }: PatientChatProps) => {
   const [messageContent, setMessageContent] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const hasInitialScrolledRef = useRef(false);
+  const previousMessagesLengthRef = useRef(0);
+  const [isListReady, setIsListReady] = useState(false);
 
   // Web app is doctor-only, always treat as doctor interface
   const isDoctor = true;
@@ -34,12 +37,46 @@ export const PatientChat = ({ patientId }: PatientChatProps) => {
   const sendMessageMutation = useSendMessage();
   const markAsReadMutation = useMarkAsRead();
 
-  // Auto-scroll to bottom when new messages arrive
+  // Scroll to bottom on initial load and when new messages arrive
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    if (messages.length === 0) {
+      return;
     }
-  }, [messages]);
+
+    const currentLength = messages.length;
+    const previousLength = previousMessagesLengthRef.current;
+
+    // Initial load: scroll to end without animation and mark as ready
+    if (!hasInitialScrolledRef.current) {
+      hasInitialScrolledRef.current = true;
+      previousMessagesLengthRef.current = currentLength;
+      // Use multiple attempts to ensure scroll happens
+      const scrollToEnd = () => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: "auto" });
+        }
+      };
+      // Try immediately and with delays
+      scrollToEnd();
+      setTimeout(scrollToEnd, 50);
+      setTimeout(() => {
+        scrollToEnd();
+        setIsListReady(true);
+      }, 200);
+      return;
+    }
+
+    // Only auto-scroll if new messages were added (with smooth animation)
+    if (currentLength > previousLength) {
+      setTimeout(() => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+      }, 100);
+    }
+
+    previousMessagesLengthRef.current = currentLength;
+  }, [messages.length]);
 
   // Mark unread messages as read when viewing
   useEffect(() => {
@@ -174,7 +211,18 @@ export const PatientChat = ({ patientId }: PatientChatProps) => {
       </div>
 
       {/* Messages container */}
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto p-4 space-y-4"
+        style={{ opacity: isListReady || messages.length === 0 ? 1 : 0 }}
+        onLoad={() => {
+          // Fallback: scroll to end when content loads
+          if (!isListReady && messages.length > 0 && messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: "auto" });
+            setIsListReady(true);
+          }
+        }}
+      >
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <p className="text-gray-500 mb-2">No hay mensajes aún</p>

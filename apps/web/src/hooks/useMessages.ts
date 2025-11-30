@@ -325,26 +325,14 @@ export const useNewMessageNotifications = (activePatientId?: string) => {
 
     // Listen for new messages
     const handleNewMessage = (newMessage: Message) => {
-      console.log("🔔 [WEB] useNewMessageNotifications - message:new received", {
-        messageId: newMessage.id,
-        senderId: newMessage.senderId,
-        receiverId: newMessage.receiverId,
-        userId: user.id,
-        isForThisUser: newMessage.receiverId === user.id,
-      });
-
       // Only process messages for the current user (doctor)
       if (newMessage.receiverId !== user.id) {
-        console.log("🔔 [WEB] useNewMessageNotifications - Ignoring message (not for this user)");
         return; // Not for this user, ignore
       }
 
       // Only show notification if message is from a patient not in the active conversation
       // If activePatientId is undefined (not in communication page), show all notifications
       if (currentActivePatientId && newMessage.senderId === currentActivePatientId) {
-        console.log(
-          "🔔 [WEB] useNewMessageNotifications - Ignoring message (from active conversation)",
-        );
         return; // Message is from the active conversation, don't show notification
       }
 
@@ -355,25 +343,12 @@ export const useNewMessageNotifications = (activePatientId?: string) => {
           ? `${newMessage.sender.firstName} ${newMessage.sender.lastName}`
           : newMessage.sender.email;
 
-      console.log("🔔 [WEB] useNewMessageNotifications - Adding notification", {
-        patientId,
-        patientName,
-        messageId: newMessage.id,
-      });
-
       // Add notification (avoid duplicates)
       setNotifications((prev) => {
         // Check if notification already exists for this message
         if (prev.some((n) => n.message.id === newMessage.id)) {
-          console.log(
-            "🔔 [WEB] useNewMessageNotifications - Notification already exists, skipping",
-          );
           return prev;
         }
-        console.log("🔔 [WEB] useNewMessageNotifications - Adding new notification", {
-          previousCount: prev.length,
-          newCount: prev.length + 1,
-        });
         return [...prev, { message: newMessage, patientId, patientName }];
       });
     };
@@ -381,19 +356,12 @@ export const useNewMessageNotifications = (activePatientId?: string) => {
     // Register listener function
     const registerListener = () => {
       if (!socket.connected) {
-        console.log("🔔 [WEB] useNewMessageNotifications - Socket not connected, waiting...");
         return;
       }
 
       // Remove any existing listener first to avoid duplicates
       socket.off("message:new", handleNewMessage);
       socket.on("message:new", handleNewMessage);
-
-      console.log("🔔 [WEB] useNewMessageNotifications - Listener registered", {
-        socketId: socket.id,
-        connected: socket.connected,
-        userId: user.id,
-      });
     };
 
     // Register listener immediately if socket is already connected
@@ -403,7 +371,6 @@ export const useNewMessageNotifications = (activePatientId?: string) => {
 
     // Also register when socket connects (in case it's not connected yet)
     const handleConnect = () => {
-      console.log("🔔 [WEB] useNewMessageNotifications - Socket connected, registering listener");
       registerListener();
     };
 

@@ -258,9 +258,9 @@ describe("MessagesService", () => {
   describe("getConversation", () => {
     it("should get conversation for patient with their doctor", async () => {
       (prismaService.user.findUnique as jest.Mock).mockResolvedValue(mockPatient);
-      (prismaService.doctorPatient.findFirst as jest.Mock).mockResolvedValue(
+      (prismaService.doctorPatient.findMany as jest.Mock).mockResolvedValue([
         mockDoctorPatientRelation,
-      );
+      ]);
       (prismaService.message.findMany as jest.Mock).mockResolvedValue([mockMessage]);
 
       const result = await service.getConversation(patientId);
@@ -271,15 +271,16 @@ describe("MessagesService", () => {
         senderId: patientId,
         receiverId: doctorId,
       });
-      expect(prismaService.doctorPatient.findFirst).toHaveBeenCalledWith({
+      expect(prismaService.doctorPatient.findMany).toHaveBeenCalledWith({
         where: { patientId },
         orderBy: { createdAt: "desc" },
+        select: { doctorId: true },
       });
     });
 
     it("should return empty array if patient has no doctor", async () => {
       (prismaService.user.findUnique as jest.Mock).mockResolvedValue(mockPatient);
-      (prismaService.doctorPatient.findFirst as jest.Mock).mockResolvedValue(null);
+      (prismaService.doctorPatient.findMany as jest.Mock).mockResolvedValue([]);
 
       const result = await service.getConversation(patientId);
 
@@ -300,8 +301,8 @@ describe("MessagesService", () => {
         expect.objectContaining({
           where: {
             OR: [
-              { senderId: doctorId, receiverId: patientId },
-              { senderId: patientId, receiverId: doctorId },
+              { AND: [{ senderId: doctorId }, { receiverId: patientId }] },
+              { AND: [{ senderId: patientId }, { receiverId: doctorId }] },
             ],
           },
         }),

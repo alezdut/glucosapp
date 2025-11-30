@@ -35,11 +35,6 @@ export const getSocket = (token: string | null): Socket | null => {
   // Create new socket connection only if one doesn't exist
   if (!socket) {
     const socketUrlWithNamespace = `${socketUrl}/messages`;
-    console.log("🔌 [MOBILE] Creating socket connection", {
-      url: socketUrlWithNamespace,
-      hasToken: !!token,
-      tokenLength: token?.length || 0,
-    });
 
     socket = io(socketUrlWithNamespace, {
       query: {
@@ -52,23 +47,8 @@ export const getSocket = (token: string | null): Socket | null => {
       reconnectionAttempts: 5,
     });
 
-    socket.on("connect", () => {
-      console.log("🔌 [MOBILE] Socket connected", {
-        socketId: socket?.id,
-        url: socketUrlWithNamespace,
-      });
-    });
-
-    socket.on("disconnect", (reason) => {
-      console.log("🔌 [MOBILE] Socket disconnected", { reason });
-    });
-
     socket.on("connect_error", (error) => {
-      console.error("🔌 [MOBILE] Socket connection error", {
-        error: error.message,
-        url: socketUrlWithNamespace,
-        token: token ? `${token.substring(0, 20)}...` : "no token",
-      });
+      console.error("Socket connection error:", error.message);
     });
   }
 
@@ -81,7 +61,6 @@ export const getSocket = (token: string | null): Socket | null => {
  */
 export const disconnectSocket = () => {
   if (socket) {
-    console.log("🔌 [MOBILE] Disconnecting socket intentionally");
     socket.removeAllListeners();
     socket.disconnect();
     socket = null;

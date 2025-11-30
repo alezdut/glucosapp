@@ -61,18 +61,15 @@ export const useSocket = (): UseSocketReturn => {
 
         // Set up event listeners (only once per socket instance)
         const handleConnect = () => {
-          console.log("🔌 [MOBILE] useSocket - Connected", { socketId: socketInstance.id });
           setIsConnected(true);
           setError(null);
         };
 
-        const handleDisconnect = (reason: string) => {
-          console.log("🔌 [MOBILE] useSocket - Disconnected", { reason });
+        const handleDisconnect = () => {
           setIsConnected(false);
         };
 
         const handleError = (err: Error) => {
-          console.error("🔌 [MOBILE] useSocket - Connection error", { error: err.message });
           setError(err);
           setIsConnected(false);
         };
