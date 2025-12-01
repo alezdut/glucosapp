@@ -142,10 +142,10 @@ export class ProfileService {
   }
 
   /**
-   * Get assigned doctor for patient (if any)
+   * Get assigned doctor for patient (1:1 relationship)
    */
   async getAssignedDoctor(userId: string): Promise<AssignedDoctorResponseDto | null> {
-    const relation = await this.prisma.doctorPatient.findFirst({
+    const relation = await this.prisma.doctorPatient.findUnique({
       where: { patientId: userId },
       include: {
         doctor: {
@@ -157,9 +157,6 @@ export class ProfileService {
             avatarUrl: true,
           },
         },
-      },
-      orderBy: {
-        createdAt: "desc",
       },
     });
 

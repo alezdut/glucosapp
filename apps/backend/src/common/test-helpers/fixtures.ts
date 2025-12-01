@@ -5,6 +5,26 @@ import { UserResponseDto } from "../../modules/auth/dto/auth-response.dto";
  * Test fixtures for creating mock data
  */
 
+export interface MessageMockUser {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  avatarUrl: string | null;
+}
+
+export interface MessageMock {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  content: string;
+  read: boolean;
+  readAt: Date | null;
+  createdAt: Date;
+  sender: MessageMockUser;
+  receiver: MessageMockUser;
+}
+
 export const createMockUser = (overrides?: Partial<any>): any => {
   return {
     id: "user-123",
@@ -72,7 +92,7 @@ export const createMockAccount = (overrides?: Partial<any>): any => {
   };
 };
 
-export const createMockMessage = (overrides?: Partial<any>): any => {
+export const createMockMessage = (overrides?: Partial<MessageMock>): MessageMock => {
   return {
     id: "message-123",
     senderId: "user-123",

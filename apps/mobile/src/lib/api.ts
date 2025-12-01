@@ -306,6 +306,10 @@ export function createApiClient() {
  * Get doctor assigned to the current patient
  */
 export interface AssignedDoctor {
+  id: string;
+  doctorId: string;
+  patientId: string;
+  createdAt: string;
   doctor: {
     id: string;
     email: string;
@@ -324,4 +328,27 @@ export async function getAssignedDoctor(): Promise<AssignedDoctor | null> {
   }
 
   return response.data ?? null;
+}
+
+/**
+ * Mark multiple messages as read (batch operation)
+ */
+export async function markMessagesAsReadBatch(
+  messageIds: string[],
+): Promise<{ count: number; messageIds: string[] }> {
+  const client = createApiClient();
+  const response = await client.POST<{ count: number; messageIds: string[] }>(
+    "/messages/mark-read-batch",
+    { messageIds },
+  );
+
+  if (response.error) {
+    throw new Error(response.error.message || "Failed to mark messages as read");
+  }
+
+  if (!response.data) {
+    throw new Error("No data returned from mark-read-batch endpoint");
+  }
+
+  return response.data;
 }

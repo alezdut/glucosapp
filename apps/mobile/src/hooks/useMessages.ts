@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useSocket } from "./useSocket";
 import { useAuth } from "../contexts/AuthContext";
-import { getAssignedDoctor } from "../lib/api";
+import { getAssignedDoctor, markMessagesAsReadBatch } from "../lib/api";
 import type { Message, Conversation } from "../lib/messages-api";
 
 /**
@@ -189,6 +189,27 @@ export const useMarkAsRead = () => {
           },
         );
       });
+    },
+    onSuccess: () => {
+      // Invalidate queries to update read status
+      queryClient.invalidateQueries({ queryKey: ["messages", "conversation"] });
+      queryClient.invalidateQueries({ queryKey: ["messages", "conversations"] });
+    },
+  });
+};
+
+/**
+ * Hook to mark multiple messages as read (batch operation)
+ */
+export const useMarkAsReadBatch = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (messageIds: string[]): Promise<{ count: number; messageIds: string[] }> => {
+      if (messageIds.length === 0) {
+        return { count: 0, messageIds: [] };
+      }
+      return markMessagesAsReadBatch(messageIds);
     },
     onSuccess: () => {
       // Invalidate queries to update read status

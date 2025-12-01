@@ -10,6 +10,7 @@ import { MessageNotificationCard } from "@/components/dashboard/MessageNotificat
 import { useConversations, useNewMessageNotifications } from "@/hooks/useMessages";
 import { useAuth } from "@/contexts/auth-context";
 import { Loader2, MessageSquare } from "lucide-react";
+import Image from "next/image";
 
 /**
  * Communication page - Shows conversations for doctors or chat with doctor for patients
@@ -115,6 +116,12 @@ export default function CommunicationPage() {
                             : conversation.participant.email;
 
                         const hasMessages = conversation.lastMessageAt !== undefined;
+                        const initials = participantName
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .toUpperCase()
+                          .slice(0, 2);
 
                         return (
                           <button
@@ -126,26 +133,58 @@ export default function CommunicationPage() {
                                 : ""
                             }`}
                           >
-                            <div className="flex items-center justify-between mb-1">
-                              <p className="font-medium text-gray-900">{participantName}</p>
-                              {conversation.unreadCount > 0 && (
-                                <span className="bg-red-500 text-white text-xs font-semibold rounded-full px-2 py-1 min-w-[20px] text-center">
-                                  {conversation.unreadCount > 9 ? "9+" : conversation.unreadCount}
-                                </span>
-                              )}
+                            <div className="flex items-center gap-3">
+                              {/* Patient Avatar */}
+                              <div className="flex-shrink-0">
+                                {conversation.participant.avatarUrl ? (
+                                  <Image
+                                    src={conversation.participant.avatarUrl}
+                                    alt={participantName}
+                                    width={40}
+                                    height={40}
+                                    className="w-10 h-10 rounded-full object-cover"
+                                    loading="lazy"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                                    <span className="text-sm font-semibold text-gray-600">
+                                      {initials}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Patient Info */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-1">
+                                  <p className="font-medium text-gray-900 truncate">
+                                    {participantName}
+                                  </p>
+                                  {conversation.unreadCount > 0 && (
+                                    <span className="bg-red-500 text-white text-xs font-semibold rounded-full px-2 py-1 min-w-[20px] text-center ml-2 flex-shrink-0">
+                                      {conversation.unreadCount > 9
+                                        ? "9+"
+                                        : conversation.unreadCount}
+                                    </span>
+                                  )}
+                                </div>
+                                {hasMessages ? (
+                                  <p className="text-xs text-gray-500">
+                                    {new Date(conversation.lastMessageAt!).toLocaleDateString(
+                                      "es-ES",
+                                      {
+                                        day: "numeric",
+                                        month: "short",
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      },
+                                    )}
+                                  </p>
+                                ) : (
+                                  <p className="text-xs text-gray-400 italic">Sin mensajes aún</p>
+                                )}
+                              </div>
                             </div>
-                            {hasMessages ? (
-                              <p className="text-xs text-gray-500">
-                                {new Date(conversation.lastMessageAt!).toLocaleDateString("es-ES", {
-                                  day: "numeric",
-                                  month: "short",
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })}
-                              </p>
-                            ) : (
-                              <p className="text-xs text-gray-400 italic">Sin mensajes aún</p>
-                            )}
                           </button>
                         );
                       })

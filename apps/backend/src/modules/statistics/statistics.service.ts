@@ -55,7 +55,6 @@ export class StatisticsService {
           try {
             return this.encryptionService.decryptGlucoseValue(entry.mgdlEncrypted);
           } catch (error) {
-            console.error("[Statistics] Failed to decrypt glucose entry:", error);
             return null;
           }
         })
@@ -66,7 +65,6 @@ export class StatisticsService {
           try {
             return this.encryptionService.decryptGlucoseValue(reading.glucoseEncrypted);
           } catch (error) {
-            console.error("[Statistics] Failed to decrypt sensor reading:", error);
             return null;
           }
         })
@@ -155,7 +153,6 @@ export class StatisticsService {
           try {
             return this.encryptionService.decryptGlucoseValue(entry.mgdlEncrypted);
           } catch (error) {
-            console.error("[Statistics] Failed to decrypt glucose entry:", error);
             return null;
           }
         })
@@ -165,7 +162,6 @@ export class StatisticsService {
           try {
             return this.encryptionService.decryptGlucoseValue(reading.glucoseEncrypted);
           } catch (error) {
-            console.error("[Statistics] Failed to decrypt sensor reading:", error);
             return null;
           }
         })
@@ -259,7 +255,6 @@ export class StatisticsService {
               date: new Date(entry.recordedAt),
             };
           } catch (error) {
-            console.error("[Statistics] Failed to decrypt glucose entry:", error);
             return null;
           }
         })
@@ -273,7 +268,6 @@ export class StatisticsService {
               date: new Date(reading.recordedAt),
             };
           } catch (error) {
-            console.error("[Statistics] Failed to decrypt sensor reading:", error);
             return null;
           }
         })

@@ -74,9 +74,6 @@ export class SensorReadingsService {
       if (!reading.id) {
         console.error("[SensorReadings] Reading ID is not available after creation");
       } else {
-        console.log(
-          `[SensorReadings] Calling detectAlert with reading.id: ${reading.id}, glucose: ${data.glucose}`,
-        );
         this.alertsService.detectAlert(userId, data.glucose, reading.id).catch((error) => {
           console.error("[SensorReadings] Failed to detect alert:", error);
         });
@@ -217,9 +214,6 @@ export class SensorReadingsService {
 
     // Detect alerts for non-historical readings after transaction completes
     for (const { readingId, glucoseValue } of result.readingsForAlertDetection) {
-      console.log(
-        `[SensorReadings] Calling detectAlert (batch) with readingId: ${readingId}, glucose: ${glucoseValue}`,
-      );
       this.alertsService.detectAlert(userId, glucoseValue, readingId).catch((error) => {
         console.error("[SensorReadings] Failed to detect alert:", error);
       });
@@ -292,7 +286,6 @@ export class SensorReadingsService {
             createdAt: reading.createdAt.toISOString(),
           };
         } catch (error) {
-          console.error("[SensorReadings] Failed to decrypt reading:", reading.id, error);
           return null;
         }
       })

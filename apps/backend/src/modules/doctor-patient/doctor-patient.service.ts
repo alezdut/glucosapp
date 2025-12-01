@@ -474,7 +474,7 @@ export class DoctorPatientService {
 
   /**
    * Search for patients globally (all patients, not just assigned)
-   * Returns only patients not yet assigned to the doctor
+   * Returns only patients without any assignment (1:1 relationship enforced)
    */
   async searchGlobalPatients(
     doctorId: string,
@@ -482,15 +482,18 @@ export class DoctorPatientService {
   ): Promise<PatientListItemDto[]> {
     await this.doctorUtils.verifyDoctor(doctorId);
 
-    // Get assigned patient IDs to exclude them
-    const assignedPatientIds = await this.doctorUtils.getDoctorPatientIds(doctorId);
+    // Get all assigned patient IDs (from any doctor) to exclude them
+    const allAssignedPatients = await this.prisma.doctorPatient.findMany({
+      select: { patientId: true },
+    });
+    const assignedPatientIds = allAssignedPatients.map((r) => r.patientId);
 
     // Build search query
     const searchTerm = searchDto.q.trim();
 
     const where: Prisma.UserWhereInput = {
       role: UserRole.PATIENT,
-      // Exclude already assigned patients
+      // Exclude all patients already assigned to any doctor
       ...(assignedPatientIds.length > 0 && { id: { notIn: assignedPatientIds } }),
       OR: [
         { firstName: { contains: searchTerm, mode: "insensitive" } },
@@ -579,7 +582,6 @@ export class DoctorPatientService {
         try {
           return this.encryptionService.decryptGlucoseValue(entry.mgdlEncrypted);
         } catch (error) {
-          console.error(`Failed to decrypt glucose entry for patient ${patientId}:`, error);
           return null;
         }
       })
@@ -591,7 +593,6 @@ export class DoctorPatientService {
         try {
           return this.encryptionService.decryptGlucoseValue(reading.glucoseEncrypted);
         } catch (error) {
-          console.error(`Failed to decrypt glucose reading for patient ${patientId}:`, error);
           return null;
         }
       })
@@ -699,6 +700,7 @@ export class DoctorPatientService {
 
   /**
    * Assign a patient to a doctor
+   * Enforces 1:1 relationship - a patient can only be assigned to one doctor
    */
   async assignPatient(
     doctorId: string,
@@ -720,18 +722,19 @@ export class DoctorPatientService {
       throw new ConflictException("User is not a patient");
     }
 
-    // Check if relationship already exists
-    const existing = await this.prisma.doctorPatient.findUnique({
+    // Check if patient is already assigned to any doctor (1:1 relationship)
+    const existingAssignment = await this.prisma.doctorPatient.findUnique({
       where: {
-        doctorId_patientId: {
-          doctorId,
-          patientId: createDto.patientId,
-        },
+        patientId: createDto.patientId,
       },
     });
 
-    if (existing) {
-      throw new ConflictException("Patient is already assigned to this doctor");
+    if (existingAssignment) {
+      if (existingAssignment.doctorId === doctorId) {
+        throw new ConflictException("Patient is already assigned to this doctor");
+      } else {
+        throw new ConflictException("Patient is already assigned to another doctor");
+      }
     }
 
     const relation = await this.prisma.doctorPatient.create({
@@ -1147,7 +1150,7 @@ export class DoctorPatientService {
   }
 
   /**
-   * Get the doctor assigned to a patient
+   * Get the doctor assigned to a patient (1:1 relationship)
    * @param patientId - Patient ID
    * @returns Doctor information or null if no doctor assigned
    */
@@ -1164,7 +1167,7 @@ export class DoctorPatientService {
       avatarUrl?: string;
     };
   } | null> {
-    const relation = await this.prisma.doctorPatient.findFirst({
+    const relation = await this.prisma.doctorPatient.findUnique({
       where: { patientId },
       include: {
         doctor: {
@@ -1176,9 +1179,6 @@ export class DoctorPatientService {
             avatarUrl: true,
           },
         },
-      },
-      orderBy: {
-        createdAt: "desc",
       },
     });
 

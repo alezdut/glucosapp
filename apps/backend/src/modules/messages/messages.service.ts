@@ -136,7 +136,7 @@ export class MessagesService {
 
   /**
    * Get conversation between current user and another user
-   * For patients: returns conversation with their doctor
+   * For patients: returns conversation with their assigned doctor (1:1 relationship)
    * For doctors: returns conversation with a specific patient
    */
   async getConversation(userId: string, otherUserId?: string): Promise<MessageResponseDto[]> {
@@ -145,63 +145,18 @@ export class MessagesService {
     let targetUserId: string;
 
     if (userRole === UserRole.PATIENT) {
-      // Patients can see conversation with any doctor they have a relationship with
-      // Get all doctor-patient relationships for this patient
-      const relations = await this.prisma.doctorPatient.findMany({
+      // Patients have a 1:1 relationship with their doctor
+      // Get the assigned doctor for this patient
+      const relation = await this.prisma.doctorPatient.findUnique({
         where: { patientId: userId },
-        orderBy: { createdAt: "desc" },
         select: { doctorId: true },
       });
 
-      if (relations.length === 0) {
+      if (!relation) {
         return [];
       }
 
-      // For patients, we need to get messages with ALL their assigned doctors
-      // We'll handle this differently - get all messages where patient is involved
-      // and the other user is one of their assigned doctors
-      const doctorIds = relations.map((r) => r.doctorId);
-
-      // Get all messages where patient is sender or receiver, and the other user is one of their doctors
-      const messages = await this.prisma.message.findMany({
-        where: {
-          OR: [
-            // Messages where patient is sender and receiver is one of their doctors
-            {
-              AND: [{ senderId: userId }, { receiverId: { in: doctorIds } }],
-            },
-            // Messages where patient is receiver and sender is one of their doctors
-            {
-              AND: [{ receiverId: userId }, { senderId: { in: doctorIds } }],
-            },
-          ],
-        },
-        include: {
-          sender: {
-            select: {
-              id: true,
-              email: true,
-              firstName: true,
-              lastName: true,
-              avatarUrl: true,
-            },
-          },
-          receiver: {
-            select: {
-              id: true,
-              email: true,
-              firstName: true,
-              lastName: true,
-              avatarUrl: true,
-            },
-          },
-        },
-        orderBy: {
-          createdAt: "asc",
-        },
-      });
-
-      return messages.map((msg) => this.mapMessageToDto(msg));
+      targetUserId = relation.doctorId;
     } else {
       // Doctors need to specify which patient
       if (!otherUserId) {
@@ -293,70 +248,106 @@ export class MessagesService {
       },
     });
 
-    // For each patient, get the conversation and unread count
-    const conversations = await Promise.all(
-      relations.map(async (relation) => {
-        const patientId = relation.patientId;
+    // Get all patient IDs for batch operations
+    const patientIds = relations.map((relation) => relation.patientId);
 
-        // Get all messages with this patient
-        const messages = await this.prisma.message.findMany({
-          where: {
-            OR: [
-              { senderId: userId, receiverId: patientId },
-              { senderId: patientId, receiverId: userId },
-            ],
-          },
-          include: {
-            sender: {
-              select: {
-                id: true,
-                email: true,
-                firstName: true,
-                lastName: true,
-                avatarUrl: true,
-              },
-            },
-            receiver: {
-              select: {
-                id: true,
-                email: true,
-                firstName: true,
-                lastName: true,
-                avatarUrl: true,
-              },
-            },
-          },
-          orderBy: {
-            createdAt: "asc",
-          },
-        });
+    // Batch query for unread counts - group by senderId (patientId) and count unread messages
+    const unreadCounts = await this.prisma.message.groupBy({
+      by: ["senderId"],
+      where: {
+        senderId: { in: patientIds },
+        receiverId: userId,
+        read: false,
+      },
+      _count: {
+        id: true,
+      },
+    });
 
-        // Count unread messages (messages sent by patient to doctor that are not read)
-        const unreadCount = await this.prisma.message.count({
-          where: {
-            senderId: patientId,
-            receiverId: userId,
-            read: false,
-          },
-        });
+    // Create a lookup map for unread counts
+    const unreadCountMap = new Map<string, number>();
+    unreadCounts.forEach((count) => {
+      unreadCountMap.set(count.senderId, count._count.id);
+    });
 
-        // Get last message timestamp
-        const lastMessage = messages[messages.length - 1];
-
-        return {
-          participant: {
-            id: relation.patient.id,
-            email: relation.patient.email,
-            firstName: relation.patient.firstName ?? undefined,
-            lastName: relation.patient.lastName ?? undefined,
-            avatarUrl: relation.patient.avatarUrl ?? undefined,
+    // Batch query for all messages in all conversations
+    const allMessages = await this.prisma.message.findMany({
+      where: {
+        OR: [
+          { senderId: userId, receiverId: { in: patientIds } },
+          { senderId: { in: patientIds }, receiverId: userId },
+        ],
+      },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
           },
-          messages: messages.map((msg) => this.mapMessageToDto(msg)),
-          unreadCount,
-          lastMessageAt: lastMessage ? lastMessage.createdAt.toISOString() : undefined,
-        };
-      }),
-    );
+        },
+        receiver: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc", // Most recent first for easier latest message extraction
+      },
+    });
+
+    // Create lookup maps for latest messages per conversation
+    const latestMessageMap = new Map<string, (typeof allMessages)[0]>();
+    const allMessagesMap = new Map<string, (typeof allMessages)[0][]>();
+
+    allMessages.forEach((message) => {
+      // Determine the patient ID for this conversation
+      const patientId = message.senderId === userId ? message.receiverId : message.senderId;
+      const conversationKey = `${userId}-${patientId}`;
+
+      // Collect all messages for this conversation
+      if (!allMessagesMap.has(conversationKey)) {
+        allMessagesMap.set(conversationKey, []);
+      }
+      allMessagesMap.get(conversationKey)!.push(message);
+
+      // Track the latest message (first in descending order)
+      if (!latestMessageMap.has(conversationKey)) {
+        latestMessageMap.set(conversationKey, message);
+      }
+    });
+
+    // Build conversations using in-memory operations
+    const conversations = relations.map((relation) => {
+      const patientId = relation.patientId;
+      const conversationKey = `${userId}-${patientId}`;
+
+      const messages = allMessagesMap.get(conversationKey) || [];
+      const latestMessage = latestMessageMap.get(conversationKey);
+      const unreadCount = unreadCountMap.get(patientId) || 0;
+
+      return {
+        participant: {
+          id: relation.patient.id,
+          email: relation.patient.email,
+          firstName: relation.patient.firstName ?? undefined,
+          lastName: relation.patient.lastName ?? undefined,
+          avatarUrl: relation.patient.avatarUrl ?? undefined,
+        },
+        messages: messages
+          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()) // Sort ascending for display
+          .map((msg) => this.mapMessageToDto(msg)),
+        unreadCount,
+        lastMessageAt: latestMessage ? latestMessage.createdAt.toISOString() : undefined,
+      };
+    });
 
     // Sort by last message time (most recent first)
     return conversations.sort((a, b) => {
@@ -434,6 +425,52 @@ export class MessagesService {
     });
 
     return this.mapMessageToDto(updatedMessage);
+  }
+
+  /**
+   * Mark multiple messages as read (batch operation)
+   */
+  async markAsReadBatch(
+    userId: string,
+    messageIds: string[],
+  ): Promise<{ count: number; messageIds: string[] }> {
+    if (messageIds.length === 0) {
+      return { count: 0, messageIds: [] };
+    }
+
+    // Verify all messages belong to the user and are unread
+    const messages = await this.prisma.message.findMany({
+      where: {
+        id: { in: messageIds },
+        receiverId: userId,
+        read: false,
+      },
+      select: { id: true },
+    });
+
+    if (messages.length === 0) {
+      return { count: 0, messageIds: [] };
+    }
+
+    const validMessageIds = messages.map((m) => m.id);
+
+    // Update all messages in a single transaction
+    await this.prisma.message.updateMany({
+      where: {
+        id: { in: validMessageIds },
+        receiverId: userId,
+        read: false,
+      },
+      data: {
+        read: true,
+        readAt: new Date(),
+      },
+    });
+
+    return {
+      count: validMessageIds.length,
+      messageIds: validMessageIds,
+    };
   }
 
   /**

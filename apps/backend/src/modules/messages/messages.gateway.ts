@@ -302,14 +302,13 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         }
         room = getConversationRoom(user.id, dto.patientId);
       } else {
-        // For patients, get their assigned doctor(s) from doctor-patient relationship
-        const relations = await this.prisma.doctorPatient.findMany({
+        // For patients, get their assigned doctor (1:1 relationship)
+        const relation = await this.prisma.doctorPatient.findUnique({
           where: { patientId: user.id },
-          orderBy: { createdAt: "desc" },
           select: { doctorId: true },
         });
 
-        if (relations.length === 0) {
+        if (!relation) {
           client.emit("error", {
             message: "No assigned doctor found",
             code: "NO_DOCTOR_ASSIGNED",
@@ -317,9 +316,8 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
           return { success: false, error: "No assigned doctor found" };
         }
 
-        // Join room with first doctor (most recent)
-        const doctorId = relations[0].doctorId;
-        room = getConversationRoom(doctorId, user.id);
+        // Join room with assigned doctor
+        room = getConversationRoom(relation.doctorId, user.id);
       }
 
       await client.join(room);
@@ -371,19 +369,17 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         }
         room = getConversationRoom(user.id, dto.patientId);
       } else {
-        // For patients, get their assigned doctor from doctor-patient relationship
-        const relations = await this.prisma.doctorPatient.findMany({
+        // For patients, get their assigned doctor (1:1 relationship)
+        const relation = await this.prisma.doctorPatient.findUnique({
           where: { patientId: user.id },
-          orderBy: { createdAt: "desc" },
           select: { doctorId: true },
         });
 
-        if (relations.length === 0) {
+        if (!relation) {
           return { success: false, error: "No assigned doctor found" };
         }
 
-        const doctorId = relations[0].doctorId;
-        room = getConversationRoom(doctorId, user.id);
+        room = getConversationRoom(relation.doctorId, user.id);
       }
 
       await client.leave(room);

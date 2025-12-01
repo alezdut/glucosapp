@@ -21,7 +21,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   useConversationWithDoctor,
   useSendMessage,
-  useMarkAsRead,
+  useMarkAsReadBatch,
   useAssignedDoctor,
 } from "../hooks/useMessages";
 import { formatTimeAgo } from "@glucosapp/utils";
@@ -32,6 +32,56 @@ type CommunicationScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
   "Communication"
 >;
+
+interface MessageItemProps {
+  message: Message;
+  user: { id: string } | null;
+  getMessageSenderName: (message: Message) => string;
+}
+
+const MessageItem = React.memo(({ message, user, getMessageSenderName }: MessageItemProps) => {
+  const isOwnMessage = message.senderId === user?.id;
+  const senderName = getMessageSenderName(message);
+
+  return (
+    <View
+      style={[
+        styles.messageContainer,
+        isOwnMessage ? styles.messageContainerOwn : styles.messageContainerOther,
+      ]}
+    >
+      {!isOwnMessage && <Text style={styles.senderName}>{senderName}</Text>}
+      <View
+        style={[
+          styles.messageBubble,
+          isOwnMessage ? styles.messageBubbleOwn : styles.messageBubbleOther,
+        ]}
+      >
+        <Text
+          style={[
+            styles.messageText,
+            isOwnMessage ? styles.messageTextOwn : styles.messageTextOther,
+          ]}
+        >
+          {message.content}
+        </Text>
+        <View style={styles.messageFooter}>
+          <Text
+            style={[
+              styles.messageTime,
+              isOwnMessage ? styles.messageTimeOwn : styles.messageTimeOther,
+            ]}
+          >
+            {formatTimeAgo(message.createdAt)}
+          </Text>
+          {isOwnMessage && message.read && <Text style={styles.readIndicator}>✓ Leído</Text>}
+        </View>
+      </View>
+    </View>
+  );
+});
+
+MessageItem.displayName = "MessageItem";
 
 export default function CommunicationScreen() {
   const insets = useSafeAreaInsets();
@@ -44,8 +94,14 @@ export default function CommunicationScreen() {
   const { data: messages = [], isLoading } = useConversationWithDoctor();
   const { data: assignedDoctor } = useAssignedDoctor();
   const sendMessageMutation = useSendMessage();
-  const markAsReadMutation = useMarkAsRead();
+  const markAsReadBatchMutation = useMarkAsReadBatch();
+  const markAsReadBatchMutationRef = useRef(markAsReadBatchMutation);
   const queryClient = useQueryClient();
+
+  // Keep ref in sync with mutation
+  useEffect(() => {
+    markAsReadBatchMutationRef.current = markAsReadBatchMutation;
+  }, [markAsReadBatchMutation]);
 
   // Always navigate back to "Médico" tab
   const handleBack = () => {
@@ -69,6 +125,7 @@ export default function CommunicationScreen() {
   }, []);
 
   // Mark unread messages as read when screen is focused (user is viewing)
+  // Using ref to avoid re-executions when mutation object changes
   useFocusEffect(
     React.useCallback(() => {
       if (!messages.length || !user) {
@@ -77,11 +134,12 @@ export default function CommunicationScreen() {
 
       const unreadMessages = messages.filter((msg) => !msg.read && msg.receiverId === user.id);
 
-      // Mark all unread messages as read when user is viewing the screen
-      unreadMessages.forEach((msg) => {
-        markAsReadMutation.mutate(msg.id);
-      });
-    }, [messages, user, markAsReadMutation]),
+      // Mark all unread messages as read in a single batch operation
+      if (unreadMessages.length > 0) {
+        const messageIds = unreadMessages.map((msg) => msg.id);
+        markAsReadBatchMutationRef.current.mutate(messageIds);
+      }
+    }, [messages, user]),
   );
 
   const handleSendMessage = async () => {
@@ -132,51 +190,11 @@ export default function CommunicationScreen() {
     return message.sender.email;
   };
 
-  const MessageItem = React.memo(({ message }: { message: Message }) => {
-    const isOwnMessage = message.senderId === user?.id;
-    const senderName = getMessageSenderName(message);
-
-    return (
-      <View
-        style={[
-          styles.messageContainer,
-          isOwnMessage ? styles.messageContainerOwn : styles.messageContainerOther,
-        ]}
-      >
-        {!isOwnMessage && <Text style={styles.senderName}>{senderName}</Text>}
-        <View
-          style={[
-            styles.messageBubble,
-            isOwnMessage ? styles.messageBubbleOwn : styles.messageBubbleOther,
-          ]}
-        >
-          <Text
-            style={[
-              styles.messageText,
-              isOwnMessage ? styles.messageTextOwn : styles.messageTextOther,
-            ]}
-          >
-            {message.content}
-          </Text>
-          <View style={styles.messageFooter}>
-            <Text
-              style={[
-                styles.messageTime,
-                isOwnMessage ? styles.messageTimeOwn : styles.messageTimeOther,
-              ]}
-            >
-              {formatTimeAgo(message.createdAt)}
-            </Text>
-            {isOwnMessage && message.read && <Text style={styles.readIndicator}>✓ Leído</Text>}
-          </View>
-        </View>
-      </View>
-    );
-  });
-
   const renderMessage = ({ item: message }: { item: Message }) => {
     if (!user) return null;
-    return <MessageItem message={message} />;
+    return (
+      <MessageItem message={message} user={user} getMessageSenderName={getMessageSenderName} />
+    );
   };
 
   if (isLoading && messages.length === 0) {

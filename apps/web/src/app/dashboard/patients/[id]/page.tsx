@@ -5,7 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ProtectedRoute } from "@/components/protected-route";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { Header } from "@/components/dashboard/Header";
-import { usePatientDetails } from "@/hooks/usePatients";
+import { usePatientDetails, useRemovePatient } from "@/hooks/usePatients";
 import {
   usePatientGlucoseEvolution,
   usePatientInsulinStats,
@@ -19,7 +19,7 @@ import { PatientLogs } from "@/components/dashboard/PatientLogs";
 import { PatientParameters } from "@/components/dashboard/PatientParameters";
 import { PatientChat } from "@/components/dashboard/PatientChat";
 import { PatientAvatar } from "@/components/dashboard/PatientAvatar";
-import { Loader2, User, MessageSquare } from "lucide-react";
+import { Loader2, User, MessageSquare, Trash2, AlertTriangle } from "lucide-react";
 import { calculateAge, formatTimeAgo, getDiabetesTypeLabel } from "@glucosapp/utils";
 import { getStatusColor } from "@/utils/patient-utils";
 import { DiabetesType } from "@glucosapp/types";
@@ -66,6 +66,8 @@ export default function PatientDetailsPage() {
     error: errorInsulin,
   } = usePatientInsulinStats(patientId, 12);
   const { data: profile } = usePatientProfile(patientId);
+  const removePatientMutation = useRemovePatient();
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   // Extract chart data
   // glucoseEvolution is the result of useQuery, which has {data?: PatientGlucoseEvolution, ...}
@@ -204,9 +206,13 @@ export default function PatientDetailsPage() {
 
               {/* Action Buttons */}
               <div className="flex flex-col gap-3">
-                <button className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors font-medium flex items-center gap-2">
-                  <User className="w-4 h-4" />
-                  Editar Perfil
+                <button
+                  onClick={() => setShowConfirmDialog(true)}
+                  disabled={removePatientMutation.isPending}
+                  className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  {removePatientMutation.isPending ? "Desvinculando..." : "Desvincular"}
                 </button>
                 <button
                   onClick={() => router.push(`/dashboard/communication?patientId=${patientId}`)}
@@ -272,6 +278,63 @@ export default function PatientDetailsPage() {
 
           {activeTab === "parameters" && profile && (
             <PatientParameters profile={profile} patientId={patientId} />
+          )}
+
+          {/* Confirm Remove Dialog */}
+          {showConfirmDialog && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Desvincular Paciente</h3>
+                    <p className="text-sm text-gray-500">Esta acción no se puede deshacer</p>
+                  </div>
+                </div>
+                <p className="text-gray-700 mb-6">
+                  ¿Estás seguro de que deseas desvincular a <strong>{patientName}</strong>? Los
+                  datos del paciente permanecerán intactos, pero ya no podrás acceder a su
+                  información. El paciente podrá ser asignado a otro médico.
+                </p>
+                <div className="flex gap-3 justify-end">
+                  <button
+                    onClick={() => setShowConfirmDialog(false)}
+                    disabled={removePatientMutation.isPending}
+                    className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await removePatientMutation.mutateAsync(patientId);
+                        setShowConfirmDialog(false);
+                        router.push("/dashboard/patients");
+                      } catch (error) {
+                        console.error("Failed to remove patient:", error);
+                        // Error will be handled by the mutation
+                      }
+                    }}
+                    disabled={removePatientMutation.isPending}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {removePatientMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Desvinculando...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-4 h-4" />
+                        Desvincular
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </main>
       </div>

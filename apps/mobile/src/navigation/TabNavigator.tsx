@@ -1,6 +1,6 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, type TabPressEvent } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Home, BookOpen, PlusCircle, Stethoscope, User } from "lucide-react-native";
 
@@ -21,7 +21,7 @@ export default function TabNavigator() {
   const rootNavigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { data: unreadCount = 0 } = useUnreadMessagesFromDoctor();
 
-  const handleDoctorTabPress = (e: any) => {
+  const handleDoctorTabPress = (e: TabPressEvent) => {
     // If there are unread messages, navigate to Communication screen
     if (unreadCount > 0) {
       e.preventDefault();
