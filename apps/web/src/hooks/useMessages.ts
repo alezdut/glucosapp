@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/auth-context";
 import { useSocket } from "./useSocket";
 import type { Message, Conversation } from "@/lib/messages-api";
@@ -202,7 +202,6 @@ export const useConversations = () => {
  * Hook to send a message
  */
 export const useSendMessage = () => {
-  const queryClient = useQueryClient();
   const { socket, isConnected } = useSocket();
 
   return useMutation({
@@ -231,11 +230,8 @@ export const useSendMessage = () => {
         );
       });
     },
-    onSuccess: () => {
-      // Invalidate queries to update UI
-      queryClient.invalidateQueries({ queryKey: ["messages", "conversation"] });
-      queryClient.invalidateQueries({ queryKey: ["messages", "conversations"] });
-    },
+    // UI updates automatically via socket listeners (useConversation/useConversations)
+    // No need to invalidate queries as these hooks use useState, not React Query
   });
 };
 
@@ -243,7 +239,6 @@ export const useSendMessage = () => {
  * Hook to mark a message as read
  */
 export const useMarkAsRead = () => {
-  const queryClient = useQueryClient();
   const { socket, isConnected } = useSocket();
 
   return useMutation({
@@ -266,11 +261,8 @@ export const useMarkAsRead = () => {
         );
       });
     },
-    onSuccess: () => {
-      // Invalidate queries to update read status
-      queryClient.invalidateQueries({ queryKey: ["messages", "conversation"] });
-      queryClient.invalidateQueries({ queryKey: ["messages", "conversations"] });
-    },
+    // UI updates automatically via socket listeners (useConversation/useConversations)
+    // No need to invalidate queries as these hooks use useState, not React Query
   });
 };
 
