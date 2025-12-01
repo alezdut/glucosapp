@@ -115,7 +115,7 @@ export async function refreshAccessToken(): Promise<{
       if (response.error) {
         console.error("Token refresh failed:", response.error);
         // Only clear tokens for 401/403 errors (invalid token), not for network/server errors
-        const status = (response.error as any)?.status;
+        const status = (response.error as { status?: number })?.status;
         if (status === 401 || status === 403) {
           console.log("Invalid refresh token, clearing tokens");
           await clearTokens();

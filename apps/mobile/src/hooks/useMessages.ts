@@ -126,7 +126,6 @@ export const useConversations = () => {
  */
 export const useSendMessage = () => {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   const { socket, isConnected } = useSocket();
 
   return useMutation({

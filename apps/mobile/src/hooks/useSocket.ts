@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { Socket } from "socket.io-client";
-import { getSocket, disconnectSocket, isSocketConnected } from "../lib/socket-client";
+import { getSocket, disconnectSocket } from "../lib/socket-client";
 import { useAuth } from "../contexts/AuthContext";
 import { getAccessToken } from "../lib/api";
 
