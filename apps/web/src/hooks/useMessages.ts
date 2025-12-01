@@ -301,9 +301,10 @@ export const useNewMessageNotifications = (activePatientId?: string) => {
   const { socket } = useSocket();
   const [notifications, setNotifications] = useState<
     Array<{
-      message: Message;
       patientId: string;
       patientName: string;
+      latestMessage: Message;
+      messageCount: number;
     }>
   >([]);
   const activePatientIdRef = useRef<string | undefined>(activePatientId);
@@ -342,13 +343,24 @@ export const useNewMessageNotifications = (activePatientId?: string) => {
           ? `${newMessage.sender.firstName} ${newMessage.sender.lastName}`
           : newMessage.sender.email;
 
-      // Add notification (avoid duplicates)
+      // Update or create notification grouped by patient
       setNotifications((prev) => {
-        // Check if notification already exists for this message
-        if (prev.some((n) => n.message.id === newMessage.id)) {
-          return prev;
+        // Check if notification already exists for this patient
+        const existingIndex = prev.findIndex((n) => n.patientId === patientId);
+
+        if (existingIndex >= 0) {
+          // Update existing notification with latest message and increment count
+          const updated = [...prev];
+          updated[existingIndex] = {
+            ...updated[existingIndex],
+            latestMessage: newMessage,
+            messageCount: updated[existingIndex].messageCount + 1,
+          };
+          return updated;
+        } else {
+          // Create new notification for this patient
+          return [...prev, { patientId, patientName, latestMessage: newMessage, messageCount: 1 }];
         }
-        return [...prev, { message: newMessage, patientId, patientName }];
       });
     };
 
@@ -388,8 +400,8 @@ export const useNewMessageNotifications = (activePatientId?: string) => {
     }
   }, [activePatientId]);
 
-  const clearNotification = (messageId: string) => {
-    setNotifications((prev) => prev.filter((n) => n.message.id !== messageId));
+  const clearNotification = (patientId: string) => {
+    setNotifications((prev) => prev.filter((n) => n.patientId !== patientId));
   };
 
   const clearAllNotifications = () => {

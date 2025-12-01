@@ -60,7 +60,15 @@ function CommunicationPageContent() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50">
+      <div
+        className="min-h-screen h-screen bg-gray-50"
+        onClick={() => {
+          // Close conversation when clicking on gray background (outside main content)
+          if (selectedPatientId) {
+            setSelectedPatientId(undefined);
+          }
+        }}
+      >
         <Sidebar />
         <Header />
 
@@ -69,15 +77,16 @@ function CommunicationPageContent() {
 
           {/* Notifications for new messages from patients not in active conversation */}
           {notifications.length > 0 && (
-            <div className="mb-6 space-y-3">
+            <div className="mb-6 space-y-3" onClick={(e) => e.stopPropagation()}>
               {notifications.map((notification) => (
                 <MessageNotificationCard
-                  key={notification.message.id}
-                  message={notification.message}
+                  key={notification.patientId}
+                  message={notification.latestMessage}
                   patientId={notification.patientId}
                   patientName={notification.patientName}
-                  onRead={() => clearNotification(notification.message.id)}
-                  onDismiss={() => clearNotification(notification.message.id)}
+                  messageCount={notification.messageCount}
+                  onRead={() => clearNotification(notification.patientId)}
+                  onDismiss={() => clearNotification(notification.patientId)}
                 />
               ))}
             </div>
@@ -88,7 +97,10 @@ function CommunicationPageContent() {
               {/* Conversations List */}
               <div className="lg:col-span-1">
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                  <div className="p-4 border-b border-gray-200">
+                  <div
+                    className="p-4 border-b border-gray-200"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <h2 className="text-lg font-semibold text-gray-900">Conversaciones</h2>
                   </div>
                   <div className="divide-y divide-gray-200 max-h-[600px] overflow-y-auto">
@@ -128,7 +140,10 @@ function CommunicationPageContent() {
                         return (
                           <button
                             key={conversation.participant.id}
-                            onClick={() => setSelectedPatientId(conversation.participant.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedPatientId(conversation.participant.id);
+                            }}
                             className={`w-full p-4 text-left hover:bg-gray-50 transition-colors ${
                               selectedPatientId === conversation.participant.id
                                 ? "bg-blue-50 border-l-4 border-blue-600"
@@ -196,7 +211,7 @@ function CommunicationPageContent() {
               </div>
 
               {/* Chat Area */}
-              <div className="lg:col-span-2">
+              <div className="lg:col-span-2" onClick={(e) => e.stopPropagation()}>
                 {selectedPatientId ? (
                   <PatientChat patientId={selectedPatientId} />
                 ) : conversations.length === 0 ? (

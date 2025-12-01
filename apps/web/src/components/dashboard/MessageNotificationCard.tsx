@@ -9,6 +9,7 @@ interface MessageNotificationCardProps {
   message: Message;
   patientId: string;
   patientName: string;
+  messageCount?: number;
   onRead?: () => void;
   onDismiss?: () => void;
 }
@@ -17,6 +18,7 @@ export const MessageNotificationCard = ({
   message,
   patientId,
   patientName,
+  messageCount = 1,
   onRead,
   onDismiss,
 }: MessageNotificationCardProps) => {
@@ -52,7 +54,17 @@ export const MessageNotificationCard = ({
       <div className="flex items-start gap-3 pr-6">
         <MessageSquare className="w-6 h-6 text-blue-600 flex-shrink-0" />
         <div className="flex-1">
-          <h3 className="font-semibold mb-1">{patientName}: Nuevo mensaje</h3>
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="font-semibold">
+              {patientName}:{" "}
+              {messageCount > 1 ? `${messageCount} mensajes nuevos` : "Nuevo mensaje"}
+            </h3>
+            {messageCount > 1 && (
+              <span className="bg-blue-600 text-white text-xs font-semibold rounded-full px-2 py-0.5">
+                {messageCount}
+              </span>
+            )}
+          </div>
           <p className="text-sm mb-2">{previewContent}</p>
           <p className="text-xs opacity-75">{formatTimeAgo(message.createdAt)}</p>
         </div>

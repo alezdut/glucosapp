@@ -31,73 +31,113 @@ export const NotificationDropdown = () => {
   const { data: conversations = [] } = useConversations();
   const queryClient = useQueryClient();
 
-  // Get unread messages from conversations (existing messages)
+  // Get unread messages from conversations (existing messages), grouped by patient
   const unreadMessagesFromConversations = useMemo(() => {
     if (!user) return [];
 
-    const unreadMessagesList: Array<{
-      message: Message;
-      patientId: string;
-      patientName: string;
-    }> = [];
+    // Group unread messages by patient
+    const patientMessagesMap = new Map<
+      string,
+      {
+        patientId: string;
+        patientName: string;
+        messages: Message[];
+      }
+    >();
 
     // For doctors, get unread messages from all conversations
     for (const conversation of conversations) {
       // Check if conversation has unread messages
       if (conversation.unreadCount > 0) {
         // Get unread messages from this conversation
-        // conversation.messages should always exist, but filter to be safe
         const conversationMessages = conversation.messages || [];
         const unread = conversationMessages.filter(
           (msg) => !msg.read && msg.receiverId === user.id,
         );
 
-        for (const msg of unread) {
+        // Also exclude if this is the active patient (when on communication page)
+        const isActivePatient = activePatientId && conversation.participant.id === activePatientId;
+
+        if (!isActivePatient && unread.length > 0) {
+          const patientId = conversation.participant.id;
+          const patientName =
+            conversation.participant.firstName && conversation.participant.lastName
+              ? `${conversation.participant.firstName} ${conversation.participant.lastName}`
+              : conversation.participant.email;
+
+          // Check if patient already has notifications from newMessageNotifications
+          const hasNewNotification = newMessageNotifications.some((n) => n.patientId === patientId);
+
           // Only include if not already in newMessageNotifications
-          const isNewNotification = newMessageNotifications.some((n) => n.message.id === msg.id);
-
-          // Also exclude if this is the active patient (when on communication page)
-          const isActivePatient =
-            activePatientId && conversation.participant.id === activePatientId;
-
-          if (!isNewNotification && !isActivePatient) {
-            unreadMessagesList.push({
-              message: msg,
-              patientId: conversation.participant.id,
-              patientName:
-                conversation.participant.firstName && conversation.participant.lastName
-                  ? `${conversation.participant.firstName} ${conversation.participant.lastName}`
-                  : conversation.participant.email,
-            });
+          if (!hasNewNotification) {
+            const existing = patientMessagesMap.get(patientId);
+            if (existing) {
+              existing.messages.push(...unread);
+            } else {
+              patientMessagesMap.set(patientId, {
+                patientId,
+                patientName,
+                messages: [...unread],
+              });
+            }
           }
         }
       }
     }
 
-    // Sort by creation date (newest first) and limit
-    return unreadMessagesList
+    // Convert map to array format matching newMessageNotifications structure
+    return Array.from(patientMessagesMap.values())
+      .map(({ patientId, patientName, messages }) => {
+        // Sort messages by date (newest first) and get the latest
+        const sortedMessages = messages.sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        );
+        return {
+          patientId,
+          patientName,
+          latestMessage: sortedMessages[0],
+          messageCount: messages.length,
+        };
+      })
       .sort(
-        (a, b) => new Date(b.message.createdAt).getTime() - new Date(a.message.createdAt).getTime(),
+        (a, b) =>
+          new Date(b.latestMessage.createdAt).getTime() -
+          new Date(a.latestMessage.createdAt).getTime(),
       )
       .slice(0, 10);
   }, [user, conversations, newMessageNotifications, activePatientId]);
 
-  // Combine new notifications with existing unread messages
+  // Combine new notifications with existing unread messages, grouped by patient
   const allMessageNotifications = useMemo(() => {
-    // Combine and deduplicate
-    const combined = [...newMessageNotifications, ...unreadMessagesFromConversations];
-    const seen = new Set<string>();
-    return combined
-      .filter((n) => {
-        if (seen.has(n.message.id)) {
-          return false;
-        }
-        seen.add(n.message.id);
-        return true;
-      })
-      .sort(
-        (a, b) => new Date(b.message.createdAt).getTime() - new Date(a.message.createdAt).getTime(),
-      );
+    // Combine notifications by patientId (newMessageNotifications already grouped, unreadMessagesFromConversations also grouped)
+    const patientNotificationsMap = new Map<
+      string,
+      {
+        patientId: string;
+        patientName: string;
+        latestMessage: Message;
+        messageCount: number;
+      }
+    >();
+
+    // Add new message notifications
+    for (const notification of newMessageNotifications) {
+      patientNotificationsMap.set(notification.patientId, notification);
+    }
+
+    // Add unread messages from conversations (only if not already in newMessageNotifications)
+    for (const notification of unreadMessagesFromConversations) {
+      if (!patientNotificationsMap.has(notification.patientId)) {
+        patientNotificationsMap.set(notification.patientId, notification);
+      }
+    }
+
+    // Convert to array and sort by latest message date
+    return Array.from(patientNotificationsMap.values()).sort(
+      (a, b) =>
+        new Date(b.latestMessage.createdAt).getTime() -
+        new Date(a.latestMessage.createdAt).getTime(),
+    );
   }, [newMessageNotifications, unreadMessagesFromConversations]);
 
   // Force re-render when notifications change to ensure badge updates in real-time
@@ -130,8 +170,8 @@ export const NotificationDropdown = () => {
     invalidateAlertQueries(queryClient);
   };
 
-  const handleMessageRead = (messageId: string) => {
-    clearMessageNotification(messageId);
+  const handleMessageRead = (patientId: string) => {
+    clearMessageNotification(patientId);
     // Invalidate messages queries to update unread count
     queryClient.invalidateQueries({ queryKey: ["messages", "unread"] });
     queryClient.invalidateQueries({ queryKey: ["messages", "unread-count"] });
@@ -185,12 +225,13 @@ export const NotificationDropdown = () => {
                 {/* Show unread messages first */}
                 {allMessageNotifications.map((notification) => (
                   <MessageNotificationCard
-                    key={notification.message.id}
-                    message={notification.message}
+                    key={notification.patientId}
+                    message={notification.latestMessage}
                     patientId={notification.patientId}
                     patientName={notification.patientName}
-                    onRead={() => handleMessageRead(notification.message.id)}
-                    onDismiss={() => handleMessageRead(notification.message.id)}
+                    messageCount={notification.messageCount}
+                    onRead={() => handleMessageRead(notification.patientId)}
+                    onDismiss={() => handleMessageRead(notification.patientId)}
                   />
                 ))}
                 {/* Then show alerts */}
