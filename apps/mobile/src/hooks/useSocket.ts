@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Socket } from "socket.io-client";
 import { getSocket, disconnectSocket } from "../lib/socket-client";
 import { useAuth } from "../contexts/AuthContext";
@@ -20,6 +20,21 @@ export const useSocket = (): UseSocketReturn => {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const socketRef = useRef<Socket | null>(null);
+
+  // Stable handler functions using useCallback
+  const handleConnect = useCallback(() => {
+    setIsConnected(true);
+    setError(null);
+  }, []);
+
+  const handleDisconnect = useCallback(() => {
+    setIsConnected(false);
+  }, []);
+
+  const handleError = useCallback((err: Error) => {
+    setError(err);
+    setIsConnected(false);
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
@@ -59,26 +74,12 @@ export const useSocket = (): UseSocketReturn => {
           setIsConnected(socketInstance.connected);
         }
 
-        // Set up event listeners (only once per socket instance)
-        const handleConnect = () => {
-          setIsConnected(true);
-          setError(null);
-        };
-
-        const handleDisconnect = () => {
-          setIsConnected(false);
-        };
-
-        const handleError = (err: Error) => {
-          setError(err);
-          setIsConnected(false);
-        };
-
-        // Remove old listeners before adding new ones
+        // Remove old listeners before adding new ones (using stable handlers)
         socketInstance.off("connect", handleConnect);
         socketInstance.off("disconnect", handleDisconnect);
         socketInstance.off("connect_error", handleError);
 
+        // Register event listeners with stable handler functions
         socketInstance.on("connect", handleConnect);
         socketInstance.on("disconnect", handleDisconnect);
         socketInstance.on("connect_error", handleError);
@@ -89,15 +90,15 @@ export const useSocket = (): UseSocketReturn => {
 
     connectSocket();
 
-    // Cleanup: remove listeners when dependencies change
+    // Cleanup: remove only the specific handlers registered by this hook
     return () => {
       if (socketRef.current) {
-        socketRef.current.off("connect");
-        socketRef.current.off("disconnect");
-        socketRef.current.off("connect_error");
+        socketRef.current.off("connect", handleConnect);
+        socketRef.current.off("disconnect", handleDisconnect);
+        socketRef.current.off("connect_error", handleError);
       }
     };
-  }, [isAuthenticated, user?.id]);
+  }, [isAuthenticated, user?.id, handleConnect, handleDisconnect, handleError]);
 
   // Don't disconnect socket on unmount - let it persist
   // The socket singleton will be managed by socket-client.ts

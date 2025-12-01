@@ -22,6 +22,7 @@ export const useSocket = (): UseSocketReturn => {
   const [error, setError] = useState<Error | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const tokenRef = useRef<string | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
@@ -82,14 +83,19 @@ export const useSocket = (): UseSocketReturn => {
         const freshToken =
           typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
         if (freshToken) {
+          // Clear any existing timeout before creating a new one
+          if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
+          }
           // Try to reconnect with fresh token after a delay
-          setTimeout(() => {
+          reconnectTimeoutRef.current = setTimeout(() => {
             const newSocket = getSocket(freshToken);
             if (newSocket && newSocket !== socketInstance) {
               socketRef.current = newSocket;
               setSocket(newSocket);
               setIsConnected(newSocket.connected);
             }
+            reconnectTimeoutRef.current = null;
           }, 1000);
         }
       }
@@ -105,14 +111,19 @@ export const useSocket = (): UseSocketReturn => {
         const freshToken =
           typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
         if (freshToken && freshToken !== token) {
+          // Clear any existing timeout before creating a new one
+          if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
+          }
           // Token was refreshed, reconnect with new token
-          setTimeout(() => {
+          reconnectTimeoutRef.current = setTimeout(() => {
             const newSocket = getSocket(freshToken);
             if (newSocket && newSocket !== socketInstance) {
               socketRef.current = newSocket;
               setSocket(newSocket);
               setIsConnected(newSocket.connected);
             }
+            reconnectTimeoutRef.current = null;
           }, 1000);
         }
       }
@@ -127,12 +138,17 @@ export const useSocket = (): UseSocketReturn => {
     socketInstance.on("disconnect", handleDisconnect);
     socketInstance.on("connect_error", handleError);
 
-    // Cleanup: remove listeners when dependencies change
+    // Cleanup: remove listeners and clear timeouts when dependencies change
     return () => {
       if (socketInstance) {
         socketInstance.off("connect", handleConnect);
         socketInstance.off("disconnect", handleDisconnect);
         socketInstance.off("connect_error", handleError);
+      }
+      // Clear any pending reconnection timeout to prevent state updates after unmount
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
       }
     };
   }, [isAuthenticated, user]);

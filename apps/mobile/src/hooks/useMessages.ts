@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useSocket } from "./useSocket";
 import { useAuth } from "../contexts/AuthContext";
@@ -246,15 +246,11 @@ export const useUnreadMessagesFromDoctor = () => {
   const messagesRef = useRef<Message[]>([]);
   const hasJoinedRef = useRef(false);
 
-  // Always listen for new messages (even before joining room)
-  useEffect(() => {
-    if (!socket || !isConnected || !user) {
-      return;
-    }
+  // Stable handler functions using useCallback
+  const handleNewMessage = useCallback(
+    (newMessage: Message) => {
+      if (!user) return;
 
-    // Listen for new messages - this listener is ALWAYS active
-    // It will receive messages even if we're not in the room (server emits directly to socket)
-    const handleNewMessage = (newMessage: Message) => {
       // Only process messages for the current user
       if (newMessage.receiverId !== user.id) {
         return; // Not for this user, ignore
@@ -277,10 +273,14 @@ export const useUnreadMessagesFromDoctor = () => {
           return newCount;
         });
       }
-    };
+    },
+    [user],
+  );
 
-    // Listen for message read updates
-    const handleMessageRead = (data: { messageId: string; read: boolean }) => {
+  const handleMessageRead = useCallback(
+    (data: { messageId: string; read: boolean }) => {
+      if (!user) return;
+
       // Update the message in our ref
       messagesRef.current = messagesRef.current.map((msg) =>
         msg.id === data.messageId ? { ...msg, read: data.read } : msg,
@@ -290,11 +290,15 @@ export const useUnreadMessagesFromDoctor = () => {
         (msg) => !msg.read && msg.receiverId === user.id,
       ).length;
       setUnreadCount(count);
-    };
+    },
+    [user],
+  );
 
-    // Register listeners (remove old ones first to avoid duplicates)
-    socket.off("message:new", handleNewMessage);
-    socket.off("message:read", handleMessageRead);
+  // Always listen for new messages (even before joining room)
+  useEffect(() => {
+    if (!socket || !isConnected || !user) {
+      return;
+    }
 
     // Register listeners - these will fire for ALL messages received on this socket
     socket.on("message:new", handleNewMessage);
@@ -304,7 +308,7 @@ export const useUnreadMessagesFromDoctor = () => {
       socket.off("message:new", handleNewMessage);
       socket.off("message:read", handleMessageRead);
     };
-  }, [socket, isConnected, user?.id]);
+  }, [socket, isConnected, user, handleNewMessage, handleMessageRead]);
 
   // Join conversation room to get initial messages and stay in room
   // This hook should ALWAYS stay in the room to receive notifications

@@ -58,15 +58,15 @@ export const useConversation = (patientId?: string) => {
       }
     };
 
-    // Register listener immediately (socket might already be connected)
-    socket.on("message:new", handleNewMessage);
-
-    // Also register when socket connects (in case it's not connected yet)
+    // Register listener when socket connects
     const handleConnect = () => {
       socket.on("message:new", handleNewMessage);
     };
 
-    if (!socket.connected) {
+    // Register listener if socket is already connected, otherwise wait for connect event
+    if (socket.connected) {
+      handleConnect();
+    } else {
       socket.on("connect", handleConnect);
     }
 

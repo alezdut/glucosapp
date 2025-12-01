@@ -172,9 +172,7 @@ export const NotificationDropdown = () => {
 
   const handleMessageRead = (patientId: string) => {
     clearMessageNotification(patientId);
-    // Invalidate messages queries to update unread count
-    queryClient.invalidateQueries({ queryKey: ["messages", "unread"] });
-    queryClient.invalidateQueries({ queryKey: ["messages", "unread-count"] });
+    // UI will update automatically via socket/state listeners (useConversations/useConversation)
   };
 
   const unacknowledgedCount = alerts.length;
