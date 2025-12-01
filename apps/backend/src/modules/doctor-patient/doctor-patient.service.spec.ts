@@ -290,7 +290,7 @@ describe("DoctorPatientService", () => {
         }),
       ];
 
-      (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue([patientId]);
+      (prismaService.doctorPatient.findMany as jest.Mock).mockResolvedValue([]);
       (prismaService.user.findMany as jest.Mock).mockResolvedValue(patients);
 
       const result = await service.searchGlobalPatients(doctorId, searchDto);
@@ -306,7 +306,9 @@ describe("DoctorPatientService", () => {
       const searchDto = { q: "test" };
       const assignedPatientIds = [patientId];
 
-      (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(assignedPatientIds);
+      (prismaService.doctorPatient.findMany as jest.Mock).mockResolvedValue([
+        { patientId: patientId },
+      ]);
       (prismaService.user.findMany as jest.Mock).mockResolvedValue([]);
 
       await service.searchGlobalPatients(doctorId, searchDto);
@@ -597,7 +599,7 @@ describe("DoctorPatientService", () => {
         doctor,
       };
 
-      (prismaService.doctorPatient.findFirst as jest.Mock).mockResolvedValue(relation);
+      (prismaService.doctorPatient.findUnique as jest.Mock).mockResolvedValue(relation);
 
       const result = await service.getPatientDoctor(patientId);
 
@@ -612,7 +614,7 @@ describe("DoctorPatientService", () => {
     });
 
     it("should return null if no doctor assigned", async () => {
-      (prismaService.doctorPatient.findFirst as jest.Mock).mockResolvedValue(null);
+      (prismaService.doctorPatient.findUnique as jest.Mock).mockResolvedValue(null);
 
       const result = await service.getPatientDoctor(patientId);
 

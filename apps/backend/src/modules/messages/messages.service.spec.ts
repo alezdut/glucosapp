@@ -258,9 +258,9 @@ describe("MessagesService", () => {
   describe("getConversation", () => {
     it("should get conversation for patient with their doctor", async () => {
       (prismaService.user.findUnique as jest.Mock).mockResolvedValue(mockPatient);
-      (prismaService.doctorPatient.findMany as jest.Mock).mockResolvedValue([
+      (prismaService.doctorPatient.findUnique as jest.Mock).mockResolvedValue(
         mockDoctorPatientRelation,
-      ]);
+      );
       (prismaService.message.findMany as jest.Mock).mockResolvedValue([mockMessage]);
 
       const result = await service.getConversation(patientId);
@@ -271,9 +271,8 @@ describe("MessagesService", () => {
         senderId: patientId,
         receiverId: doctorId,
       });
-      expect(prismaService.doctorPatient.findMany).toHaveBeenCalledWith({
+      expect(prismaService.doctorPatient.findUnique).toHaveBeenCalledWith({
         where: { patientId },
-        orderBy: { createdAt: "desc" },
         select: { doctorId: true },
       });
     });
@@ -342,8 +341,10 @@ describe("MessagesService", () => {
 
       (prismaService.user.findUnique as jest.Mock).mockResolvedValue(mockDoctor);
       (prismaService.doctorPatient.findMany as jest.Mock).mockResolvedValue(mockConversations);
+      (prismaService.message.groupBy as jest.Mock).mockResolvedValue([
+        { senderId: patientId, _count: { id: 1 } },
+      ]);
       (prismaService.message.findMany as jest.Mock).mockResolvedValue([mockMessage]);
-      (prismaService.message.count as jest.Mock).mockResolvedValue(1);
 
       const result = await service.getConversations(doctorId);
 
@@ -407,12 +408,28 @@ describe("MessagesService", () => {
         createdAt: new Date("2024-01-01T14:00:00.000Z"),
       };
 
+      const olderMessageWithPatient = {
+        ...olderMessage,
+        senderId: patientId,
+        receiverId: doctorId,
+      };
+      const newerMessageWithPatient = {
+        ...newerMessage,
+        senderId: patient2Id,
+        receiverId: doctorId,
+      };
+
       (prismaService.user.findUnique as jest.Mock).mockResolvedValue(mockDoctor);
       (prismaService.doctorPatient.findMany as jest.Mock).mockResolvedValue(mockConversations);
-      (prismaService.message.findMany as jest.Mock)
-        .mockResolvedValueOnce([olderMessage]) // First patient
-        .mockResolvedValueOnce([newerMessage]); // Second patient
-      (prismaService.message.count as jest.Mock).mockResolvedValue(0);
+      (prismaService.message.groupBy as jest.Mock).mockResolvedValue([
+        { senderId: patientId, _count: { id: 0 } },
+        { senderId: patient2Id, _count: { id: 0 } },
+      ]);
+      // All messages are returned in a single call, ordered by createdAt desc
+      (prismaService.message.findMany as jest.Mock).mockResolvedValue([
+        newerMessageWithPatient, // Newer message first (desc order)
+        olderMessageWithPatient, // Older message second
+      ]);
 
       const result = await service.getConversations(doctorId);
 
