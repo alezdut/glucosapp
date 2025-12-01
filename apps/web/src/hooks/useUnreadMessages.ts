@@ -20,7 +20,7 @@ export const useUnreadMessages = (limit: number = 10) => {
       return [];
     }
 
-    let unreadMessagesList: Array<Message & { participantId: string; participantName: string }> =
+    const unreadMessagesList: Array<Message & { participantId: string; participantName: string }> =
       [];
 
     // Use uppercase comparison to handle any case variations

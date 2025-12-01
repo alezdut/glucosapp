@@ -57,9 +57,10 @@ export const getSocket = (token: string | null): Socket | null => {
       // If token expired, disable auto-reconnection and disconnect
       // The useSocket hook will handle reconnection with new token
       if (
-        error.message.includes("expired") ||
-        error.message.includes("jwt") ||
-        error.message.includes("Invalid token")
+        socket &&
+        (error.message.includes("expired") ||
+          error.message.includes("jwt") ||
+          error.message.includes("Invalid token"))
       ) {
         socket.io.opts.reconnection = false; // Disable auto-reconnection
         socket.disconnect();

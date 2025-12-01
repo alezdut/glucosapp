@@ -19,7 +19,7 @@ import { PatientLogs } from "@/components/dashboard/PatientLogs";
 import { PatientParameters } from "@/components/dashboard/PatientParameters";
 import { PatientChat } from "@/components/dashboard/PatientChat";
 import { PatientAvatar } from "@/components/dashboard/PatientAvatar";
-import { Loader2, User, MessageSquare, Trash2, AlertTriangle } from "lucide-react";
+import { Loader2, MessageSquare, Trash2, AlertTriangle } from "lucide-react";
 import { calculateAge, formatTimeAgo, getDiabetesTypeLabel } from "@glucosapp/utils";
 import { getStatusColor } from "@/utils/patient-utils";
 import { DiabetesType } from "@glucosapp/types";

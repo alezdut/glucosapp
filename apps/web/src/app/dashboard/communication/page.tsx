@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { ProtectedRoute } from "@/components/protected-route";
 import { Sidebar } from "@/components/dashboard/Sidebar";
@@ -12,10 +12,13 @@ import { useAuth } from "@/contexts/auth-context";
 import { Loader2, MessageSquare } from "lucide-react";
 import Image from "next/image";
 
+// Force dynamic rendering to prevent prerender errors (requires auth and WebSocket)
+export const dynamic = "force-dynamic";
+
 /**
- * Communication page - Shows conversations for doctors or chat with doctor for patients
+ * Communication page content component (uses useSearchParams, must be wrapped in Suspense)
  */
-export default function CommunicationPage() {
+function CommunicationPageContent() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const patientIdFromUrl = searchParams.get("patientId");
@@ -23,8 +26,7 @@ export default function CommunicationPage() {
     patientIdFromUrl || undefined,
   );
   const { data: conversations = [], isLoading, error: conversationsError } = useConversations();
-  const { notifications, clearNotification, clearAllNotifications } =
-    useNewMessageNotifications(selectedPatientId);
+  const { notifications, clearNotification } = useNewMessageNotifications(selectedPatientId);
 
   // Update selected patient when URL parameter changes
   useEffect(() => {
@@ -227,5 +229,31 @@ export default function CommunicationPage() {
         </main>
       </div>
     </ProtectedRoute>
+  );
+}
+
+/**
+ * Communication page - Shows conversations for doctors or chat with doctor for patients
+ */
+export default function CommunicationPage() {
+  return (
+    <Suspense
+      fallback={
+        <ProtectedRoute>
+          <div className="min-h-screen bg-gray-50">
+            <Sidebar />
+            <Header />
+            <main className="ml-64 mt-16 p-6">
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                <span className="ml-3 text-gray-600">Cargando...</span>
+              </div>
+            </main>
+          </div>
+        </ProtectedRoute>
+      }
+    >
+      <CommunicationPageContent />
+    </Suspense>
   );
 }

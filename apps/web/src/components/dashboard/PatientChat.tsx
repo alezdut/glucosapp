@@ -22,7 +22,6 @@ export const PatientChat = ({ patientId }: PatientChatProps) => {
   const [isListReady, setIsListReady] = useState(false);
 
   // Web app is doctor-only, always treat as doctor interface
-  const isDoctor = true;
   const shouldCallHook = !!patientId;
 
   const {
@@ -87,7 +86,7 @@ export const PatientChat = ({ patientId }: PatientChatProps) => {
     unreadMessages.forEach((msg) => {
       markAsReadMutation.mutate(msg.id);
     });
-  }, [messages, user]);
+  }, [messages, user, markAsReadMutation]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,8 +163,8 @@ export const PatientChat = ({ patientId }: PatientChatProps) => {
 
   if (error) {
     const errorMessage =
-      error instanceof Error
-        ? error.message
+      error && typeof error === "object" && "message" in error
+        ? String((error as { message: unknown }).message)
         : "Error al cargar los mensajes. Por favor, intenta de nuevo.";
     const isForbidden = errorMessage.includes("Forbidden") || errorMessage.includes("403");
     const isNotFound = errorMessage.includes("Not found") || errorMessage.includes("404");
@@ -215,13 +214,6 @@ export const PatientChat = ({ patientId }: PatientChatProps) => {
         ref={messagesContainerRef}
         className="flex-1 overflow-y-auto p-4 space-y-4"
         style={{ opacity: isListReady || messages.length === 0 ? 1 : 0 }}
-        onLoad={() => {
-          // Fallback: scroll to end when content loads
-          if (!isListReady && messages.length > 0 && messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: "auto" });
-            setIsListReady(true);
-          }
-        }}
       >
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">

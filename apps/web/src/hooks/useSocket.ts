@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { Socket } from "socket.io-client";
-import { getSocket, disconnectSocket, isSocketConnected } from "@/lib/socket-client";
+import { getSocket, disconnectSocket } from "@/lib/socket-client";
 import { useAuth } from "@/contexts/auth-context";
 
 interface UseSocketReturn {
@@ -135,7 +135,7 @@ export const useSocket = (): UseSocketReturn => {
         socketInstance.off("connect_error", handleError);
       }
     };
-  }, [isAuthenticated, user?.id]);
+  }, [isAuthenticated, user]);
 
   // Poll for token changes and handle reconnection (token refresh happens in same tab, so storage event won't fire)
   useEffect(() => {
@@ -151,7 +151,6 @@ export const useSocket = (): UseSocketReturn => {
 
       // If token changed, reconnect socket
       if (currentToken !== tokenRef.current) {
-        const oldToken = tokenRef.current;
         tokenRef.current = currentToken;
 
         // Get new socket with fresh token
@@ -193,7 +192,7 @@ export const useSocket = (): UseSocketReturn => {
     return () => {
       clearInterval(interval);
     };
-  }, [isAuthenticated, user?.id]);
+  }, [isAuthenticated, user]);
 
   // Don't disconnect socket on unmount - let it persist
   // The socket singleton will be managed by socket-client.ts

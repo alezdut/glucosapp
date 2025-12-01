@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/auth-context";
 import { useSocket } from "./useSocket";
 import type { Message, Conversation } from "@/lib/messages-api";
@@ -74,7 +74,7 @@ export const useConversation = (patientId?: string) => {
       socket.off("message:new", handleNewMessage);
       socket.off("connect", handleConnect);
     };
-  }, [socket, user?.id]);
+  }, [socket, user]);
 
   // Join conversation room when enabled
   useEffect(() => {
@@ -126,7 +126,7 @@ export const useConversation = (patientId?: string) => {
         socket.emit("conversation:leave", { patientId });
       }
     };
-  }, [shouldEnable, socket, isConnected, patientId, user?.id]);
+  }, [shouldEnable, socket, isConnected, patientId, user]);
 
   return {
     data: messages,
@@ -181,7 +181,7 @@ export const useConversations = () => {
     return () => {
       socket.off("conversation:updated", handleConversationUpdated);
     };
-  }, [socket, isConnected, user?.id]);
+  }, [socket, isConnected, user]);
 
   // Reset request flag when socket disconnects
   useEffect(() => {
@@ -203,7 +203,6 @@ export const useConversations = () => {
  */
 export const useSendMessage = () => {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   const { socket, isConnected } = useSocket();
 
   return useMutation({
@@ -299,7 +298,7 @@ export const useUnreadMessagesCount = () => {
  */
 export const useNewMessageNotifications = (activePatientId?: string) => {
   const { user } = useAuth();
-  const { socket, isConnected } = useSocket();
+  const { socket } = useSocket();
   const [notifications, setNotifications] = useState<
     Array<{
       message: Message;
@@ -380,7 +379,7 @@ export const useNewMessageNotifications = (activePatientId?: string) => {
       socket.off("message:new", handleNewMessage);
       socket.off("connect", handleConnect);
     };
-  }, [socket, user?.id]);
+  }, [socket, user]);
 
   // Clear notifications when active patient changes (only if we're tracking active patient)
   useEffect(() => {
