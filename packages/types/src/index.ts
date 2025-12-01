@@ -147,6 +147,11 @@ export enum MealCategory {
   CORRECTION = "CORRECTION",
 }
 
+export enum UserRole {
+  DOCTOR = "DOCTOR",
+  PATIENT = "PATIENT",
+}
+
 export type User = {
   id: string;
   email: string;
@@ -154,6 +159,7 @@ export type User = {
   lastName?: string;
   avatarUrl?: string;
   emailVerified: boolean;
+  role: UserRole;
   createdAt: string;
 };
 

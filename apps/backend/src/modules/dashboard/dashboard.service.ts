@@ -156,7 +156,6 @@ export class DashboardService {
               recordedAt: entry.recordedAt,
             };
           } catch (error) {
-            console.error("[Dashboard] Failed to decrypt glucose entry:", error);
             return null;
           }
         })
@@ -173,7 +172,6 @@ export class DashboardService {
               recordedAt: reading.recordedAt,
             };
           } catch (error) {
-            console.error("[Dashboard] Failed to decrypt glucose reading:", error);
             return null;
           }
         })
@@ -380,7 +378,6 @@ export class DashboardService {
               recordedAt: entry.recordedAt,
             };
           } catch (error) {
-            console.error("[Dashboard] Failed to decrypt glucose entry:", error);
             return null;
           }
         })
@@ -397,7 +394,6 @@ export class DashboardService {
               recordedAt: reading.recordedAt,
             };
           } catch (error) {
-            console.error("[Dashboard] Failed to decrypt glucose reading:", error);
             return null;
           }
         })

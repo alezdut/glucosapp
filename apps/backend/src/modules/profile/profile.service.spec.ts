@@ -189,7 +189,7 @@ describe("ProfileService", () => {
         doctor,
       };
 
-      (prismaService.doctorPatient.findFirst as jest.Mock).mockResolvedValue(relation);
+      (prismaService.doctorPatient.findUnique as jest.Mock).mockResolvedValue(relation);
 
       const result = await service.getAssignedDoctor(userId);
 
@@ -209,7 +209,7 @@ describe("ProfileService", () => {
     });
 
     it("should return null if no doctor assigned", async () => {
-      (prismaService.doctorPatient.findFirst as jest.Mock).mockResolvedValue(null);
+      (prismaService.doctorPatient.findUnique as jest.Mock).mockResolvedValue(null);
 
       const result = await service.getAssignedDoctor(userId);
 

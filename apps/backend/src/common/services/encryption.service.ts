@@ -64,7 +64,6 @@ export class EncryptionService {
       // Return as hex string
       return combined.toString("hex");
     } catch (error) {
-      console.error("Encryption error:", error);
       throw new Error("Failed to encrypt data");
     }
   }
@@ -98,7 +97,6 @@ export class EncryptionService {
 
       return decrypted.toString("utf8");
     } catch (error) {
-      console.error("Decryption error:", error);
       throw new Error("Failed to decrypt data");
     }
   }

@@ -120,6 +120,17 @@ export const createMockPrismaService = (): Partial<PrismaService> => {
       update: jest.fn(),
       delete: jest.fn(),
     },
+    message: {
+      findUnique: jest.fn(),
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+      delete: jest.fn(),
+      count: jest.fn(),
+      groupBy: jest.fn(),
+    },
     $transaction: jest.fn(),
   } as unknown as PrismaService;
 };

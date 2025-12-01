@@ -271,6 +271,20 @@ export async function assignPatient(accessToken: string, patientId: string): Pro
   }
 }
 
+/**
+ * Remove/unassign a patient from the doctor
+ */
+export async function removePatient(accessToken: string, patientId: string): Promise<void> {
+  const response = await client.DELETE(`/doctor-patients/${patientId}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  if (response.error) {
+    throw new Error(response.error.message || "Failed to remove patient");
+  }
+}
+
 export interface PatientDetails {
   id: string;
   email: string;

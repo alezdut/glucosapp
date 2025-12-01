@@ -154,7 +154,6 @@ export class DoctorPatientService {
     // Apply age range filter
     if (filters?.ageRange) {
       const now = new Date();
-      const currentYear = now.getFullYear();
       let minAge: number | undefined;
       let maxAge: number | undefined;
 
@@ -173,16 +172,18 @@ export class DoctorPatientService {
       }
 
       if (minAge !== undefined) {
-        // For minimum age: person must have been born ON OR BEFORE (currentYear - minAge)
-        // Example: to be at least 31 years old in 2025, must be born on or before Dec 31, 1994
-        const maxBirthYear = currentYear - minAge;
-        const maxBirthDate = new Date(maxBirthYear, 11, 31, 23, 59, 59, 999);
+        // For minimum age: person must have been born ON OR BEFORE (now - minAge years)
+        // Clone now, subtract minAge years, set to end-of-day for lte comparison
+        const maxBirthDate = new Date(now);
+        maxBirthDate.setFullYear(now.getFullYear() - minAge);
+        maxBirthDate.setHours(23, 59, 59, 999);
 
         if (maxAge !== undefined) {
-          // For maximum age: person must have been born ON OR AFTER (currentYear - maxAge)
-          // Example: to be at most 50 years old in 2025, must be born on or after Jan 1, 1975
-          const minBirthYear = currentYear - maxAge;
-          const minBirthDate = new Date(minBirthYear, 0, 1);
+          // For maximum age: person must have been born ON OR AFTER (now - maxAge years)
+          // Clone now, subtract maxAge years, set to start-of-day for gte comparison
+          const minBirthDate = new Date(now);
+          minBirthDate.setFullYear(now.getFullYear() - maxAge);
+          minBirthDate.setHours(0, 0, 0, 0);
           where.birthDate = {
             gte: minBirthDate, // Born on or after this date (to be at most maxAge)
             lte: maxBirthDate, // Born on or before this date (to be at least minAge)
@@ -473,7 +474,7 @@ export class DoctorPatientService {
 
   /**
    * Search for patients globally (all patients, not just assigned)
-   * Returns only patients not yet assigned to the doctor
+   * Returns only patients without any assignment (1:1 relationship enforced)
    */
   async searchGlobalPatients(
     doctorId: string,
@@ -481,15 +482,18 @@ export class DoctorPatientService {
   ): Promise<PatientListItemDto[]> {
     await this.doctorUtils.verifyDoctor(doctorId);
 
-    // Get assigned patient IDs to exclude them
-    const assignedPatientIds = await this.doctorUtils.getDoctorPatientIds(doctorId);
+    // Get all assigned patient IDs (from any doctor) to exclude them
+    const allAssignedPatients = await this.prisma.doctorPatient.findMany({
+      select: { patientId: true },
+    });
+    const assignedPatientIds = allAssignedPatients.map((r) => r.patientId);
 
     // Build search query
     const searchTerm = searchDto.q.trim();
 
     const where: Prisma.UserWhereInput = {
       role: UserRole.PATIENT,
-      // Exclude already assigned patients
+      // Exclude all patients already assigned to any doctor
       ...(assignedPatientIds.length > 0 && { id: { notIn: assignedPatientIds } }),
       OR: [
         { firstName: { contains: searchTerm, mode: "insensitive" } },
@@ -578,7 +582,6 @@ export class DoctorPatientService {
         try {
           return this.encryptionService.decryptGlucoseValue(entry.mgdlEncrypted);
         } catch (error) {
-          console.error(`Failed to decrypt glucose entry for patient ${patientId}:`, error);
           return null;
         }
       })
@@ -590,7 +593,6 @@ export class DoctorPatientService {
         try {
           return this.encryptionService.decryptGlucoseValue(reading.glucoseEncrypted);
         } catch (error) {
-          console.error(`Failed to decrypt glucose reading for patient ${patientId}:`, error);
           return null;
         }
       })
@@ -698,6 +700,7 @@ export class DoctorPatientService {
 
   /**
    * Assign a patient to a doctor
+   * Enforces 1:1 relationship - a patient can only be assigned to one doctor
    */
   async assignPatient(
     doctorId: string,
@@ -719,18 +722,19 @@ export class DoctorPatientService {
       throw new ConflictException("User is not a patient");
     }
 
-    // Check if relationship already exists
-    const existing = await this.prisma.doctorPatient.findUnique({
+    // Check if patient is already assigned to any doctor (1:1 relationship)
+    const existingAssignment = await this.prisma.doctorPatient.findUnique({
       where: {
-        doctorId_patientId: {
-          doctorId,
-          patientId: createDto.patientId,
-        },
+        patientId: createDto.patientId,
       },
     });
 
-    if (existing) {
-      throw new ConflictException("Patient is already assigned to this doctor");
+    if (existingAssignment) {
+      if (existingAssignment.doctorId === doctorId) {
+        throw new ConflictException("Patient is already assigned to this doctor");
+      } else {
+        throw new ConflictException("Patient is already assigned to another doctor");
+      }
     }
 
     const relation = await this.prisma.doctorPatient.create({
@@ -1146,7 +1150,7 @@ export class DoctorPatientService {
   }
 
   /**
-   * Get the doctor assigned to a patient
+   * Get the doctor assigned to a patient (1:1 relationship)
    * @param patientId - Patient ID
    * @returns Doctor information or null if no doctor assigned
    */
@@ -1163,7 +1167,7 @@ export class DoctorPatientService {
       avatarUrl?: string;
     };
   } | null> {
-    const relation = await this.prisma.doctorPatient.findFirst({
+    const relation = await this.prisma.doctorPatient.findUnique({
       where: { patientId },
       include: {
         doctor: {
@@ -1175,9 +1179,6 @@ export class DoctorPatientService {
             avatarUrl: true,
           },
         },
-      },
-      orderBy: {
-        createdAt: "desc",
       },
     });
 

@@ -47,3 +47,34 @@ export async function updateProfile(
 
   return response.data;
 }
+
+export interface AssignedDoctor {
+  id: string;
+  doctorId: string;
+  patientId: string;
+  createdAt: string;
+  doctor: {
+    id: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    avatarUrl?: string;
+  };
+}
+
+/**
+ * Get doctor assigned to the current patient
+ */
+export async function getAssignedDoctor(accessToken: string): Promise<AssignedDoctor | null> {
+  const response = await client.GET<AssignedDoctor | null>("/profile/doctor", {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (response.error) {
+    throw new Error(response.error.message || "Failed to fetch assigned doctor");
+  }
+
+  return response.data ?? null;
+}

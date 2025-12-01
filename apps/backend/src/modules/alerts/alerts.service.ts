@@ -331,8 +331,8 @@ export class AlertsService {
       return; // Email notifications disabled
     }
 
-    // Get doctor assigned to this patient
-    const doctorRelation = await this.prisma.doctorPatient.findFirst({
+    // Get doctor assigned to this patient (1:1 relationship)
+    const doctorRelation = await this.prisma.doctorPatient.findUnique({
       where: { patientId },
       include: {
         doctor: {
@@ -344,9 +344,6 @@ export class AlertsService {
             timezone: true,
           },
         },
-      },
-      orderBy: {
-        createdAt: "desc",
       },
     });
 
@@ -501,7 +498,7 @@ export class AlertsService {
             recentHighReadings++;
           }
         } catch (error) {
-          console.error("[Alerts] Failed to decrypt glucose entry:", error);
+          // Silently handle decryption errors
         }
       }
 
@@ -515,7 +512,7 @@ export class AlertsService {
             recentHighReadings++;
           }
         } catch (error) {
-          console.error("[Alerts] Failed to decrypt glucose reading:", error);
+          // Silently handle decryption errors
         }
       }
 
