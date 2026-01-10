@@ -24,6 +24,7 @@ export const PatientLogs = ({ patientId }: PatientLogsProps) => {
   const defaultRange = useMemo(getDefaultRange, []);
   const [range, setRange] = useState<{ start: Date; end: Date }>(defaultRange);
   const [currentPage, setCurrentPage] = useState(1);
+  const [currentPreset, setCurrentPreset] = useState<number | null>(7);
 
   const {
     data: entries,
@@ -40,6 +41,7 @@ export const PatientLogs = ({ patientId }: PatientLogsProps) => {
     start.setHours(0, 0, 0, 0);
     setRange({ start, end: now });
     setCurrentPage(1); // Reset to first page when changing filter
+    setCurrentPreset(days);
   };
 
   // Pagination logic
@@ -53,14 +55,6 @@ export const PatientLogs = ({ patientId }: PatientLogsProps) => {
       setCurrentPage(page);
     }
   };
-
-  // Calculate which preset is currently active
-  const getCurrentPreset = () => {
-    const days = Math.round((range.end.getTime() - range.start.getTime()) / (1000 * 60 * 60 * 24));
-    return [7, 14, 30, 90].find((d) => d === days) || null;
-  };
-
-  const currentPreset = getCurrentPreset();
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

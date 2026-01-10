@@ -68,7 +68,7 @@ const styles = StyleSheet.create({
   },
   logoSection: {
     alignItems: "center",
-    marginBottom: theme.spacing.xxxl,
+    marginTop: theme.spacing.xxxl,
   },
   iconContainer: {
     width: 80,

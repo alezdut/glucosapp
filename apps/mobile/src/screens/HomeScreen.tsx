@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
   },
   statCard: {
     alignItems: "center",
-    paddingVertical: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255, 255, 255, 0.2)",
   },

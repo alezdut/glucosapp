@@ -4,7 +4,6 @@ import { PatientListItem } from "@/lib/dashboard-api";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { formatTimeAgo, getDiabetesTypeLabel } from "@glucosapp/utils";
-import { getStatusBadgeColor } from "@/utils/patient-utils";
 import { PatientAvatar } from "./PatientAvatar";
 import { DiabetesType } from "@glucosapp/types";
 
@@ -25,7 +24,6 @@ export const PatientCard = ({ patient }: PatientCardProps) => {
     return null;
   }
 
-  const statusBadgeColor = getStatusBadgeColor(patient.status);
   const patientName = getPatientName(patient);
   const diabetesTypeLabel = getDiabetesTypeLabel(patient.diabetesType as DiabetesType, null);
 
@@ -33,7 +31,7 @@ export const PatientCard = ({ patient }: PatientCardProps) => {
   const displayDiabetesType = diabetesTypeLabel ? diabetesTypeLabel : null;
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow min-w-[400px]">
       <div className="flex items-start gap-4">
         {/* Avatar with status indicator */}
         <PatientAvatar
@@ -70,7 +68,9 @@ export const PatientCard = ({ patient }: PatientCardProps) => {
 
           {/* Status badge */}
           <div className="flex items-center justify-between">
-            <span className={`px-2 py-1 rounded text-xs font-medium ${statusBadgeColor}`}>
+            <span
+              className={`px-2 py-1 rounded text-xs font-medium ${patient.status === "Riesgo" ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"}`}
+            >
               {patient.status}
             </span>
 

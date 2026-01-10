@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import { getActivityDotColor } from "@/utils/patient-utils";
 
 interface PatientAvatarProps {
   avatarUrl?: string;
@@ -70,7 +69,7 @@ export const PatientAvatar = ({
       )}
       {/* Activity status indicator */}
       <div
-        className={`${getActivityDotColor(activityStatus)} absolute bottom-0 right-0 ${sizes.dot} rounded-full ${sizes.border} border-white`}
+        className={`${activityStatus === "Activo" ? "bg-green-500" : "bg-gray-400"} absolute bottom-0 right-0 ${sizes.dot} rounded-full ${sizes.border} border-white`}
       />
     </div>
   );

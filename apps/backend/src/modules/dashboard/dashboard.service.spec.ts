@@ -179,6 +179,379 @@ describe("DashboardService", () => {
 
       expect(result.data.length).toBeGreaterThan(0);
     });
+
+    describe("interpolation logic", () => {
+      const patientIds = [patientId];
+
+      // Helper function to create a date N days ago
+      const daysAgo = (n: number): Date => {
+        const date = new Date();
+        date.setDate(date.getDate() - n);
+        date.setHours(12, 0, 0, 0); // Set to noon to avoid timezone issues
+        return date;
+      };
+
+      // Helper function to get date key (YYYY-MM-DD)
+      const getDateKey = (date: Date): string => {
+        return date.toISOString().split("T")[0];
+      };
+
+      beforeEach(() => {
+        (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(patientIds);
+        (prismaService.glucoseReading.findMany as jest.Mock).mockResolvedValue([]);
+      });
+
+      it("should return empty array when no data (so frontend can show informative message)", async () => {
+        (prismaService.glucoseEntry.findMany as jest.Mock).mockResolvedValue([]);
+
+        const result = await service.getGlucoseEvolution(doctorId);
+
+        expect(result.data).toHaveLength(0);
+        expect(result.data).toEqual([]);
+      });
+
+      it("should set all 15 days to the same value when only 1 day has data", async () => {
+        const targetDay = daysAgo(7); // Day 7 (middle of the 15-day range)
+        const glucoseValue = 120;
+
+        const glucoseEntries = [
+          {
+            mgdlEncrypted: `encrypted-${glucoseValue}`,
+            recordedAt: targetDay,
+          },
+        ];
+
+        (prismaService.glucoseEntry.findMany as jest.Mock).mockResolvedValue(glucoseEntries);
+
+        const result = await service.getGlucoseEvolution(doctorId);
+
+        expect(result.data).toHaveLength(15);
+        result.data.forEach((point) => {
+          expect(point.averageGlucose).toBe(glucoseValue);
+          expect(point.minGlucose).toBe(glucoseValue);
+          expect(point.maxGlucose).toBe(glucoseValue);
+        });
+      });
+
+      it("should set all 15 days to the same value when only 1 day has data (first day)", async () => {
+        const targetDay = daysAgo(14); // First day
+        const glucoseValue = 130;
+
+        const glucoseEntries = [
+          {
+            mgdlEncrypted: `encrypted-${glucoseValue}`,
+            recordedAt: targetDay,
+          },
+        ];
+
+        (prismaService.glucoseEntry.findMany as jest.Mock).mockResolvedValue(glucoseEntries);
+
+        const result = await service.getGlucoseEvolution(doctorId);
+
+        expect(result.data).toHaveLength(15);
+        result.data.forEach((point) => {
+          expect(point.averageGlucose).toBe(glucoseValue);
+        });
+      });
+
+      it("should set all 15 days to the same value when only 1 day has data (last day)", async () => {
+        const targetDay = daysAgo(0); // Today (last day)
+        const glucoseValue = 140;
+
+        const glucoseEntries = [
+          {
+            mgdlEncrypted: `encrypted-${glucoseValue}`,
+            recordedAt: targetDay,
+          },
+        ];
+
+        (prismaService.glucoseEntry.findMany as jest.Mock).mockResolvedValue(glucoseEntries);
+
+        const result = await service.getGlucoseEvolution(doctorId);
+
+        expect(result.data).toHaveLength(15);
+        result.data.forEach((point) => {
+          expect(point.averageGlucose).toBe(glucoseValue);
+        });
+      });
+
+      it("should interpolate linearly between 2 days with data", async () => {
+        const firstDay = daysAgo(10); // Day 4 (index 4)
+        const lastDay = daysAgo(5); // Day 9 (index 9)
+        const firstValue = 100;
+        const lastValue = 150;
+
+        const glucoseEntries = [
+          {
+            mgdlEncrypted: `encrypted-${firstValue}`,
+            recordedAt: firstDay,
+          },
+          {
+            mgdlEncrypted: `encrypted-${lastValue}`,
+            recordedAt: lastDay,
+          },
+        ];
+
+        (prismaService.glucoseEntry.findMany as jest.Mock).mockResolvedValue(glucoseEntries);
+
+        const result = await service.getGlucoseEvolution(doctorId);
+
+        expect(result.data).toHaveLength(15);
+
+        // Find indices of data points
+        const firstDataIndex = result.data.findIndex((p) => getDateKey(firstDay) === p.date);
+        const lastDataIndex = result.data.findIndex((p) => getDateKey(lastDay) === p.date);
+
+        expect(firstDataIndex).toBeGreaterThanOrEqual(0);
+        expect(lastDataIndex).toBeGreaterThanOrEqual(0);
+        expect(firstDataIndex).toBeLessThan(lastDataIndex);
+
+        // Days before first data point should equal first value
+        for (let i = 0; i < firstDataIndex; i++) {
+          expect(result.data[i].averageGlucose).toBe(firstValue);
+        }
+
+        // First data point should have the correct value
+        expect(result.data[firstDataIndex].averageGlucose).toBe(firstValue);
+
+        // Days between should be linearly interpolated
+        const distance = lastDataIndex - firstDataIndex;
+        for (let i = firstDataIndex + 1; i < lastDataIndex; i++) {
+          const position = i - firstDataIndex;
+          const expectedValue = Math.round(
+            firstValue + ((lastValue - firstValue) * position) / distance,
+          );
+          expect(result.data[i].averageGlucose).toBe(expectedValue);
+        }
+
+        // Last data point should have the correct value
+        expect(result.data[lastDataIndex].averageGlucose).toBe(lastValue);
+
+        // Days after last data point should equal last value
+        for (let i = lastDataIndex + 1; i < result.data.length; i++) {
+          expect(result.data[i].averageGlucose).toBe(lastValue);
+        }
+      });
+
+      it("should interpolate linearly between 2 days with data (first and last day)", async () => {
+        const firstDay = daysAgo(14); // First day (index 0)
+        const lastDay = daysAgo(0); // Last day (index 14)
+        const firstValue = 90;
+        const lastValue = 110;
+
+        const glucoseEntries = [
+          {
+            mgdlEncrypted: `encrypted-${firstValue}`,
+            recordedAt: firstDay,
+          },
+          {
+            mgdlEncrypted: `encrypted-${lastValue}`,
+            recordedAt: lastDay,
+          },
+        ];
+
+        (prismaService.glucoseEntry.findMany as jest.Mock).mockResolvedValue(glucoseEntries);
+
+        const result = await service.getGlucoseEvolution(doctorId);
+
+        expect(result.data).toHaveLength(15);
+
+        // First day should have first value
+        expect(result.data[0].averageGlucose).toBe(firstValue);
+
+        // Days between should be linearly interpolated
+        const distance = 14;
+        for (let i = 1; i < 14; i++) {
+          const expectedValue = Math.round(firstValue + ((lastValue - firstValue) * i) / distance);
+          expect(result.data[i].averageGlucose).toBe(expectedValue);
+        }
+
+        // Last day should have last value
+        expect(result.data[14].averageGlucose).toBe(lastValue);
+      });
+
+      it("should interpolate linearly between 2 days with data (decreasing trend)", async () => {
+        const firstDay = daysAgo(10);
+        const lastDay = daysAgo(5);
+        const firstValue = 150;
+        const lastValue = 100;
+
+        const glucoseEntries = [
+          {
+            mgdlEncrypted: `encrypted-${firstValue}`,
+            recordedAt: firstDay,
+          },
+          {
+            mgdlEncrypted: `encrypted-${lastValue}`,
+            recordedAt: lastDay,
+          },
+        ];
+
+        (prismaService.glucoseEntry.findMany as jest.Mock).mockResolvedValue(glucoseEntries);
+
+        const result = await service.getGlucoseEvolution(doctorId);
+
+        expect(result.data).toHaveLength(15);
+
+        const firstDataIndex = result.data.findIndex((p) => getDateKey(firstDay) === p.date);
+        const lastDataIndex = result.data.findIndex((p) => getDateKey(lastDay) === p.date);
+
+        // Days between should be linearly interpolated (decreasing)
+        const distance = lastDataIndex - firstDataIndex;
+        for (let i = firstDataIndex + 1; i < lastDataIndex; i++) {
+          const position = i - firstDataIndex;
+          const expectedValue = Math.round(
+            firstValue + ((lastValue - firstValue) * position) / distance,
+          );
+          expect(result.data[i].averageGlucose).toBe(expectedValue);
+          // Should be decreasing
+          expect(result.data[i].averageGlucose).toBeLessThanOrEqual(
+            result.data[i - 1].averageGlucose,
+          );
+        }
+      });
+
+      it("should handle 3 days with data correctly", async () => {
+        const day1 = daysAgo(12);
+        const day2 = daysAgo(6);
+        const day3 = daysAgo(2);
+        const value1 = 100;
+        const value2 = 150;
+        const value3 = 120;
+
+        const glucoseEntries = [
+          {
+            mgdlEncrypted: `encrypted-${value1}`,
+            recordedAt: day1,
+          },
+          {
+            mgdlEncrypted: `encrypted-${value2}`,
+            recordedAt: day2,
+          },
+          {
+            mgdlEncrypted: `encrypted-${value3}`,
+            recordedAt: day3,
+          },
+        ];
+
+        (prismaService.glucoseEntry.findMany as jest.Mock).mockResolvedValue(glucoseEntries);
+
+        const result = await service.getGlucoseEvolution(doctorId);
+
+        expect(result.data).toHaveLength(15);
+
+        const index1 = result.data.findIndex((p) => getDateKey(day1) === p.date);
+        const index2 = result.data.findIndex((p) => getDateKey(day2) === p.date);
+        const index3 = result.data.findIndex((p) => getDateKey(day3) === p.date);
+
+        // Verify data points have correct values
+        expect(result.data[index1].averageGlucose).toBe(value1);
+        expect(result.data[index2].averageGlucose).toBe(value2);
+        expect(result.data[index3].averageGlucose).toBe(value3);
+
+        // Days before first should equal first value
+        for (let i = 0; i < index1; i++) {
+          expect(result.data[i].averageGlucose).toBe(value1);
+        }
+
+        // Days between day1 and day2 should be linearly interpolated
+        const distance1 = index2 - index1;
+        for (let i = index1 + 1; i < index2; i++) {
+          const position = i - index1;
+          const expectedValue = Math.round(value1 + ((value2 - value1) * position) / distance1);
+          expect(result.data[i].averageGlucose).toBe(expectedValue);
+        }
+
+        // Days between day2 and day3 should be linearly interpolated
+        const distance2 = index3 - index2;
+        for (let i = index2 + 1; i < index3; i++) {
+          const position = i - index2;
+          const expectedValue = Math.round(value2 + ((value3 - value2) * position) / distance2);
+          expect(result.data[i].averageGlucose).toBe(expectedValue);
+        }
+
+        // Days after last should equal last value
+        for (let i = index3 + 1; i < result.data.length; i++) {
+          expect(result.data[i].averageGlucose).toBe(value3);
+        }
+      });
+
+      it("should handle consecutive days with data", async () => {
+        const day1 = daysAgo(5);
+        const day2 = daysAgo(4);
+        const value1 = 120;
+        const value2 = 130;
+
+        const glucoseEntries = [
+          {
+            mgdlEncrypted: `encrypted-${value1}`,
+            recordedAt: day1,
+          },
+          {
+            mgdlEncrypted: `encrypted-${value2}`,
+            recordedAt: day2,
+          },
+        ];
+
+        (prismaService.glucoseEntry.findMany as jest.Mock).mockResolvedValue(glucoseEntries);
+
+        const result = await service.getGlucoseEvolution(doctorId);
+
+        expect(result.data).toHaveLength(15);
+
+        const index1 = result.data.findIndex((p) => getDateKey(day1) === p.date);
+        const index2 = result.data.findIndex((p) => getDateKey(day2) === p.date);
+
+        expect(result.data[index1].averageGlucose).toBe(value1);
+        expect(result.data[index2].averageGlucose).toBe(value2);
+
+        // No days between consecutive days, so no interpolation needed
+        expect(index2).toBe(index1 + 1);
+      });
+
+      it("should handle multiple readings on the same day", async () => {
+        const targetDay = daysAgo(7);
+        const readings = [100, 110, 120, 130];
+
+        // Create entries all on the same calendar day (use same date, different times)
+        const baseDate = new Date(targetDay);
+        baseDate.setHours(0, 0, 0, 0);
+        const glucoseEntries = readings.map((value, idx) => ({
+          mgdlEncrypted: `encrypted-${value}`,
+          recordedAt: new Date(baseDate.getTime() + idx * 6 * 60 * 60 * 1000), // 6 hours apart
+        }));
+
+        (prismaService.glucoseEntry.findMany as jest.Mock).mockResolvedValue(glucoseEntries);
+
+        const result = await service.getGlucoseEvolution(doctorId);
+
+        expect(result.data).toHaveLength(15);
+
+        // Find the data point - it should be the one where minGlucose !== averageGlucose
+        // (interpolated points have minGlucose === averageGlucose)
+        const expectedAverage = Math.round(readings.reduce((a, b) => a + b, 0) / readings.length);
+        const expectedMin = Math.min(...readings);
+        const expectedMax = Math.max(...readings);
+
+        const targetPoint = result.data.find(
+          (p) => p.minGlucose !== p.averageGlucose || p.maxGlucose !== p.averageGlucose,
+        );
+
+        expect(targetPoint).toBeDefined();
+        expect(targetPoint!.averageGlucose).toBe(expectedAverage);
+        expect(targetPoint!.minGlucose).toBe(expectedMin);
+        expect(targetPoint!.maxGlucose).toBe(expectedMax);
+
+        // All other days (interpolated) should equal this average for all values
+        result.data.forEach((point) => {
+          if (point !== targetPoint) {
+            expect(point.averageGlucose).toBe(expectedAverage);
+            expect(point.minGlucose).toBe(expectedAverage);
+            expect(point.maxGlucose).toBe(expectedAverage);
+          }
+        });
+      });
+    });
   });
 
   describe("getInsulinStats", () => {

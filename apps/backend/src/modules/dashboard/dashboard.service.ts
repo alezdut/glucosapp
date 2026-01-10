@@ -193,26 +193,112 @@ export class DashboardService {
     // Calculate daily average across all patients for each day
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const data: GlucoseEvolutionPointDto[] = [];
 
-    for (let i = 14; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      const dateKey = date.toISOString().split("T")[0];
+    // First pass: Build all 15 days and calculate averages for days with data
+    const data: (GlucoseEvolutionPointDto & { hasData: boolean })[] = Array.from(
+      { length: 15 },
+      (_, i) => {
+        const daysAgo = 14 - i;
+        const date = new Date(today);
+        date.setDate(date.getDate() - daysAgo);
+        const dateKey = date.toISOString().split("T")[0];
 
-      const values = groupedByDate.get(dateKey) || [];
-      // Only include days with data (daily average of all patients)
-      if (values.length > 0) {
-        data.push({
+        const values = groupedByDate.get(dateKey) || [];
+        if (values.length > 0) {
+          // Day has data - calculate normally
+          return {
+            date: dateKey,
+            averageGlucose: Math.round(values.reduce((a, b) => a + b, 0) / values.length),
+            minGlucose: Math.min(...values),
+            maxGlucose: Math.max(...values),
+            hasData: true,
+          };
+        }
+        // Day has no data - will interpolate in second pass
+        return {
           date: dateKey,
-          averageGlucose: Math.round(values.reduce((a, b) => a + b, 0) / values.length),
-          minGlucose: Math.min(...values),
-          maxGlucose: Math.max(...values),
-        });
-      }
+          averageGlucose: 0, // Placeholder, will be calculated
+          minGlucose: 0, // Placeholder, will be calculated
+          maxGlucose: 0, // Placeholder, will be calculated
+          hasData: false,
+        };
+      },
+    );
+
+    // Second pass: Interpolate missing values for days without data
+    // Find all indices with data
+    const dataIndices = data
+      .map((point, index) => (point.hasData ? index : null))
+      .filter((index): index is number => index !== null);
+
+    // If no data at all, return empty array so frontend can show informative message
+    if (dataIndices.length === 0) {
+      return { data: [] };
     }
 
-    return { data };
+    // If only one day has data, all days should equal that value
+    if (dataIndices.length === 1) {
+      const singleDataIndex = dataIndices[0];
+      const singleDataPoint = data[singleDataIndex];
+      return {
+        data: data.map(({ hasData, ...point }, index) => {
+          if (index === singleDataIndex) {
+            // Preserve original values for the day with data
+            return point;
+          }
+          // Interpolated days use averageGlucose for all values
+          return {
+            ...point,
+            averageGlucose: singleDataPoint.averageGlucose,
+            minGlucose: singleDataPoint.averageGlucose,
+            maxGlucose: singleDataPoint.averageGlucose,
+          };
+        }),
+      };
+    }
+
+    // Interpolate for days without data
+    const interpolatedData = data.map((point, index) => {
+      if (point.hasData) {
+        return point;
+      }
+
+      let interpolatedValue: number;
+
+      // Find the closest data points before and after this index
+      const beforeIndex = dataIndices.filter((i) => i < index).pop();
+      const afterIndex = dataIndices.find((i) => i > index);
+
+      if (beforeIndex === undefined && afterIndex !== undefined) {
+        // Before first data point: use first data point value
+        interpolatedValue = data[afterIndex].averageGlucose;
+      } else if (beforeIndex !== undefined && afterIndex === undefined) {
+        // After last data point: use last data point value
+        interpolatedValue = data[beforeIndex].averageGlucose;
+      } else if (beforeIndex !== undefined && afterIndex !== undefined) {
+        // Between two data points: linear interpolation
+        const beforeValue = data[beforeIndex].averageGlucose;
+        const afterValue = data[afterIndex].averageGlucose;
+        const distance = afterIndex - beforeIndex;
+        const position = index - beforeIndex;
+        interpolatedValue = Math.round(
+          beforeValue + ((afterValue - beforeValue) * position) / distance,
+        );
+      } else {
+        // Should not happen, but fallback to 0
+        interpolatedValue = 0;
+      }
+
+      return {
+        ...point,
+        averageGlucose: interpolatedValue,
+        minGlucose: interpolatedValue,
+        maxGlucose: interpolatedValue,
+      };
+    });
+
+    // Remove hasData property before returning
+    return { data: interpolatedData.map(({ hasData, ...point }) => point) };
   }
 
   /**
@@ -428,7 +514,6 @@ export class DashboardService {
       const year = targetMonth < 0 ? targetYear - 1 : targetYear;
       const month = targetMonth < 0 ? 12 + targetMonth : targetMonth;
       const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
-
       const values = groupedByMonth.get(monthKey) || [];
       if (values.length > 0) {
         // Calculate average, min, max for the month (even if partial)
