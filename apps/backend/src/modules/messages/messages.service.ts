@@ -519,8 +519,12 @@ export class MessagesService {
     let decryptedContent: string;
     try {
       decryptedContent = this.encryptionService.decrypt(message.content);
-    } catch {
-      // Fallback for legacy unencrypted messages
+    } catch (error) {
+      // Fallback for legacy unencrypted messages - log for monitoring
+      this.logger.warn(
+        `Failed to decrypt message ${message.id}, using raw content as fallback`,
+        error instanceof Error ? error.message : String(error),
+      );
       decryptedContent = message.content;
     }
 
