@@ -704,14 +704,14 @@ describe("ReportsService", () => {
       // Values: [70, 80, 90, 100, 110, 120, 130, 140, 150, 180, 200, 250]
       // Average: (70+80+90+100+110+120+130+140+150+180+200+250)/12 = 135.0
       // Sorted: [70, 80, 90, 100, 110, 120, 130, 140, 150, 180, 200, 250]
-      // Median: (120+130)/2 = 125, but code uses Math.floor(length/2) = index 6 = 130
+      // Median: (120+130)/2 = 125 (correct calculation for even-length array)
       // P25: index 3 = 100, P75: index 9 = 180
       // In range (80-140): 7 values = 58.3%
       // Hypoglycemia (<70): 0 (70 is not < 70)
       // Hyperglycemia (>180): 2 values (200, 250) = 16.7%
       expect(csv).toContain("Glucosa,Total de lecturas,12,lecturas");
       expect(csv).toContain("Glucosa,Promedio,135.0,mg/dL");
-      expect(csv).toContain("Glucosa,Mediana,130.0,mg/dL");
+      expect(csv).toContain("Glucosa,Mediana,125.0,mg/dL");
       expect(csv).toContain("Glucosa,Mínimo,70,mg/dL");
       expect(csv).toContain("Glucosa,Máximo,250,mg/dL");
       expect(csv).toContain("Glucosa,Percentil 25,100,mg/dL");
@@ -1193,7 +1193,7 @@ describe("ReportsService", () => {
       // Test values: [60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 180, 200, 250, 300]
       // Expected: avg=141.43 rounded to 141.4
       // Sorted: [60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 180, 200, 250, 300]
-      // Median: index 7 = 130
+      // Median: (value[6] + value[7])/2 = (120 + 130)/2 = 125
       // P25: index 3 = 90, P75: index 10 = 180
       // In range (80-140): 7 values = 50%
       // Hypoglycemia (<70): 1 value (60) = 7.1%
@@ -1225,7 +1225,7 @@ describe("ReportsService", () => {
       // Values: [60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 180, 200, 250, 300]
       // Average: (60+70+80+90+100+110+120+130+140+150+180+200+250+300)/14 = 141.43 rounded to 141.4
       // Sorted: [60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 180, 200, 250, 300]
-      // Median: index 7 = 130
+      // Median: (value[6] + value[7])/2 = (120 + 130)/2 = 125 (correct calculation for even-length array)
       // P25: index 3 = 90, P75: index 10 = 180
       // In range (80-140): 7 values = 50%
       // Hypoglycemia (<70): 1 value (60) = 7.1%
@@ -1234,7 +1234,7 @@ describe("ReportsService", () => {
       // Severe hyper (>250): 1 value (300) = 7.1%
       expect(csv).toContain("Glucosa,Total de lecturas,14,lecturas");
       expect(csv).toContain("Glucosa,Promedio,141.4,mg/dL");
-      expect(csv).toContain("Glucosa,Mediana,130.0,mg/dL");
+      expect(csv).toContain("Glucosa,Mediana,125.0,mg/dL");
       expect(csv).toContain("Glucosa,Mínimo,60,mg/dL");
       expect(csv).toContain("Glucosa,Máximo,300,mg/dL");
       expect(csv).toContain("Glucosa,Percentil 25,90,mg/dL");

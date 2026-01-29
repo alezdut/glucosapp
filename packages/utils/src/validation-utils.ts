@@ -238,11 +238,11 @@ export const validateGlucoseForDoseCalculation = (value: number | undefined): Va
     return { isValid: true }; // Don't block if no value
   }
 
-  // Backend algorithm requires minimum 40 mg/dL for dose calculation
-  if (value < 40) {
+  // Backend algorithm requires minimum CRITICAL_MIN_GLUCOSE for dose calculation
+  if (value < GLUCOSE_LIMITS.CRITICAL_MIN) {
     return {
       isValid: false,
-      message: "La glucosa debe ser al menos 40 mg/dL para calcular la dosis de insulina",
+      message: `La glucosa debe ser al menos ${GLUCOSE_LIMITS.CRITICAL_MIN} mg/dL para calcular la dosis de insulina`,
       severity: "error",
     };
   }

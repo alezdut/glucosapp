@@ -92,13 +92,9 @@ export interface PatientDemographics {
 
 /**
  * Diabetes type distribution statistics
+ * Keys are DiabetesType enum values or "unknown"
  */
-export interface DiabetesTypeDistribution {
-  type1: number;
-  type2: number;
-  gestational: number;
-  other: number;
-}
+export type DiabetesTypeDistribution = Record<string, number>;
 
 /**
  * Age distribution statistics

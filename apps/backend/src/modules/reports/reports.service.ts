@@ -285,7 +285,12 @@ export class ReportsService {
               average: ages.reduce((a: number, b: number) => a + b, 0) / ages.length,
               min: Math.min(...ages),
               max: Math.max(...ages),
-              median: ages.sort((a, b) => a - b)[Math.floor(ages.length / 2)],
+              median:
+                ages.length % 2 === 0
+                  ? (ages.sort((a, b) => a - b)[ages.length / 2 - 1] +
+                      ages.sort((a, b) => a - b)[ages.length / 2]) /
+                    2
+                  : ages.sort((a, b) => a - b)[Math.floor(ages.length / 2)],
             }
           : null,
       weightStats:
@@ -294,7 +299,12 @@ export class ReportsService {
               average: weights.reduce((a: number, b: number) => a + b, 0) / weights.length,
               min: Math.min(...weights),
               max: Math.max(...weights),
-              median: weights.sort((a, b) => a - b)[Math.floor(weights.length / 2)],
+              median:
+                weights.length % 2 === 0
+                  ? (weights.sort((a, b) => a - b)[weights.length / 2 - 1] +
+                      weights.sort((a, b) => a - b)[weights.length / 2]) /
+                    2
+                  : weights.sort((a, b) => a - b)[Math.floor(weights.length / 2)],
             }
           : null,
       targetGlucoseRange:
@@ -319,7 +329,11 @@ export class ReportsService {
       if (glucoseValues.length > 0) {
         const sortedValues = [...glucoseValues].sort((a, b) => a - b);
         const avg = glucoseValues.reduce((a: number, b: number) => a + b, 0) / glucoseValues.length;
-        const median = sortedValues[Math.floor(sortedValues.length / 2)];
+        const median =
+          sortedValues.length % 2 === 0
+            ? (sortedValues[sortedValues.length / 2 - 1] + sortedValues[sortedValues.length / 2]) /
+              2
+            : sortedValues[Math.floor(sortedValues.length / 2)];
         const p25 = sortedValues[Math.floor(sortedValues.length * 0.25)];
         const p75 = sortedValues[Math.floor(sortedValues.length * 0.75)];
 
@@ -1000,6 +1014,12 @@ export class ReportsService {
     }
 
     const str = String(value);
+
+    // Prevent CSV injection by prefixing dangerous characters
+    const dangerousStartChars = ["=", "+", "-", "@", "\t", "\r"];
+    if (dangerousStartChars.some((char) => str.startsWith(char))) {
+      return `"'${str.replace(/"/g, '""')}"`;
+    }
 
     // If value contains comma, quote, or newline, wrap in quotes and escape internal quotes
     if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")) {
