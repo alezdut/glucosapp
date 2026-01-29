@@ -15,6 +15,7 @@
   "dependencies": {
     "@babel/runtime": "^7.28.4",
     "@glucosapp/api-client": "workspace:*",
+    "@glucosapp/auth-utils": "workspace:*",
     "@glucosapp/theme": "workspace:*",
     "@glucosapp/types": "workspace:*",
     "@glucosapp/utils": "workspace:*",

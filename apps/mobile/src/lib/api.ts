@@ -1,4 +1,6 @@
 import { makeApiClient } from "@glucosapp/api-client";
+import { isTokenExpiringSoon } from "@glucosapp/auth-utils";
+import { throwApiError } from "@glucosapp/utils";
 import * as SecureStore from "expo-secure-store";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:3000";
@@ -10,33 +12,6 @@ const REFRESH_TOKEN_KEY = "refreshToken";
 // Flag to prevent multiple simultaneous refresh attempts
 let isRefreshing = false;
 let refreshPromise: Promise<{ accessToken: string; refreshToken: string } | null> | null = null;
-
-/**
- * Decode JWT to get expiration time
- */
-const getTokenExpiration = (token: string): number | null => {
-  try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return payload.exp ? payload.exp * 1000 : null;
-  } catch {
-    return null;
-  }
-};
-
-/**
- * Check if token is expired or about to expire
- */
-const isTokenExpiringSoon = (token: string): boolean => {
-  const expiration = getTokenExpiration(token);
-  if (!expiration) return true;
-
-  const now = Date.now();
-  const timeUntilExpiry = expiration - now;
-  const oneMinute = 60 * 1000;
-
-  // Consider token expiring if it expires in less than 1 minute
-  return timeUntilExpiry < oneMinute;
-};
 
 /**
  * Store authentication tokens securely
@@ -324,7 +299,7 @@ export async function getAssignedDoctor(): Promise<AssignedDoctor | null> {
   const response = await client.GET<AssignedDoctor>("/profile/doctor");
 
   if (response.error) {
-    throw new Error(response.error.message || "Failed to fetch assigned doctor");
+    throwApiError(response.error, "Failed to fetch assigned doctor");
   }
 
   return response.data ?? null;
@@ -343,7 +318,7 @@ export async function markMessagesAsReadBatch(
   );
 
   if (response.error) {
-    throw new Error(response.error.message || "Failed to mark messages as read");
+    throwApiError(response.error, "Failed to mark messages as read");
   }
 
   if (!response.data) {
