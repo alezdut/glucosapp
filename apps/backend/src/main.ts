@@ -1,11 +1,12 @@
 import "reflect-metadata";
-import { ValidationPipe, VersioningType } from "@nestjs/common";
+import { ValidationPipe, VersioningType, Logger } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const logger = new Logger("Bootstrap");
   const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [];
   app.enableCors({
     origin: allowedOrigins,
@@ -27,7 +28,6 @@ async function bootstrap() {
 
   const port = process.env.PORT ? Number(process.env.PORT) : 3000;
   await app.listen(port, "0.0.0.0");
-  // eslint-disable-next-line no-console
-  console.log(`API running on http://0.0.0.0:${port}/v1 (docs: /docs)`);
+  logger.log(`API running on http://0.0.0.0:${port}/v1 (docs: /docs)`);
 }
 bootstrap();

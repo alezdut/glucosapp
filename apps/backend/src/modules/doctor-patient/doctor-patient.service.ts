@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   NotFoundException,
   ConflictException,
+  Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { UserRole, DiabetesType, GlucoseEntry } from "@prisma/client";
@@ -41,6 +42,8 @@ type LogEntryWithDecryptedGlucose = Omit<
 
 @Injectable()
 export class DoctorPatientService {
+  private readonly logger = new Logger(DoctorPatientService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly doctorUtils: DoctorUtilsService,
@@ -72,9 +75,9 @@ export class DoctorPatientService {
           recordedAt: lastGlucoseEntry.recordedAt,
         };
       } catch (error) {
-        console.error(
-          `[DoctorPatient] Failed to decrypt glucose entry for patient ${patientId}:`,
-          error,
+        this.logger.error(
+          `Failed to decrypt glucose entry for patient ${patientId}`,
+          error instanceof Error ? error.stack : String(error),
         );
       }
     }
@@ -96,9 +99,9 @@ export class DoctorPatientService {
           recordedAt: lastGlucoseReadingRecord.recordedAt,
         };
       } catch (error) {
-        console.error(
-          `[DoctorPatient] Failed to decrypt glucose reading for patient ${patientId}:`,
-          error,
+        this.logger.error(
+          `Failed to decrypt glucose reading for patient ${patientId}`,
+          error instanceof Error ? error.stack : String(error),
         );
       }
     }
@@ -370,9 +373,9 @@ export class DoctorPatientService {
             recordedAt: glucoseEntry.recordedAt,
           };
         } catch (error) {
-          console.error(
-            `[DoctorPatient] Failed to decrypt glucose entry for patient ${patient.id}:`,
-            error,
+          this.logger.error(
+            `Failed to decrypt glucose entry for patient ${patient.id}`,
+            error instanceof Error ? error.stack : String(error),
           );
         }
       } else {
@@ -388,9 +391,9 @@ export class DoctorPatientService {
               recordedAt: glucoseReading.recordedAt,
             };
           } catch (error) {
-            console.error(
-              `[DoctorPatient] Failed to decrypt glucose reading for patient ${patient.id}:`,
-              error,
+            this.logger.error(
+              `Failed to decrypt glucose reading for patient ${patient.id}`,
+              error instanceof Error ? error.stack : String(error),
             );
           }
         }
@@ -576,27 +579,13 @@ export class DoctorPatientService {
       }),
     ]);
 
-    // Decrypt glucose entries
-    const decryptedEntries = glucoseEntries
-      .map((entry) => {
-        try {
-          return this.encryptionService.decryptGlucoseValue(entry.mgdlEncrypted);
-        } catch (error) {
-          return null;
-        }
-      })
-      .filter((entry) => entry !== null) as number[];
-
-    // Decrypt glucose readings
-    const decryptedReadings = glucoseReadings
-      .map((reading) => {
-        try {
-          return this.encryptionService.decryptGlucoseValue(reading.glucoseEncrypted);
-        } catch (error) {
-          return null;
-        }
-      })
-      .filter((reading) => reading !== null) as number[];
+    // Decrypt glucose entries and readings using batch method
+    const decryptedEntries = this.encryptionService.decryptGlucoseValues(
+      glucoseEntries.map((e) => e.mgdlEncrypted),
+    );
+    const decryptedReadings = this.encryptionService.decryptGlucoseValues(
+      glucoseReadings.map((r) => r.glucoseEncrypted),
+    );
 
     // Combine all glucose values
     const allGlucoseValues = [...decryptedEntries, ...decryptedReadings];
@@ -1017,9 +1006,9 @@ export class DoctorPatientService {
             },
           } as LogEntryWithDecryptedGlucose;
         } catch (error) {
-          console.error(
-            `[DoctorPatient] Failed to decrypt glucose entry ${entry.glucoseEntry.id}:`,
-            error,
+          this.logger.error(
+            `Failed to decrypt glucose entry ${entry.glucoseEntry.id}`,
+            error instanceof Error ? error.stack : String(error),
           );
           // Return entry without decrypted value if decryption fails
           return entry as LogEntryWithDecryptedGlucose;

@@ -12,8 +12,20 @@ import {
   ReportType,
 } from "./dto/generate-report.dto";
 import { GetPatientsQueryDto } from "../doctor-patient/dto/get-patients-query.dto";
+import {
+  IndividualReportData,
+  GroupReportData,
+  PatientDemographics,
+  DiabetesTypeDistribution,
+  AgeDistribution,
+  WeightDistribution,
+  GlucoseData,
+  InsulinData,
+  MealsData,
+} from "./interfaces/report-data.interface";
 import PDFDocument from "pdfkit";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { DiabetesType } from "@prisma/client";
 
 @Injectable()
 export class ReportsService {
@@ -72,7 +84,7 @@ export class ReportsService {
     const endDate = new Date(endDateStr + "T23:59:59.999");
 
     // Collect data based on report types
-    const reportData: any = {
+    const reportData: Record<string, any> = {
       patient,
       startDate: dto.startDate,
       endDate: dto.endDate,
@@ -141,7 +153,7 @@ export class ReportsService {
     const filters: GetPatientsQueryDto = dto.filters
       ? {
           search: dto.filters.search,
-          diabetesType: dto.filters.diabetesType as any,
+          diabetesType: dto.filters.diabetesType as DiabetesType,
           activeOnly: dto.filters.activeOnly,
           registrationDate: dto.filters.registrationDate,
           clinicalStatus: dto.filters.clinicalStatus,
@@ -159,7 +171,7 @@ export class ReportsService {
     }
 
     // Collect aggregated data for all patients
-    const reportData: any = {
+    const reportData: Record<string, any> = {
       startDate: dto.startDate,
       endDate: dto.endDate,
       totalPatients: patients.length,
@@ -183,15 +195,15 @@ export class ReportsService {
     const patientDataMap = new Map((fullPatients || []).map((p) => [p.id, p]));
 
     // Collect patient demographics for aggregation
-    const patientDemographics: any[] = [];
+    const patientDemographics: PatientDemographics[] = [];
     for (const patient of patients) {
       const fullPatient = patientDataMap.get(patient.id);
       patientDemographics.push({
-        diabetesType: patient.diabetesType,
-        birthDate: fullPatient?.birthDate,
-        weight: fullPatient?.weight,
-        minTargetGlucose: fullPatient?.minTargetGlucose,
-        maxTargetGlucose: fullPatient?.maxTargetGlucose,
+        diabetesType: patient.diabetesType ?? null,
+        birthDate: fullPatient?.birthDate ?? null,
+        weight: fullPatient?.weight ?? null,
+        minTargetGlucose: fullPatient?.minTargetGlucose ?? null,
+        maxTargetGlucose: fullPatient?.maxTargetGlucose ?? null,
       });
     }
 
@@ -230,14 +242,21 @@ export class ReportsService {
     const [allGlucoseData, allInsulinData, allMealsData] = await Promise.all(dataPromises);
 
     // Aggregate demographics
-    const diabetesTypeCounts = patientDemographics.reduce((acc: any, p: any) => {
-      acc[p.diabetesType] = (acc[p.diabetesType] || 0) + 1;
-      return acc;
-    }, {});
+    const diabetesTypeCounts = patientDemographics.reduce(
+      (acc: Record<string, number>, p: PatientDemographics) => {
+        const type = p.diabetesType ?? "unknown";
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      },
+      {},
+    );
 
     const ages = patientDemographics
-      .filter((p: any) => p.birthDate)
-      .map((p: any) => {
+      .filter(
+        (p: PatientDemographics): p is PatientDemographics & { birthDate: Date } =>
+          p.birthDate !== null,
+      )
+      .map((p) => {
         const birthDate = new Date(p.birthDate);
         return Math.floor(
           (new Date().getTime() - birthDate.getTime()) / (1000 * 60 * 60 * 24 * 365),
@@ -245,11 +264,17 @@ export class ReportsService {
       });
 
     const weights = patientDemographics
-      .filter((p: any) => p.weight !== null && p.weight !== undefined)
-      .map((p: any) => p.weight);
+      .filter(
+        (p: PatientDemographics): p is PatientDemographics & { weight: number } =>
+          p.weight !== null && p.weight !== undefined,
+      )
+      .map((p) => p.weight);
 
     const targetGlucoseRanges = patientDemographics.filter(
-      (p: any) => p.minTargetGlucose !== null && p.maxTargetGlucose !== null,
+      (
+        p: PatientDemographics,
+      ): p is PatientDemographics & { minTargetGlucose: number; maxTargetGlucose: number } =>
+        p.minTargetGlucose !== null && p.maxTargetGlucose !== null,
     );
 
     reportData.demographics = {
@@ -276,10 +301,10 @@ export class ReportsService {
         targetGlucoseRanges.length > 0
           ? {
               averageMin:
-                targetGlucoseRanges.reduce((sum: number, p: any) => sum + p.minTargetGlucose, 0) /
+                targetGlucoseRanges.reduce((sum: number, p) => sum + p.minTargetGlucose, 0) /
                 targetGlucoseRanges.length,
               averageMax:
-                targetGlucoseRanges.reduce((sum: number, p: any) => sum + p.maxTargetGlucose, 0) /
+                targetGlucoseRanges.reduce((sum: number, p) => sum + p.maxTargetGlucose, 0) /
                 targetGlucoseRanges.length,
             }
           : null,
