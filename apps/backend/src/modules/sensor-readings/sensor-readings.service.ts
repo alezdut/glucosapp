@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, Inject, forwardRef } from "@nestjs/common";
+import { Injectable, BadRequestException, Inject, forwardRef, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { EncryptionService } from "../../common/services/encryption.service";
 import { AlertsService } from "../alerts/alerts.service";
@@ -12,6 +12,8 @@ import { ExportReadingsQueryDto, ExportFormat } from "./dto/export-readings-quer
  */
 @Injectable()
 export class SensorReadingsService {
+  private readonly logger = new Logger(SensorReadingsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly encryptionService: EncryptionService,
@@ -72,10 +74,10 @@ export class SensorReadingsService {
     if (!data.isHistorical) {
       // Ensure reading.id is available before calling detectAlert
       if (!reading.id) {
-        console.error("[SensorReadings] Reading ID is not available after creation");
+        this.logger.error("Reading ID is not available after creation");
       } else {
         this.alertsService.detectAlert(userId, data.glucose, reading.id).catch((error) => {
-          console.error("[SensorReadings] Failed to detect alert:", error);
+          this.logger.error("Failed to detect alert", error.stack);
         });
       }
     }
@@ -215,7 +217,7 @@ export class SensorReadingsService {
     // Detect alerts for non-historical readings after transaction completes
     for (const { readingId, glucoseValue } of result.readingsForAlertDetection) {
       this.alertsService.detectAlert(userId, glucoseValue, readingId).catch((error) => {
-        console.error("[SensorReadings] Failed to detect alert:", error);
+        this.logger.error("Failed to detect alert", error.stack);
       });
     }
 

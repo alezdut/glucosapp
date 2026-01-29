@@ -27,6 +27,12 @@ describe("DoctorPatientService", () => {
         const match = encrypted.match(/encrypted-(\d+)/);
         return match ? parseInt(match[1], 10) : 100;
       }),
+      decryptGlucoseValues: jest.fn((encryptedValues: string[]) => {
+        return encryptedValues.map((encrypted) => {
+          const match = encrypted.match(/encrypted-(\d+)/);
+          return match ? parseInt(match[1], 10) : 100;
+        });
+      }),
     };
     const mockDoctorUtilsService = {
       verifyDoctor: jest.fn().mockResolvedValue(undefined),

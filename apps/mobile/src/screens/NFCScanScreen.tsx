@@ -4,6 +4,7 @@ import { Animated, Easing } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Activity, Nfc } from "lucide-react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { useQueryClient } from "@tanstack/react-query";
 import { theme } from "../theme";
 import {
   parseLibreNfcData,
@@ -48,6 +49,7 @@ try {
  */
 const NFCScanScreen = () => {
   const navigation = useNavigation();
+  const queryClient = useQueryClient();
   const [isScanning, setIsScanning] = useState(false);
   const [sensorData, setSensorData] = useState<LibreSensorData | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -544,6 +546,10 @@ const NFCScanScreen = () => {
       const savedCount = result?.created || readingsToSave.length;
 
       console.log(`Successfully saved ${savedCount} readings`);
+
+      // Invalidar caché de estadísticas para que el HomeScreen se actualice
+      queryClient.invalidateQueries({ queryKey: ["statistics"] });
+
       // Refrescar el gráfico con datos de la base
       // Pequeño delay para asegurar que la DB haya actualizado
       setTimeout(() => {
