@@ -8,6 +8,7 @@ import {
 import { PrismaService } from "../../prisma/prisma.service";
 import { UserRole } from "@prisma/client";
 import { DoctorUtilsService } from "../../common/services/doctor-utils.service";
+import { EncryptionService } from "../../common/services/encryption.service";
 import { CreateMessageDto } from "./dto/create-message.dto";
 import {
   MessageResponseDto,
@@ -26,6 +27,7 @@ export class MessagesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly doctorUtils: DoctorUtilsService,
+    private readonly encryptionService: EncryptionService,
   ) {}
 
   /**
@@ -102,12 +104,13 @@ export class MessagesService {
       throw new ForbiddenException("Doctors can only send messages to their assigned patients");
     }
 
-    // Create message
+    // Encrypt and create message
+    const encryptedContent = this.encryptionService.encrypt(content.trim());
     const message = await this.prisma.message.create({
       data: {
         senderId,
         receiverId,
-        content: content.trim(),
+        content: encryptedContent,
       },
       include: {
         sender: {
@@ -487,6 +490,7 @@ export class MessagesService {
 
   /**
    * Map Prisma message to DTO
+   * Decrypts the message content before returning
    */
   private mapMessageToDto(message: {
     id: string;
@@ -511,11 +515,24 @@ export class MessagesService {
       avatarUrl: string | null;
     };
   }): MessageResponseDto {
+    // Decrypt message content
+    let decryptedContent: string;
+    try {
+      decryptedContent = this.encryptionService.decrypt(message.content);
+    } catch (error) {
+      // Fallback for legacy unencrypted messages - log for monitoring
+      this.logger.warn(
+        `Failed to decrypt message ${message.id}, using raw content as fallback`,
+        error instanceof Error ? error.message : String(error),
+      );
+      decryptedContent = message.content;
+    }
+
     return {
       id: message.id,
       senderId: message.senderId,
       receiverId: message.receiverId,
-      content: message.content,
+      content: decryptedContent,
       read: message.read,
       readAt: message.readAt ? message.readAt.toISOString() : undefined,
       createdAt: message.createdAt.toISOString(),

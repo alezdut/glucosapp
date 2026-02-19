@@ -6,6 +6,7 @@ import { MessagesController } from "./messages.controller";
 import { MessagesService } from "./messages.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { DoctorUtilsService } from "../../common/services/doctor-utils.service";
+import { EncryptionService } from "../../common/services/encryption.service";
 import { AuthModule } from "../auth/auth.module";
 
 /**
@@ -26,7 +27,13 @@ import { AuthModule } from "../auth/auth.module";
     }),
   ],
   controllers: [MessagesController],
-  providers: [MessagesGateway, MessagesService, PrismaService, DoctorUtilsService],
+  providers: [
+    MessagesGateway,
+    MessagesService,
+    PrismaService,
+    DoctorUtilsService,
+    EncryptionService,
+  ],
   exports: [MessagesService],
 })
 export class MessagesModule {}

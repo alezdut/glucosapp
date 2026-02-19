@@ -61,24 +61,14 @@ export async function refreshAccessToken(): Promise<{
   refreshPromise = (async () => {
     try {
       const currentRefreshToken = await getRefreshToken();
-      console.log("Attempting token refresh, has refresh token:", !!currentRefreshToken);
       if (!currentRefreshToken) {
-        console.log("No refresh token available");
         return null;
       }
 
-      console.log("Making refresh request to server");
       const { client } = makeApiClient(`${API_BASE_URL}/v1`);
       const response = await client.POST("/auth/refresh", {
         refreshToken: currentRefreshToken,
       });
-
-      console.log(
-        "Refresh response received, has data:",
-        !!response.data,
-        "has error:",
-        !!response.error,
-      );
 
       if (response.data) {
         const { accessToken, refreshToken } = response.data;
@@ -88,26 +78,18 @@ export async function refreshAccessToken(): Promise<{
 
       // If refresh fails, clear tokens only for certain errors
       if (response.error) {
-        console.error("Token refresh failed:", response.error);
         // Only clear tokens for 401/403 errors (invalid token), not for network/server errors
         const status = (response.error as { status?: number })?.status;
         if (status === 401 || status === 403) {
-          console.log("Invalid refresh token, clearing tokens");
           await clearTokens();
-        } else {
-          console.log("Refresh failed due to server/network error, keeping tokens");
         }
       }
 
       return null;
     } catch (error) {
-      console.error("Failed to refresh token:", error);
       // Don't clear tokens on network/server errors, only on auth errors
       if (error instanceof Error && error.message.includes("401")) {
-        console.log("Network error with 401, clearing tokens");
         await clearTokens();
-      } else {
-        console.log("Network/server error, keeping tokens for retry");
       }
       return null;
     } finally {
@@ -183,18 +165,13 @@ export function createApiClient() {
       "status" in response.error &&
       response.error.status === 401
     ) {
-      console.log("Received 401, attempting to refresh token...");
       const refreshResult = await refreshAccessToken();
 
       if (refreshResult) {
-        console.log("Token refresh successful, retrying request");
         // Retry the request with the new token
         response = await retryFn();
-      } else {
-        console.log("Token refresh failed, keeping existing tokens for manual re-auth");
-        // Don't clear tokens here, let user re-authenticate manually
-        // await clearTokens(); // Commented out to prevent aggressive token clearing
       }
+      // Don't clear tokens on refresh failure, let user re-authenticate manually
     }
 
     return response;

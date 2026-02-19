@@ -1,4 +1,5 @@
-import { IsString, IsNotEmpty, IsOptional, MaxLength } from "class-validator";
+import { IsString, IsNotEmpty, IsOptional, MaxLength, MinLength } from "class-validator";
+import { Transform } from "class-transformer";
 
 /**
  * DTO for sending a message via WebSocket
@@ -8,8 +9,10 @@ export class SendMessageDto {
   @IsNotEmpty()
   receiverId!: string;
 
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: "Message content cannot be empty" })
+  @MinLength(1, { message: "Message content cannot be empty" })
   @MaxLength(5000, { message: "Message content cannot exceed 5000 characters" })
   content!: string;
 }

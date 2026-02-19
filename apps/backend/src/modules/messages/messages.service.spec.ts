@@ -3,6 +3,7 @@ import { ForbiddenException, NotFoundException, BadRequestException } from "@nes
 import { PrismaService } from "../../prisma/prisma.service";
 import { MessagesService } from "./messages.service";
 import { DoctorUtilsService } from "../../common/services/doctor-utils.service";
+import { EncryptionService } from "../../common/services/encryption.service";
 import { createMockPrismaService } from "../../common/test-helpers/prisma.mock";
 import { createMockUser } from "../../common/test-helpers/fixtures";
 import { UserRole } from "@prisma/client";
@@ -68,6 +69,16 @@ describe("MessagesService", () => {
     const mockDoctorUtilsService = {
       verifyDoctor: jest.fn().mockResolvedValue(undefined),
     };
+    const mockEncryptionService = {
+      encrypt: jest.fn().mockImplementation((text: string) => `encrypted:${text}`),
+      decrypt: jest.fn().mockImplementation((text: string) => {
+        // Handle both encrypted and legacy unencrypted messages
+        if (text.startsWith("encrypted:")) {
+          return text.replace("encrypted:", "");
+        }
+        return text;
+      }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -79,6 +90,10 @@ describe("MessagesService", () => {
         {
           provide: DoctorUtilsService,
           useValue: mockDoctorUtilsService,
+        },
+        {
+          provide: EncryptionService,
+          useValue: mockEncryptionService,
         },
       ],
     }).compile();
