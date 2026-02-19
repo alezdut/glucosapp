@@ -1,6 +1,7 @@
 "use client";
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { User } from "@glucosapp/types";
+import { isTokenExpiringSoon } from "@glucosapp/auth-utils";
 import * as authApi from "@/lib/auth-api";
 
 interface AuthContextValue {
@@ -67,18 +68,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   /**
-   * Decode JWT to get expiration time
-   */
-  const getTokenExpiration = (token: string): number | null => {
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      return payload.exp ? payload.exp * 1000 : null;
-    } catch {
-      return null;
-    }
-  };
-
-  /**
    * Refresh access token if needed
    */
   const refreshTokenIfNeeded = async () => {
@@ -88,18 +77,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       return false;
     }
 
-    const expiration = getTokenExpiration(accessToken);
-
-    if (!expiration) {
-      return false;
-    }
-
-    const now = Date.now();
-    const timeUntilExpiry = expiration - now;
-    const oneMinute = 60 * 1000;
-
     // Refresh if token expires in less than 1 minute
-    if (timeUntilExpiry < oneMinute) {
+    if (isTokenExpiringSoon(accessToken)) {
       try {
         const tokens = await authApi.refreshAccessToken(refreshToken);
         setTokens(tokens.accessToken, tokens.refreshToken);
