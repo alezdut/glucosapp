@@ -52,6 +52,14 @@ export interface Alert {
   };
 }
 
+export interface GetAlertsFilters {
+  limit?: number;
+  acknowledged?: boolean;
+  severity?: string[];
+  sinceHours?: number;
+  patientId?: string;
+}
+
 /**
  * Get dashboard summary
  */
@@ -115,34 +123,43 @@ export async function getMealStats(accessToken: string, days?: number): Promise<
 }
 
 /**
- * Get recent alerts
+ * Get alerts with optional filters (unified endpoint)
  */
-export async function getRecentAlerts(accessToken: string, limit?: number): Promise<Alert[]> {
-  const queryParams = limit ? `?limit=${limit}` : "";
-  const response = await client.GET<Alert[]>(`/dashboard/recent-alerts${queryParams}`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
+export async function getAlerts(accessToken: string, filters?: GetAlertsFilters): Promise<Alert[]> {
+  // Build query params from filters
+  const queryParams = new URLSearchParams();
+  if (filters?.limit) queryParams.append("limit", filters.limit.toString());
+  if (filters?.acknowledged !== undefined)
+    queryParams.append("acknowledged", filters.acknowledged.toString());
+  if (filters?.severity?.length) queryParams.append("severity", filters.severity.join(","));
+  if (filters?.sinceHours) queryParams.append("sinceHours", filters.sinceHours.toString());
+  if (filters?.patientId) queryParams.append("patientId", filters.patientId);
+
+  const queryString = queryParams.toString();
+  const response = await client.GET<Alert[]>(`/alerts${queryString ? `?${queryString}` : ""}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (response.error) {
-    throw new Error(response.error.message || "Failed to fetch recent alerts");
+    throw new Error(response.error.message || "Failed to fetch alerts");
   }
-  return response.data!;
+  return response.data || [];
+}
+
+/**
+ * Get recent alerts (last 24 hours)
+ */
+export async function getRecentAlerts(accessToken: string, limit?: number): Promise<Alert[]> {
+  return getAlerts(accessToken, { sinceHours: 24, limit });
 }
 
 /**
  * Get critical alerts (unacknowledged, severity CRITICAL or HIGH)
  */
 export async function getCriticalAlerts(accessToken: string): Promise<Alert[]> {
-  const response = await client.GET<Alert[]>(`/alerts/critical`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
+  return getAlerts(accessToken, {
+    acknowledged: false,
+    severity: ["CRITICAL", "HIGH"],
   });
-  if (response.error) {
-    throw new Error(response.error.message || "Failed to fetch critical alerts");
-  }
-  return response.data!;
 }
 
 /**
@@ -152,17 +169,7 @@ export async function getUnacknowledgedAlerts(
   accessToken: string,
   limit?: number,
 ): Promise<Alert[]> {
-  const queryParams = limit ? `?limit=${limit}` : "";
-  const response = await client.GET<Alert[]>(`/alerts${queryParams}`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
-  if (response.error) {
-    throw new Error(response.error.message || "Failed to fetch alerts");
-  }
-  // Filter to only return unacknowledged alerts
-  return (response.data || []).filter((alert) => !alert.acknowledged);
+  return getAlerts(accessToken, { acknowledged: false, limit });
 }
 
 /**

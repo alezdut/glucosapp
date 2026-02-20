@@ -9,6 +9,8 @@ import {
   getMealStats,
   getRecentAlerts,
   getUnacknowledgedAlerts,
+  getAlerts,
+  type GetAlertsFilters,
 } from "@/lib/dashboard-api";
 
 const getToken = () => {
@@ -100,5 +102,24 @@ export const useUnacknowledgedAlerts = (limit: number = 10) => {
     },
     enabled: !!user,
     refetchInterval: 30000, // Refetch every 30 seconds to keep notifications up to date
+  });
+};
+
+/**
+ * Unified hook for getting alerts with optional filters
+ */
+export const useAlerts = (filters?: GetAlertsFilters) => {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ["alerts", filters],
+    queryFn: async () => {
+      const token = getToken();
+      if (!token) throw new Error("Not authenticated");
+      return getAlerts(token, filters);
+    },
+    enabled: !!user,
+    // Auto-refresh for unacknowledged alerts
+    refetchInterval: filters?.acknowledged === false ? 30000 : undefined,
   });
 };

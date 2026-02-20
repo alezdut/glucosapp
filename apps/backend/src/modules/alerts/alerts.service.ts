@@ -626,92 +626,67 @@ export class AlertsService {
   }
 
   /**
-   * Get all alerts for doctor's patients
+   * Get alerts with optional filters
+   * Replaces findAll, getCritical, and getRecent methods
    */
-  async findAll(doctorId: string, limit: number = 50): Promise<AlertResponseDto[]> {
+  async findAllWithFilters(
+    doctorId: string,
+    filters: {
+      limit?: number;
+      acknowledged?: boolean;
+      severity?: AlertSeverity[];
+      sinceHours?: number;
+      patientId?: string;
+    } = {},
+  ): Promise<AlertResponseDto[]> {
+    // Verify doctor role
     await this.doctorUtils.verifyDoctor(doctorId);
 
+    // Get doctor's patient IDs
     const patientIds = await this.doctorUtils.getDoctorPatientIds(doctorId);
     if (patientIds.length === 0) {
       return [];
     }
 
-    const alerts = await this.prisma.alert.findMany({
-      where: {
-        userId: { in: patientIds },
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      take: limit,
-    });
-
-    return alerts.map((alert) => this.mapAlertToDto(alert));
-  }
-
-  /**
-   * Get critical alerts (not acknowledged, severity CRITICAL or HIGH)
-   */
-  async getCritical(doctorId: string): Promise<AlertResponseDto[]> {
-    await this.doctorUtils.verifyDoctor(doctorId);
-
-    const patientIds = await this.doctorUtils.getDoctorPatientIds(doctorId);
-    if (patientIds.length === 0) {
-      return [];
+    // If patientId filter is provided, verify doctor owns this patient
+    if (filters.patientId) {
+      if (!patientIds.includes(filters.patientId)) {
+        throw new ForbiddenException("You can only access alerts for patients assigned to you");
+      }
     }
 
-    const alerts = await this.prisma.alert.findMany({
-      where: {
-        userId: { in: patientIds },
-        acknowledged: false,
-        severity: { in: [AlertSeverity.CRITICAL, AlertSeverity.HIGH] },
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+    // Build dynamic where clause
+    const where: {
+      userId: { in: string[] } | string;
+      acknowledged?: boolean;
+      severity?: { in: AlertSeverity[] };
+      createdAt?: { gte: Date };
+    } = {
+      userId: filters.patientId ? filters.patientId : { in: patientIds },
+    };
 
-    return alerts.map((alert) => this.mapAlertToDto(alert));
-  }
-
-  /**
-   * Get recent alerts (last 24 hours)
-   */
-  async getRecent(doctorId: string, limit: number = 10): Promise<AlertResponseDto[]> {
-    await this.doctorUtils.verifyDoctor(doctorId);
-
-    const patientIds = await this.doctorUtils.getDoctorPatientIds(doctorId);
-    if (patientIds.length === 0) {
-      return [];
+    // Apply acknowledged filter
+    if (filters.acknowledged !== undefined) {
+      where.acknowledged = filters.acknowledged;
     }
 
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    // Apply severity filter
+    if (filters.severity && filters.severity.length > 0) {
+      where.severity = { in: filters.severity };
+    }
 
+    // Apply time filter (sinceHours)
+    if (filters.sinceHours) {
+      const sinceTime = new Date(Date.now() - filters.sinceHours * 60 * 60 * 1000);
+      where.createdAt = { gte: sinceTime };
+    }
+
+    // Apply limit (default 50, max 100)
+    const limit = Math.min(filters.limit ?? 50, 100);
+
+    // Query alerts
     const alerts = await this.prisma.alert.findMany({
-      where: {
-        userId: { in: patientIds },
-        createdAt: { gte: twentyFourHoursAgo },
-      },
+      where,
       include: {
         user: {
           select: {
