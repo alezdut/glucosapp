@@ -522,20 +522,20 @@ export class DashboardService {
       const monthData = groupedByMonth.get(monthKey) || { basal: [], bolus: [] };
 
       if (monthData.basal.length > 0 || monthData.bolus.length > 0) {
-        // Calculate averages for months with data
+        // Calculate number of days in the month
+        const year = date.getFullYear();
+        const month = date.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        // Calculate total units for the month and divide by days (not by number of doses)
+        const totalBasalUnits = monthData.basal.reduce((a, b) => a + b, 0);
+        const totalBolusUnits = monthData.bolus.reduce((a, b) => a + b, 0);
+
         const averageBasal =
-          monthData.basal.length > 0
-            ? Math.round(
-                (monthData.basal.reduce((a, b) => a + b, 0) / monthData.basal.length) * 10,
-              ) / 10
-            : 0;
+          monthData.basal.length > 0 ? Math.round((totalBasalUnits / daysInMonth) * 10) / 10 : 0;
 
         const averageBolus =
-          monthData.bolus.length > 0
-            ? Math.round(
-                (monthData.bolus.reduce((a, b) => a + b, 0) / monthData.bolus.length) * 10,
-              ) / 10
-            : 0;
+          monthData.bolus.length > 0 ? Math.round((totalBolusUnits / daysInMonth) * 10) / 10 : 0;
 
         data.push({
           month: monthKey,
