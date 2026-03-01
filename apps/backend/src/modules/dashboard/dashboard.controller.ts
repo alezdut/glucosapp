@@ -34,23 +34,31 @@ export class DashboardController {
     type: DashboardSummaryDto,
   })
   @ApiResponse({ status: 403, description: "Forbidden - Only doctors can access" })
-  async getSummary(@AuthUser() user: UserResponseDto): Promise<DashboardSummaryDto> {
-    return this.dashboardService.getSummary(user.id);
+  async getSummary(
+    @AuthUser() user: UserResponseDto,
+    @Query(new ValidationPipe({ transform: true, whitelist: true })) query: GetStatsQueryDto,
+  ): Promise<DashboardSummaryDto> {
+    const days = query.days ?? 7; // Default 7 days
+    return this.dashboardService.getSummary(user.id, days);
   }
 
   /**
-   * Get glucose evolution data for the last 15 days (daily average of all patients)
+   * Get glucose evolution data for the last N days (daily average of all patients)
    */
   @Get("glucose-evolution")
-  @ApiOperation({ summary: "Get glucose evolution data for last 15 days" })
+  @ApiOperation({ summary: "Get glucose evolution data for last N days" })
   @ApiResponse({
     status: 200,
     description: "Glucose evolution data retrieved successfully",
     type: GlucoseEvolutionDto,
   })
   @ApiResponse({ status: 403, description: "Forbidden - Only doctors can access" })
-  async getGlucoseEvolution(@AuthUser() user: UserResponseDto): Promise<GlucoseEvolutionDto> {
-    return this.dashboardService.getGlucoseEvolution(user.id);
+  async getGlucoseEvolution(
+    @AuthUser() user: UserResponseDto,
+    @Query(new ValidationPipe({ transform: true, whitelist: true })) query: GetStatsQueryDto,
+  ): Promise<GlucoseEvolutionDto> {
+    const days = query.days ?? 15; // Default 15 days
+    return this.dashboardService.getGlucoseEvolution(user.id, days);
   }
 
   /**

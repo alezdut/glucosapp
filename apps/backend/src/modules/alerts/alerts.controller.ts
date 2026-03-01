@@ -17,6 +17,7 @@ import { UserResponseDto } from "../auth/dto/auth-response.dto";
 import { AlertResponseDto } from "./dto/alert-response.dto";
 import { AlertSettingsResponseDto, UpdateAlertSettingsDto } from "./dto/alert-settings.dto";
 import { GetAlertsQueryDto } from "./dto/get-alerts-query.dto";
+import { AcknowledgeBatchDto } from "./dto/acknowledge-batch.dto";
 
 /**
  * Controller handling alerts
@@ -71,6 +72,22 @@ export class AlertsController {
     @Param("id") id: string,
   ): Promise<AlertResponseDto> {
     return this.alertsService.acknowledge(user.id, id);
+  }
+
+  /**
+   * Acknowledge multiple alerts at once
+   */
+  @Post("acknowledge-batch")
+  @ApiOperation({ summary: "Acknowledge multiple alerts at once" })
+  @ApiResponse({
+    status: 200,
+    description: "Alerts acknowledged successfully",
+  })
+  async acknowledgeBatch(
+    @AuthUser() user: UserResponseDto,
+    @Body() dto: AcknowledgeBatchDto,
+  ): Promise<{ acknowledgedCount: number }> {
+    return this.alertsService.acknowledgeBatch(user.id, dto);
   }
 
   /**
