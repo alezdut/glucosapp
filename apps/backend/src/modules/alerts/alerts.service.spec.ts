@@ -932,8 +932,34 @@ describe("AlertsService", () => {
   });
 
   describe("findAllWithFilters", () => {
+    const mockSettings = {
+      id: "settings-123",
+      userId: patientId,
+      alertsEnabled: true,
+      hypoglycemiaEnabled: true,
+      hypoglycemiaThreshold: 70,
+      severeHypoglycemiaEnabled: true,
+      severeHypoglycemiaThreshold: 54,
+      hyperglycemiaEnabled: true,
+      hyperglycemiaThreshold: 250,
+      persistentHyperglycemiaEnabled: true,
+      persistentHyperglycemiaThreshold: 250,
+      persistentHyperglycemiaWindowHours: 4,
+      persistentHyperglycemiaMinReadings: 2,
+      notificationChannels: { dashboard: true, email: false, push: false },
+      dailySummaryEnabled: true,
+      dailySummaryTime: "08:00",
+      quietHoursEnabled: false,
+      quietHoursStart: null,
+      quietHoursEnd: null,
+      notificationFrequency: "IMMEDIATE",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
     beforeEach(() => {
       (doctorUtilsService.verifyDoctor as jest.Mock).mockResolvedValue(undefined);
+      (prismaService.alertSettings.upsert as jest.Mock).mockResolvedValue(mockSettings);
     });
 
     it("should return all alerts for doctor's patients with default filters", async () => {
