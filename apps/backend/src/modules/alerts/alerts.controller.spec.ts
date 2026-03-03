@@ -41,7 +41,7 @@ describe("AlertsController", () => {
 
   describe("findAll (unified endpoint with filters)", () => {
     it("should return all alerts with default filters", async () => {
-      const expectedResult: any[] = [];
+      const expectedResult: AlertResponseDto[] = [];
       const query: GetAlertsQueryDto = {};
 
       (service.findAllWithFilters as jest.Mock).mockResolvedValue(expectedResult);
@@ -59,7 +59,7 @@ describe("AlertsController", () => {
     });
 
     it("should return alerts with limit filter", async () => {
-      const expectedResult: any[] = [];
+      const expectedResult: AlertResponseDto[] = [];
       const query: GetAlertsQueryDto = { limit: 20 };
 
       (service.findAllWithFilters as jest.Mock).mockResolvedValue(expectedResult);
@@ -77,7 +77,7 @@ describe("AlertsController", () => {
     });
 
     it("should return unacknowledged alerts", async () => {
-      const expectedResult: any[] = [];
+      const expectedResult: AlertResponseDto[] = [];
       const query: GetAlertsQueryDto = { acknowledged: false };
 
       (service.findAllWithFilters as jest.Mock).mockResolvedValue(expectedResult);
@@ -95,7 +95,7 @@ describe("AlertsController", () => {
     });
 
     it("should return acknowledged alerts", async () => {
-      const expectedResult: any[] = [];
+      const expectedResult: AlertResponseDto[] = [];
       const query: GetAlertsQueryDto = { acknowledged: true };
 
       (service.findAllWithFilters as jest.Mock).mockResolvedValue(expectedResult);
@@ -113,7 +113,7 @@ describe("AlertsController", () => {
     });
 
     it("should return alerts filtered by single severity", async () => {
-      const expectedResult: any[] = [];
+      const expectedResult: AlertResponseDto[] = [];
       const query: GetAlertsQueryDto = { severity: [AlertSeverity.CRITICAL] };
 
       (service.findAllWithFilters as jest.Mock).mockResolvedValue(expectedResult);
@@ -131,7 +131,7 @@ describe("AlertsController", () => {
     });
 
     it("should return alerts filtered by multiple severities", async () => {
-      const expectedResult: any[] = [];
+      const expectedResult: AlertResponseDto[] = [];
       const query: GetAlertsQueryDto = {
         severity: [AlertSeverity.CRITICAL, AlertSeverity.HIGH],
       };
@@ -151,7 +151,7 @@ describe("AlertsController", () => {
     });
 
     it("should return alerts from last N hours", async () => {
-      const expectedResult: any[] = [];
+      const expectedResult: AlertResponseDto[] = [];
       const query: GetAlertsQueryDto = { sinceHours: 24 };
 
       (service.findAllWithFilters as jest.Mock).mockResolvedValue(expectedResult);
@@ -169,7 +169,7 @@ describe("AlertsController", () => {
     });
 
     it("should return alerts for specific patient", async () => {
-      const expectedResult: any[] = [];
+      const expectedResult: AlertResponseDto[] = [];
       const patientId = "patient-123";
       const query: GetAlertsQueryDto = { patientId };
 
@@ -188,7 +188,7 @@ describe("AlertsController", () => {
     });
 
     it("should return alerts with combined filters (critical alerts use case)", async () => {
-      const expectedResult: any[] = [];
+      const expectedResult: AlertResponseDto[] = [];
       const query: GetAlertsQueryDto = {
         acknowledged: false,
         severity: [AlertSeverity.CRITICAL, AlertSeverity.HIGH],
@@ -209,7 +209,7 @@ describe("AlertsController", () => {
     });
 
     it("should return alerts with combined filters (recent alerts use case)", async () => {
-      const expectedResult: any[] = [];
+      const expectedResult: AlertResponseDto[] = [];
       const query: GetAlertsQueryDto = {
         sinceHours: 24,
         limit: 10,
@@ -230,7 +230,7 @@ describe("AlertsController", () => {
     });
 
     it("should return alerts with all filters combined", async () => {
-      const expectedResult: any[] = [];
+      const expectedResult: AlertResponseDto[] = [];
       const patientId = "patient-123";
       const query: GetAlertsQueryDto = {
         limit: 50,

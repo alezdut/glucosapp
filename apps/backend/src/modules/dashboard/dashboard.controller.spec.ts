@@ -49,10 +49,11 @@ describe("DashboardController", () => {
 
       (dashboardService.getSummary as jest.Mock).mockResolvedValue(expectedResult);
 
-      const result = await controller.getSummary(mockUser);
+      const query: GetStatsQueryDto = {};
+      const result = await controller.getSummary(mockUser, query);
 
       expect(result).toEqual(expectedResult);
-      expect(dashboardService.getSummary).toHaveBeenCalledWith(mockUser.id);
+      expect(dashboardService.getSummary).toHaveBeenCalledWith(mockUser.id, 7);
     });
   });
 
@@ -62,10 +63,11 @@ describe("DashboardController", () => {
 
       (dashboardService.getGlucoseEvolution as jest.Mock).mockResolvedValue(expectedResult);
 
-      const result = await controller.getGlucoseEvolution(mockUser);
+      const query: GetStatsQueryDto = {};
+      const result = await controller.getGlucoseEvolution(mockUser, query);
 
       expect(result).toEqual(expectedResult);
-      expect(dashboardService.getGlucoseEvolution).toHaveBeenCalledWith(mockUser.id);
+      expect(dashboardService.getGlucoseEvolution).toHaveBeenCalledWith(mockUser.id, 15);
     });
   });
 
