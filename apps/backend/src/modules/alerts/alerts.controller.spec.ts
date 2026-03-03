@@ -4,6 +4,7 @@ import { AlertsService } from "./alerts.service";
 import { createMockUserResponse } from "../../common/test-helpers/fixtures";
 import { UpdateAlertSettingsDto } from "./dto/alert-settings.dto";
 import { GetAlertsQueryDto } from "./dto/get-alerts-query.dto";
+import { AlertResponseDto } from "./dto/alert-response.dto";
 import { AlertSeverity } from "@prisma/client";
 
 describe("AlertsController", () => {
