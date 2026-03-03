@@ -56,6 +56,22 @@ export class AlertsController {
   }
 
   /**
+   * Acknowledge multiple alerts at once
+   */
+  @Post("acknowledge-batch")
+  @ApiOperation({ summary: "Acknowledge multiple alerts at once" })
+  @ApiResponse({
+    status: 200,
+    description: "Alerts acknowledged successfully",
+  })
+  async acknowledgeBatch(
+    @AuthUser() user: UserResponseDto,
+    @Body() dto: AcknowledgeBatchDto,
+  ): Promise<{ acknowledgedCount: number }> {
+    return this.alertsService.acknowledgeBatch(user.id, dto);
+  }
+
+  /**
    * Acknowledge an alert
    */
   @Post(":id/acknowledge")
@@ -72,22 +88,6 @@ export class AlertsController {
     @Param("id") id: string,
   ): Promise<AlertResponseDto> {
     return this.alertsService.acknowledge(user.id, id);
-  }
-
-  /**
-   * Acknowledge multiple alerts at once
-   */
-  @Post("acknowledge-batch")
-  @ApiOperation({ summary: "Acknowledge multiple alerts at once" })
-  @ApiResponse({
-    status: 200,
-    description: "Alerts acknowledged successfully",
-  })
-  async acknowledgeBatch(
-    @AuthUser() user: UserResponseDto,
-    @Body() dto: AcknowledgeBatchDto,
-  ): Promise<{ acknowledgedCount: number }> {
-    return this.alertsService.acknowledgeBatch(user.id, dto);
   }
 
   /**
