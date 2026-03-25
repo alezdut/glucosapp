@@ -2,8 +2,8 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Bell, X } from "lucide-react";
-import { useUnacknowledgedAlerts } from "@/hooks/useDashboard";
+import { Bell, X, CheckCheck } from "lucide-react";
+import { useUnacknowledgedAlerts, useAcknowledgeBatch } from "@/hooks/useDashboard";
 import { useNewMessageNotifications, useConversations } from "@/hooks/useMessages";
 import { useAuth } from "@/contexts/auth-context";
 import { AlertCard } from "./AlertCard";
@@ -30,6 +30,7 @@ export const NotificationDropdown = () => {
     useNewMessageNotifications(activePatientId);
   const { data: conversations = [] } = useConversations();
   const queryClient = useQueryClient();
+  const acknowledgeBatchMutation = useAcknowledgeBatch();
 
   // Get unread messages from conversations (existing messages), grouped by patient
   const unreadMessagesFromConversations = useMemo(() => {
@@ -170,6 +171,23 @@ export const NotificationDropdown = () => {
     invalidateAlertQueries(queryClient);
   };
 
+  const handleAcknowledgeAllAlerts = async () => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
+
+    try {
+      // Dismiss all critical/high alerts
+      await acknowledgeBatchMutation.mutateAsync({
+        token,
+        acknowledgeAll: true,
+      });
+      // Close dropdown after successfully dismissing all
+      setTimeout(() => setIsOpen(false), 500);
+    } catch (error) {
+      console.error("Failed to dismiss all alerts:", error);
+    }
+  };
+
   const handleMessageRead = (patientId: string) => {
     clearMessageNotification(patientId);
     // UI will update automatically via socket/state listeners (useConversations/useConversation)
@@ -209,6 +227,24 @@ export const NotificationDropdown = () => {
               <X className="w-5 h-5" />
             </button>
           </div>
+
+          {/* Dismiss All Notifications Button */}
+          {unacknowledgedCount > 0 && (
+            <div className="px-4 pt-3 pb-2 border-b border-gray-200">
+              <button
+                onClick={handleAcknowledgeAllAlerts}
+                disabled={acknowledgeBatchMutation.isPending}
+                className="w-full px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50
+                           rounded-md hover:bg-blue-100 transition-colors
+                           disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <CheckCheck className="w-4 h-4" />
+                {acknowledgeBatchMutation.isPending
+                  ? "Descartando..."
+                  : `Descartar todas (${unacknowledgedCount})`}
+              </button>
+            </div>
+          )}
 
           <div className="overflow-y-auto flex-1 p-4">
             {isLoading ? (

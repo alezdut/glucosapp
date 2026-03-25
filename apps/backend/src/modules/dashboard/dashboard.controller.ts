@@ -11,10 +11,7 @@ import { MealStatsDto } from "./dto/meal-stats.dto";
 import { PatientGlucoseEvolutionDto } from "./dto/patient-glucose-evolution.dto";
 import { PatientInsulinStatsDto } from "./dto/patient-insulin-stats.dto";
 import { GetStatsQueryDto } from "./dto/get-stats-query.dto";
-import { GetRecentAlertsQueryDto } from "./dto/get-recent-alerts-query.dto";
 import { GetPatientStatsQueryDto } from "./dto/get-patient-stats-query.dto";
-import { AlertsService } from "../alerts/alerts.service";
-import { AlertResponseDto } from "../alerts/dto/alert-response.dto";
 
 /**
  * Controller handling dashboard endpoints
@@ -24,10 +21,7 @@ import { AlertResponseDto } from "../alerts/dto/alert-response.dto";
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class DashboardController {
-  constructor(
-    private readonly dashboardService: DashboardService,
-    private readonly alertsService: AlertsService,
-  ) {}
+  constructor(private readonly dashboardService: DashboardService) {}
 
   /**
    * Get dashboard summary (active patients, critical alerts, upcoming appointments)
@@ -40,23 +34,31 @@ export class DashboardController {
     type: DashboardSummaryDto,
   })
   @ApiResponse({ status: 403, description: "Forbidden - Only doctors can access" })
-  async getSummary(@AuthUser() user: UserResponseDto): Promise<DashboardSummaryDto> {
-    return this.dashboardService.getSummary(user.id);
+  async getSummary(
+    @AuthUser() user: UserResponseDto,
+    @Query(new ValidationPipe({ transform: true, whitelist: true })) query: GetStatsQueryDto,
+  ): Promise<DashboardSummaryDto> {
+    const days = query.days ?? 7; // Default 7 days
+    return this.dashboardService.getSummary(user.id, days);
   }
 
   /**
-   * Get glucose evolution data for the last 15 days (daily average of all patients)
+   * Get glucose evolution data for the last N days (daily average of all patients)
    */
   @Get("glucose-evolution")
-  @ApiOperation({ summary: "Get glucose evolution data for last 15 days" })
+  @ApiOperation({ summary: "Get glucose evolution data for last N days" })
   @ApiResponse({
     status: 200,
     description: "Glucose evolution data retrieved successfully",
     type: GlucoseEvolutionDto,
   })
   @ApiResponse({ status: 403, description: "Forbidden - Only doctors can access" })
-  async getGlucoseEvolution(@AuthUser() user: UserResponseDto): Promise<GlucoseEvolutionDto> {
-    return this.dashboardService.getGlucoseEvolution(user.id);
+  async getGlucoseEvolution(
+    @AuthUser() user: UserResponseDto,
+    @Query(new ValidationPipe({ transform: true, whitelist: true })) query: GetStatsQueryDto,
+  ): Promise<GlucoseEvolutionDto> {
+    const days = query.days ?? 15; // Default 15 days
+    return this.dashboardService.getGlucoseEvolution(user.id, days);
   }
 
   /**
@@ -95,25 +97,6 @@ export class DashboardController {
   ): Promise<MealStatsDto> {
     const days = query.days ?? 30;
     return this.dashboardService.getMealStats(user.id, days);
-  }
-
-  /**
-   * Get recent alerts
-   */
-  @Get("recent-alerts")
-  @ApiOperation({ summary: "Get recent alerts" })
-  @ApiResponse({
-    status: 200,
-    description: "Recent alerts retrieved successfully",
-    type: [AlertResponseDto],
-  })
-  @ApiResponse({ status: 403, description: "Forbidden - Only doctors can access" })
-  async getRecentAlerts(
-    @AuthUser() user: UserResponseDto,
-    @Query(new ValidationPipe({ transform: true, whitelist: true })) query: GetRecentAlertsQueryDto,
-  ): Promise<AlertResponseDto[]> {
-    const limit = query.limit ?? 10;
-    return this.alertsService.getRecent(user.id, limit);
   }
 
   /**

@@ -52,11 +52,23 @@ export interface Alert {
   };
 }
 
+export interface GetAlertsFilters {
+  limit?: number;
+  acknowledged?: boolean;
+  severity?: string[];
+  sinceHours?: number;
+  patientId?: string;
+}
+
 /**
  * Get dashboard summary
  */
-export async function getDashboardSummary(accessToken: string): Promise<DashboardSummary> {
-  const response = await client.GET<DashboardSummary>("/dashboard/summary", {
+export async function getDashboardSummary(
+  accessToken: string,
+  days?: number,
+): Promise<DashboardSummary> {
+  const queryParams = days ? `?days=${days}` : "";
+  const response = await client.GET<DashboardSummary>(`/dashboard/summary${queryParams}`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },
@@ -70,12 +82,19 @@ export async function getDashboardSummary(accessToken: string): Promise<Dashboar
 /**
  * Get glucose evolution data
  */
-export async function getGlucoseEvolution(accessToken: string): Promise<GlucoseEvolution> {
-  const response = await client.GET<GlucoseEvolution>("/dashboard/glucose-evolution", {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
+export async function getGlucoseEvolution(
+  accessToken: string,
+  days?: number,
+): Promise<GlucoseEvolution> {
+  const queryParams = days ? `?days=${days}` : "";
+  const response = await client.GET<GlucoseEvolution>(
+    `/dashboard/glucose-evolution${queryParams}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
     },
-  });
+  );
   if (response.error) {
     throw new Error(response.error.message || "Failed to fetch glucose evolution");
   }
@@ -115,54 +134,56 @@ export async function getMealStats(accessToken: string, days?: number): Promise<
 }
 
 /**
- * Get recent alerts
+ * Get alerts with optional filters (unified endpoint)
  */
-export async function getRecentAlerts(accessToken: string, limit?: number): Promise<Alert[]> {
-  const queryParams = limit ? `?limit=${limit}` : "";
-  const response = await client.GET<Alert[]>(`/dashboard/recent-alerts${queryParams}`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
+export async function getAlerts(accessToken: string, filters?: GetAlertsFilters): Promise<Alert[]> {
+  // Build query params from filters
+  const queryParams = new URLSearchParams();
+  if (filters?.limit) queryParams.append("limit", filters.limit.toString());
+  if (filters?.acknowledged !== undefined)
+    queryParams.append("acknowledged", filters.acknowledged.toString());
+  if (filters?.severity?.length) queryParams.append("severity", filters.severity.join(","));
+  if (filters?.sinceHours) queryParams.append("sinceHours", filters.sinceHours.toString());
+  if (filters?.patientId) queryParams.append("patientId", filters.patientId);
+
+  const queryString = queryParams.toString();
+  const response = await client.GET<Alert[]>(`/alerts${queryString ? `?${queryString}` : ""}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (response.error) {
-    throw new Error(response.error.message || "Failed to fetch recent alerts");
+    throw new Error(response.error.message || "Failed to fetch alerts");
   }
-  return response.data!;
+  return response.data || [];
+}
+
+/**
+ * Get recent alerts (most recent alerts, regardless of age)
+ */
+export async function getRecentAlerts(accessToken: string, limit?: number): Promise<Alert[]> {
+  return getAlerts(accessToken, { limit });
 }
 
 /**
  * Get critical alerts (unacknowledged, severity CRITICAL or HIGH)
  */
 export async function getCriticalAlerts(accessToken: string): Promise<Alert[]> {
-  const response = await client.GET<Alert[]>(`/alerts/critical`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
+  return getAlerts(accessToken, {
+    acknowledged: false,
+    severity: ["CRITICAL", "HIGH"],
   });
-  if (response.error) {
-    throw new Error(response.error.message || "Failed to fetch critical alerts");
-  }
-  return response.data!;
 }
 
 /**
- * Get unacknowledged alerts
+ * Get unacknowledged alerts (respects user's alert settings configuration)
  */
 export async function getUnacknowledgedAlerts(
   accessToken: string,
   limit?: number,
 ): Promise<Alert[]> {
-  const queryParams = limit ? `?limit=${limit}` : "";
-  const response = await client.GET<Alert[]>(`/alerts${queryParams}`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
+  return getAlerts(accessToken, {
+    acknowledged: false,
+    limit,
   });
-  if (response.error) {
-    throw new Error(response.error.message || "Failed to fetch alerts");
-  }
-  // Filter to only return unacknowledged alerts
-  return (response.data || []).filter((alert) => !alert.acknowledged);
 }
 
 /**
@@ -176,6 +197,29 @@ export async function acknowledgeAlert(accessToken: string, alertId: string): Pr
   });
   if (response.error) {
     throw new Error(response.error.message || "Failed to acknowledge alert");
+  }
+  return response.data!;
+}
+
+/**
+ * Acknowledge multiple alerts at once
+ */
+export async function acknowledgeBatchAlerts(
+  accessToken: string,
+  options: { alertIds?: string[]; acknowledgeAll?: boolean },
+): Promise<{ acknowledgedCount: number }> {
+  const response = await client.POST<{ acknowledgedCount: number }>(
+    "/alerts/acknowledge-batch",
+    options,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    },
+  );
+  if (response.error) {
+    throw new Error(response.error.message || "Failed to acknowledge alerts");
   }
   return response.data!;
 }

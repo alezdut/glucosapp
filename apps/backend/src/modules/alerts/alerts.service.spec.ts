@@ -931,12 +931,38 @@ describe("AlertsService", () => {
     });
   });
 
-  describe("findAll", () => {
+  describe("findAllWithFilters", () => {
+    const mockSettings = {
+      id: "settings-123",
+      userId: patientId,
+      alertsEnabled: true,
+      hypoglycemiaEnabled: true,
+      hypoglycemiaThreshold: 70,
+      severeHypoglycemiaEnabled: true,
+      severeHypoglycemiaThreshold: 54,
+      hyperglycemiaEnabled: true,
+      hyperglycemiaThreshold: 250,
+      persistentHyperglycemiaEnabled: true,
+      persistentHyperglycemiaThreshold: 250,
+      persistentHyperglycemiaWindowHours: 4,
+      persistentHyperglycemiaMinReadings: 2,
+      notificationChannels: { dashboard: true, email: false, push: false },
+      dailySummaryEnabled: true,
+      dailySummaryTime: "08:00",
+      quietHoursEnabled: false,
+      quietHoursStart: null,
+      quietHoursEnd: null,
+      notificationFrequency: "IMMEDIATE",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
     beforeEach(() => {
       (doctorUtilsService.verifyDoctor as jest.Mock).mockResolvedValue(undefined);
+      (prismaService.alertSettings.upsert as jest.Mock).mockResolvedValue(mockSettings);
     });
 
-    it("should return all alerts for doctor's patients", async () => {
+    it("should return all alerts for doctor's patients with default filters", async () => {
       const patientIds = [patientId];
       const alerts = [
         {
@@ -959,105 +985,258 @@ describe("AlertsService", () => {
       (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(patientIds);
       (prismaService.alert.findMany as jest.Mock).mockResolvedValue(alerts);
 
-      const result = await service.findAll(doctorId, 50);
+      const result = await service.findAllWithFilters(doctorId, {});
 
       expect(result).toHaveLength(1);
       expect(result[0]).toMatchObject({
         id: "alert-1",
         userId: patientId,
       });
-    });
-
-    it("should return empty array if no patients", async () => {
-      (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue([]);
-
-      const result = await service.findAll(doctorId);
-
-      expect(result).toEqual([]);
-    });
-  });
-
-  describe("getCritical", () => {
-    beforeEach(() => {
-      (doctorUtilsService.verifyDoctor as jest.Mock).mockResolvedValue(undefined);
-    });
-
-    it("should return only critical and high severity alerts", async () => {
-      const patientIds = [patientId];
-      const alerts = [
-        {
-          id: "alert-1",
-          userId: patientId,
-          type: AlertType.SEVERE_HYPOGLYCEMIA,
-          severity: AlertSeverity.CRITICAL,
-          message: "Critical alert",
-          acknowledged: false,
-          createdAt: new Date(),
-          user: {
-            id: patientId,
-            email: "patient@example.com",
-            firstName: "Patient",
-            lastName: "One",
-          },
-        },
-      ];
-
-      (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(patientIds);
-      (prismaService.alert.findMany as jest.Mock).mockResolvedValue(alerts);
-
-      const result = await service.getCritical(doctorId);
-
-      expect(result).toHaveLength(1);
       expect(prismaService.alert.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            severity: { in: [AlertSeverity.CRITICAL, AlertSeverity.HIGH] },
+            userId: { in: patientIds },
+          }),
+          take: 50, // Default limit
+          orderBy: { createdAt: "desc" },
+        }),
+      );
+    });
+
+    it("should return empty array if doctor has no patients", async () => {
+      (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue([]);
+
+      const result = await service.findAllWithFilters(doctorId, {});
+
+      expect(result).toEqual([]);
+      expect(prismaService.alert.findMany).not.toHaveBeenCalled();
+    });
+
+    it("should apply custom limit", async () => {
+      const patientIds = [patientId];
+      (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(patientIds);
+      (prismaService.alert.findMany as jest.Mock).mockResolvedValue([]);
+
+      await service.findAllWithFilters(doctorId, { limit: 20 });
+
+      expect(prismaService.alert.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          take: 20,
+        }),
+      );
+    });
+
+    it("should enforce maximum limit of 100", async () => {
+      const patientIds = [patientId];
+      (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(patientIds);
+      (prismaService.alert.findMany as jest.Mock).mockResolvedValue([]);
+
+      await service.findAllWithFilters(doctorId, { limit: 200 });
+
+      expect(prismaService.alert.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          take: 100, // Capped at max
+        }),
+      );
+    });
+
+    it("should filter by acknowledged status (true)", async () => {
+      const patientIds = [patientId];
+      (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(patientIds);
+      (prismaService.alert.findMany as jest.Mock).mockResolvedValue([]);
+
+      await service.findAllWithFilters(doctorId, { acknowledged: true });
+
+      expect(prismaService.alert.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            acknowledged: true,
+          }),
+        }),
+      );
+    });
+
+    it("should filter by acknowledged status (false)", async () => {
+      const patientIds = [patientId];
+      (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(patientIds);
+      (prismaService.alert.findMany as jest.Mock).mockResolvedValue([]);
+
+      await service.findAllWithFilters(doctorId, { acknowledged: false });
+
+      expect(prismaService.alert.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
             acknowledged: false,
           }),
         }),
       );
     });
-  });
 
-  describe("getRecent", () => {
-    beforeEach(() => {
-      (doctorUtilsService.verifyDoctor as jest.Mock).mockResolvedValue(undefined);
-    });
-
-    it("should return recent alerts within 24 hours", async () => {
+    it("should filter by single severity", async () => {
       const patientIds = [patientId];
-      const alerts = [
-        {
-          id: "alert-1",
-          userId: patientId,
-          type: AlertType.HYPOGLYCEMIA,
-          severity: AlertSeverity.HIGH,
-          message: "Recent alert",
-          acknowledged: false,
-          createdAt: new Date(),
-          user: {
-            id: patientId,
-            email: "patient@example.com",
-            firstName: "Patient",
-            lastName: "One",
-          },
-        },
-      ];
-
       (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(patientIds);
-      (prismaService.alert.findMany as jest.Mock).mockResolvedValue(alerts);
+      (prismaService.alert.findMany as jest.Mock).mockResolvedValue([]);
 
-      const result = await service.getRecent(doctorId, 10);
+      await service.findAllWithFilters(doctorId, { severity: [AlertSeverity.CRITICAL] });
 
-      expect(result).toHaveLength(1);
       expect(prismaService.alert.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          take: 10,
+          where: expect.objectContaining({
+            severity: { in: [AlertSeverity.CRITICAL] },
+          }),
+        }),
+      );
+    });
+
+    it("should filter by multiple severities", async () => {
+      const patientIds = [patientId];
+      (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(patientIds);
+      (prismaService.alert.findMany as jest.Mock).mockResolvedValue([]);
+
+      await service.findAllWithFilters(doctorId, {
+        severity: [AlertSeverity.CRITICAL, AlertSeverity.HIGH],
+      });
+
+      expect(prismaService.alert.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            severity: { in: [AlertSeverity.CRITICAL, AlertSeverity.HIGH] },
+          }),
+        }),
+      );
+    });
+
+    it("should filter by time range (sinceHours)", async () => {
+      const patientIds = [patientId];
+      (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(patientIds);
+      (prismaService.alert.findMany as jest.Mock).mockResolvedValue([]);
+
+      await service.findAllWithFilters(doctorId, { sinceHours: 24 });
+
+      expect(prismaService.alert.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
           where: expect.objectContaining({
             createdAt: expect.objectContaining({
               gte: expect.any(Date),
             }),
           }),
+        }),
+      );
+    });
+
+    it("should filter by specific patient", async () => {
+      const patientIds = [patientId, "patient-456"];
+      const specificPatientId = patientId;
+      (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(patientIds);
+      (prismaService.alert.findMany as jest.Mock).mockResolvedValue([]);
+
+      await service.findAllWithFilters(doctorId, { patientId: specificPatientId });
+
+      expect(prismaService.alert.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            userId: specificPatientId, // Should use specific patient ID instead of array
+          }),
+        }),
+      );
+    });
+
+    it("should throw ForbiddenException if patientId not assigned to doctor", async () => {
+      const patientIds = [patientId];
+      const unauthorizedPatientId = "patient-999";
+      (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(patientIds);
+
+      await expect(
+        service.findAllWithFilters(doctorId, { patientId: unauthorizedPatientId }),
+      ).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.findAllWithFilters(doctorId, { patientId: unauthorizedPatientId }),
+      ).rejects.toThrow("You can only access alerts for patients assigned to you");
+    });
+
+    it("should combine multiple filters (critical alerts use case)", async () => {
+      const patientIds = [patientId];
+      (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(patientIds);
+      (prismaService.alert.findMany as jest.Mock).mockResolvedValue([]);
+
+      await service.findAllWithFilters(doctorId, {
+        acknowledged: false,
+        severity: [AlertSeverity.CRITICAL, AlertSeverity.HIGH],
+      });
+
+      expect(prismaService.alert.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            userId: { in: patientIds },
+            acknowledged: false,
+            severity: { in: [AlertSeverity.CRITICAL, AlertSeverity.HIGH] },
+          }),
+        }),
+      );
+    });
+
+    it("should combine multiple filters (recent alerts use case)", async () => {
+      const patientIds = [patientId];
+      (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(patientIds);
+      (prismaService.alert.findMany as jest.Mock).mockResolvedValue([]);
+
+      await service.findAllWithFilters(doctorId, {
+        sinceHours: 24,
+        limit: 10,
+      });
+
+      expect(prismaService.alert.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            userId: { in: patientIds },
+            createdAt: expect.objectContaining({
+              gte: expect.any(Date),
+            }),
+          }),
+          take: 10,
+        }),
+      );
+    });
+
+    it("should combine all filters", async () => {
+      const patientIds = [patientId, "patient-456"];
+      (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(patientIds);
+      (prismaService.alert.findMany as jest.Mock).mockResolvedValue([]);
+
+      await service.findAllWithFilters(doctorId, {
+        limit: 50,
+        acknowledged: false,
+        severity: [AlertSeverity.CRITICAL],
+        sinceHours: 12,
+        patientId,
+      });
+
+      expect(prismaService.alert.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            userId: patientId,
+            acknowledged: false,
+            severity: { in: [AlertSeverity.CRITICAL] },
+            createdAt: expect.objectContaining({
+              gte: expect.any(Date),
+            }),
+          }),
+          take: 50,
+          orderBy: { createdAt: "desc" },
+        }),
+      );
+    });
+
+    it("should order results by createdAt descending", async () => {
+      const patientIds = [patientId];
+      (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(patientIds);
+      (prismaService.alert.findMany as jest.Mock).mockResolvedValue([]);
+
+      await service.findAllWithFilters(doctorId, {});
+
+      expect(prismaService.alert.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: { createdAt: "desc" },
         }),
       );
     });

@@ -66,6 +66,13 @@ describe("DashboardService", () => {
   describe("getSummary", () => {
     beforeEach(() => {
       (doctorUtilsService.verifyDoctor as jest.Mock).mockResolvedValue(undefined);
+      (prismaService.alertSettings.findUnique as jest.Mock).mockResolvedValue({
+        alertsEnabled: true,
+        hypoglycemiaEnabled: true,
+        severeHypoglycemiaEnabled: true,
+        hyperglycemiaEnabled: true,
+        persistentHyperglycemiaEnabled: true,
+      });
     });
 
     it("should return dashboard summary with correct counts", async () => {
@@ -262,7 +269,7 @@ describe("DashboardService", () => {
       const patientIds = [patientId];
 
       (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(patientIds);
-      (prismaService.meal.count as jest.Mock).mockResolvedValue(25);
+      (prismaService.logEntry.count as jest.Mock).mockResolvedValue(25);
 
       const result = await service.getMealStats(doctorId, 30);
 
@@ -277,7 +284,7 @@ describe("DashboardService", () => {
       const patientIds = [patientId];
 
       (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(patientIds);
-      (prismaService.meal.count as jest.Mock).mockResolvedValue(10);
+      (prismaService.logEntry.count as jest.Mock).mockResolvedValue(10);
 
       const result = await service.getMealStats(doctorId, 30);
 
@@ -288,7 +295,7 @@ describe("DashboardService", () => {
       const patientIds = [patientId];
 
       (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(patientIds);
-      (prismaService.meal.count as jest.Mock).mockResolvedValue(10);
+      (prismaService.logEntry.count as jest.Mock).mockResolvedValue(10);
 
       const result = await service.getMealStats(doctorId, 15);
 

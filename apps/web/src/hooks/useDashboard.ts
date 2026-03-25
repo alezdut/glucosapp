@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/auth-context";
 import {
   getDashboardSummary,
@@ -9,7 +9,11 @@ import {
   getMealStats,
   getRecentAlerts,
   getUnacknowledgedAlerts,
+  getAlerts,
+  acknowledgeBatchAlerts,
+  type GetAlertsFilters,
 } from "@/lib/dashboard-api";
+import { invalidateAlertQueries } from "@/lib/alert-utils";
 
 const getToken = () => {
   if (typeof window !== "undefined") {
@@ -18,29 +22,30 @@ const getToken = () => {
   return null;
 };
 
-export const useDashboardSummary = () => {
+export const useDashboardSummary = (days?: number) => {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["dashboard", "summary"],
+    queryKey: ["dashboard", "summary", days],
     queryFn: async () => {
       const token = getToken();
       if (!token) throw new Error("Not authenticated");
-      return getDashboardSummary(token);
+      return getDashboardSummary(token, days);
     },
     enabled: !!user,
+    staleTime: 30000, // 30 seconds
   });
 };
 
-export const useGlucoseEvolution = () => {
+export const useGlucoseEvolution = (days?: number) => {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["dashboard", "glucose-evolution"],
+    queryKey: ["dashboard", "glucose-evolution", days],
     queryFn: async () => {
       const token = getToken();
       if (!token) throw new Error("Not authenticated");
-      return getGlucoseEvolution(token);
+      return getGlucoseEvolution(token, days);
     },
     enabled: !!user,
   });
@@ -100,5 +105,48 @@ export const useUnacknowledgedAlerts = (limit: number = 10) => {
     },
     enabled: !!user,
     refetchInterval: 30000, // Refetch every 30 seconds to keep notifications up to date
+  });
+};
+
+/**
+ * Unified hook for getting alerts with optional filters
+ */
+export const useAlerts = (filters?: GetAlertsFilters) => {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ["alerts", filters],
+    queryFn: async () => {
+      const token = getToken();
+      if (!token) throw new Error("Not authenticated");
+      return getAlerts(token, filters);
+    },
+    enabled: !!user,
+    // Auto-refresh for unacknowledged alerts
+    refetchInterval: filters?.acknowledged === false ? 30000 : undefined,
+  });
+};
+
+/**
+ * Hook for acknowledging multiple alerts at once
+ */
+export const useAcknowledgeBatch = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (options: {
+      token: string;
+      alertIds?: string[];
+      acknowledgeAll?: boolean;
+    }) => {
+      return acknowledgeBatchAlerts(options.token, {
+        alertIds: options.alertIds,
+        acknowledgeAll: options.acknowledgeAll,
+      });
+    },
+    onSuccess: () => {
+      // Invalidate all alert-related queries to refresh
+      invalidateAlertQueries(queryClient);
+    },
   });
 };
