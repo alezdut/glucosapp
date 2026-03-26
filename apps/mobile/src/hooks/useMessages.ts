@@ -13,6 +13,7 @@ const BATCH_MESSAGES_READ_EVENT = "messages:batch-read";
  */
 export const useConversationWithDoctor = () => {
   const { user } = useAuth();
+  const userId = user?.id ?? null;
   const { socket, isConnected } = useSocket();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -20,7 +21,7 @@ export const useConversationWithDoctor = () => {
 
   // Join conversation room when enabled
   useEffect(() => {
-    if (!socket || !isConnected || !user) {
+    if (!socket || !isConnected || !userId) {
       setIsLoading(true);
       return;
     }
@@ -99,7 +100,7 @@ export const useConversationWithDoctor = () => {
       // The room will be cleaned up when socket disconnects
       hasJoinedRef.current = false;
     };
-  }, [socket, isConnected, user?.id]);
+  }, [socket, isConnected, userId]);
 
   return {
     data: messages,
@@ -114,12 +115,13 @@ export const useConversationWithDoctor = () => {
  */
 export const useConversations = () => {
   const { user } = useAuth();
+  const userId = user?.id ?? null;
   const { socket, isConnected } = useSocket();
   const [conversations, setConversations] = useState<Conversation[]>([]);
 
   // Request conversations list when connected
   useEffect(() => {
-    if (!socket || !isConnected || !user) return;
+    if (!socket || !isConnected || !userId) return;
 
     // Request conversations list
     socket.emit(
@@ -142,7 +144,7 @@ export const useConversations = () => {
     return () => {
       socket.off("conversation:updated", handleConversationUpdated);
     };
-  }, [socket, isConnected, user?.id]);
+  }, [socket, isConnected, userId]);
 
   return {
     data: conversations,
@@ -275,6 +277,7 @@ export const useUnreadMessagesCount = () => {
  */
 export const useUnreadMessagesFromDoctor = () => {
   const { user } = useAuth();
+  const userId = user?.id ?? null;
   const { socket, isConnected } = useSocket();
   const [unreadCount, setUnreadCount] = useState(0);
   const messagesRef = useRef<Message[]>([]);
@@ -283,10 +286,10 @@ export const useUnreadMessagesFromDoctor = () => {
   // Stable handler functions using useCallback
   const handleNewMessage = useCallback(
     (newMessage: Message) => {
-      if (!user) return;
+      if (!userId) return;
 
       // Only process messages for the current user
-      if (newMessage.receiverId !== user.id) {
+      if (newMessage.receiverId !== userId) {
         return; // Not for this user, ignore
       }
 
@@ -308,12 +311,12 @@ export const useUnreadMessagesFromDoctor = () => {
         });
       }
     },
-    [user],
+    [userId],
   );
 
   const handleMessageRead = useCallback(
     (data: { messageId: string; read: boolean }) => {
-      if (!user) return;
+      if (!userId) return;
 
       // Update the message in our ref
       messagesRef.current = messagesRef.current.map((msg) =>
@@ -321,16 +324,16 @@ export const useUnreadMessagesFromDoctor = () => {
       );
       // Recalculate unread count
       const count = messagesRef.current.filter(
-        (msg) => !msg.read && msg.receiverId === user.id,
+        (msg) => !msg.read && msg.receiverId === userId,
       ).length;
       setUnreadCount(count);
     },
-    [user],
+    [userId],
   );
 
   const handleBatchMessagesRead = useCallback(
     ({ messageIds }: { messageIds: string[] }) => {
-      if (!user || messageIds.length === 0) return;
+      if (!userId || messageIds.length === 0) return;
 
       const messageIdsSet = new Set(messageIds);
       messagesRef.current = messagesRef.current.map((msg) =>
@@ -338,16 +341,16 @@ export const useUnreadMessagesFromDoctor = () => {
       );
 
       const count = messagesRef.current.filter(
-        (msg) => !msg.read && msg.receiverId === user.id,
+        (msg) => !msg.read && msg.receiverId === userId,
       ).length;
       setUnreadCount(count);
     },
-    [user],
+    [userId],
   );
 
   // Always listen for new messages (even before joining room)
   useEffect(() => {
-    if (!socket || !isConnected || !user) {
+    if (!socket || !isConnected || !userId) {
       return;
     }
 
@@ -364,12 +367,12 @@ export const useUnreadMessagesFromDoctor = () => {
       socket.off("message:read", handleMessageRead);
       batchReadSubscription.remove();
     };
-  }, [socket, isConnected, user, handleNewMessage, handleMessageRead, handleBatchMessagesRead]);
+  }, [socket, isConnected, userId, handleNewMessage, handleMessageRead, handleBatchMessagesRead]);
 
   // Join conversation room to get initial messages and stay in room
   // This hook should ALWAYS stay in the room to receive notifications
   useEffect(() => {
-    if (!socket || !isConnected || !user) {
+    if (!socket || !isConnected || !userId) {
       setUnreadCount(0);
       messagesRef.current = [];
       hasJoinedRef.current = false;
@@ -395,7 +398,7 @@ export const useUnreadMessagesFromDoctor = () => {
     const handleConversationMessages = (conversationMessages: Message[]) => {
       messagesRef.current = conversationMessages;
       const count = conversationMessages.filter(
-        (msg) => !msg.read && msg.receiverId === user.id,
+        (msg) => !msg.read && msg.receiverId === userId,
       ).length;
       setUnreadCount(count);
     };
@@ -408,7 +411,7 @@ export const useUnreadMessagesFromDoctor = () => {
       // NEVER leave room - we need to stay in room to receive notifications
       // This hook should persist for the lifetime of the app session
     };
-  }, [socket, isConnected, user?.id]);
+  }, [socket, isConnected, userId]);
 
   return {
     data: unreadCount,
@@ -424,13 +427,14 @@ export const useUnreadMessagesFromDoctor = () => {
  */
 export const useAssignedDoctor = () => {
   const { user } = useAuth();
+  const userId = user?.id ?? null;
 
   return useQuery({
     queryKey: ["assigned-doctor"],
     queryFn: async () => {
       return getAssignedDoctor();
     },
-    enabled: !!user,
+    enabled: !!userId,
     staleTime: 1 * 60 * 5000, // Cache for 1 minute (reduced to avoid stale data)
     refetchOnMount: true, // Always refetch when component mounts
   });

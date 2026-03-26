@@ -91,6 +91,7 @@ Scripts (package.json)
 - build: next build
 - start: next start
 - lint: next lint
+- typecheck: tsc --noEmit
 
 Troubleshooting
 

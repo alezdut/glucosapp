@@ -106,6 +106,17 @@ pnpm docker:dev
 pnpm docker:down
 ```
 
+Validaciones de calidad:
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+`typecheck` ahora cubre backend, web, mobile y los packages compartidos que participan del runtime.
+
 ## Configuración
 
 ### Base de Datos
@@ -630,6 +641,11 @@ pnpm lint
 # Type check en todo el monorepo
 pnpm typecheck
 ```
+
+Nota sobre mobile NFC:
+
+- En Android con development build se usa NFC real.
+- En iOS Simulator o entornos sin acceso al hardware se mantiene el modo simulado para pruebas de flujo.
 
 ### Base de Datos
 

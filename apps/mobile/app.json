@@ -1,9 +1,10 @@
 {
   "expo": {
-    "name": "Glucosapp Mobile",
+    "name": "Glucosapp",
     "slug": "glucosapp-mobile",
     "version": "1.0.0",
     "sdkVersion": "54.0.0",
+    "icon": "./assets/icon.png",
     "scheme": "glucosapp",
     "platforms": ["ios", "android", "web"],
     "orientation": "portrait",
@@ -46,6 +47,7 @@
       "package": "com.glucosapp.mobile",
       "permissions": ["POST_NOTIFICATIONS"],
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
       "intentFilters": [
