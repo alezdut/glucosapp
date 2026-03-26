@@ -7,6 +7,7 @@ import { MessagesService } from "./messages.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { DoctorUtilsService } from "../../common/services/doctor-utils.service";
 import { AuthModule } from "../auth/auth.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 
 /**
  * Module for messages between doctors and patients
@@ -14,6 +15,7 @@ import { AuthModule } from "../auth/auth.module";
 @Module({
   imports: [
     AuthModule,
+    NotificationsModule,
     ConfigModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -27,6 +29,6 @@ import { AuthModule } from "../auth/auth.module";
   ],
   controllers: [MessagesController],
   providers: [MessagesGateway, MessagesService, PrismaService, DoctorUtilsService],
-  exports: [MessagesService],
+  exports: [MessagesService, MessagesGateway],
 })
 export class MessagesModule {}

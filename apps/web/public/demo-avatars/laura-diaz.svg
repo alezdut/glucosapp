@@ -1,0 +1,10 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="256" height="256" rx="48" fill="#F3F0FF"/>
+  <circle cx="128" cy="98" r="54" fill="#F1C6A7"/>
+  <path d="M62 228C62 186 92 162 128 162C164 162 194 186 194 228V256H62V228Z" fill="#7048E8"/>
+  <path d="M68 94C68 52 94 30 128 30C162 30 188 52 188 94V118C181 104 166 96 150 96H106C90 96 75 104 68 118V94Z" fill="#3D2D2A"/>
+  <circle cx="108" cy="100" r="5" fill="#322019"/>
+  <circle cx="148" cy="100" r="5" fill="#322019"/>
+  <path d="M112 126C119 132 137 132 144 126" stroke="#B27159" stroke-width="6" stroke-linecap="round"/>
+  <text x="128" y="230" text-anchor="middle" font-size="28" font-family="Arial, sans-serif" font-weight="700" fill="#FFFFFF">LD</text>
+</svg>

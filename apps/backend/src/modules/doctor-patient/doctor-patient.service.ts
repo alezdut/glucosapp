@@ -523,7 +523,17 @@ export class DoctorPatientService {
       },
     });
 
-    // Build result with basic info (no need for full status calculation in search)
+    const activityStatuses = await Promise.all(
+      patients.map(async (patient) => ({
+        patientId: patient.id,
+        activityStatus: await this.calculatePatientActivityStatus(patient.id),
+      })),
+    );
+
+    const activityStatusMap = new Map(
+      activityStatuses.map((status) => [status.patientId, status.activityStatus]),
+    );
+
     return patients.map((patient) => ({
       id: patient.id,
       email: patient.email,
@@ -531,9 +541,9 @@ export class DoctorPatientService {
       lastName: patient.lastName || undefined,
       avatarUrl: patient.avatarUrl || undefined,
       diabetesType: patient.diabetesType || undefined,
-      lastGlucoseReading: undefined, // Not needed for search results
-      status: "Estable" as const, // Default clinical status for search
-      activityStatus: "Inactivo" as const, // Default activity status for search
+      lastGlucoseReading: undefined,
+      status: "Estable" as const,
+      activityStatus: activityStatusMap.get(patient.id) || ("Inactivo" as const),
       registrationDate: patient.createdAt.toISOString(),
     }));
   }

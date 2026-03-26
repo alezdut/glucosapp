@@ -203,7 +203,7 @@ export function createApiClient() {
   // Create a wrapper that automatically adds auth headers and handles token refresh
   const authenticatedClient = {
     ...client,
-    GET: async (path: string, init?: Record<string, unknown>) => {
+    GET: async <T = any>(path: string, init?: Record<string, unknown>) => {
       return executeWithAuth(
         async () => {
           const accessToken = await getAccessToken();
@@ -213,7 +213,7 @@ export function createApiClient() {
             ...((init as any)?.headers as Record<string, string>),
             ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
           };
-          return client.GET(path, { ...init, headers });
+          return client.GET<T>(path, { ...init, headers });
         },
         async () => {
           const accessToken = await getAccessToken();
@@ -223,7 +223,7 @@ export function createApiClient() {
             ...((init as any)?.headers as Record<string, string>),
             ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
           };
-          return client.GET(path, { ...init, headers });
+          return client.GET<T>(path, { ...init, headers });
         },
         path,
       );
@@ -272,6 +272,49 @@ export function createApiClient() {
         path,
       );
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    PUT: async (path: string, body?: any, init?: RequestInit) => {
+      return executeWithAuth(
+        async () => {
+          const accessToken = await getAccessToken();
+          const headers: Record<string, string> = {
+            ...((init?.headers as Record<string, string>) || {}),
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          };
+          return client.PUT(path, body, { ...init, headers });
+        },
+        async () => {
+          const accessToken = await getAccessToken();
+          const headers: Record<string, string> = {
+            ...((init?.headers as Record<string, string>) || {}),
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          };
+          return client.PUT(path, body, { ...init, headers });
+        },
+        path,
+      );
+    },
+    DELETE: async (path: string, init?: RequestInit) => {
+      return executeWithAuth(
+        async () => {
+          const accessToken = await getAccessToken();
+          const headers: Record<string, string> = {
+            ...((init?.headers as Record<string, string>) || {}),
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          };
+          return client.DELETE(path, { ...init, headers });
+        },
+        async () => {
+          const accessToken = await getAccessToken();
+          const headers: Record<string, string> = {
+            ...((init?.headers as Record<string, string>) || {}),
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          };
+          return client.DELETE(path, { ...init, headers });
+        },
+        path,
+      );
+    },
   };
 
   return authenticatedClient;
@@ -296,7 +339,7 @@ export interface AssignedDoctor {
 
 export async function getAssignedDoctor(): Promise<AssignedDoctor | null> {
   const client = createApiClient();
-  const response = await client.GET<AssignedDoctor>("/profile/doctor");
+  const response = await client.GET<AssignedDoctor | null>("/profile/doctor");
 
   if (response.error) {
     throwApiError(response.error, "Failed to fetch assigned doctor");
@@ -312,10 +355,7 @@ export async function markMessagesAsReadBatch(
   messageIds: string[],
 ): Promise<{ count: number; messageIds: string[] }> {
   const client = createApiClient();
-  const response = await client.POST<{ count: number; messageIds: string[] }>(
-    "/messages/mark-read-batch",
-    { messageIds },
-  );
+  const response = await client.POST("/messages/mark-read-batch", { messageIds });
 
   if (response.error) {
     throwApiError(response.error, "Failed to mark messages as read");
@@ -325,5 +365,27 @@ export async function markMessagesAsReadBatch(
     throw new Error("No data returned from mark-read-batch endpoint");
   }
 
-  return response.data;
+  return response.data as { count: number; messageIds: string[] };
+}
+
+export async function registerPushToken(input: {
+  expoPushToken: string;
+  platform: string;
+  deviceId?: string;
+}): Promise<void> {
+  const client = createApiClient();
+  const response = await client.POST("/push/register", input);
+
+  if (response.error) {
+    throwApiError(response.error, "Failed to register push token");
+  }
+}
+
+export async function unregisterPushToken(expoPushToken: string): Promise<void> {
+  const client = createApiClient();
+  const response = await client.POST("/push/unregister", { expoPushToken });
+
+  if (response.error) {
+    throwApiError(response.error, "Failed to unregister push token");
+  }
 }

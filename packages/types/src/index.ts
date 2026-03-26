@@ -152,6 +152,18 @@ export enum UserRole {
   PATIENT = "PATIENT",
 }
 
+export enum AppointmentStatus {
+  SCHEDULED = "SCHEDULED",
+  CONFIRMED = "CONFIRMED",
+  COMPLETED = "COMPLETED",
+  CANCELLED = "CANCELLED",
+}
+
+export enum AppointmentModality {
+  IN_PERSON = "IN_PERSON",
+  VIRTUAL = "VIRTUAL",
+}
+
 export type User = {
   id: string;
   email: string;
@@ -233,6 +245,31 @@ export type Statistics = {
   dailyInsulinDose: number;
   mealsRegistered: number;
 };
+
+export type AppointmentCounterparty = {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+};
+
+export type DoctorAppointment = {
+  id: string;
+  doctorId: string;
+  patientId: string;
+  scheduledAt: string;
+  notes?: string;
+  status: AppointmentStatus;
+  modality: AppointmentModality;
+  location?: string;
+  meetingUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+  patient?: AppointmentCounterparty;
+  doctor?: AppointmentCounterparty;
+};
+
+export type PatientAppointment = DoctorAppointment;
 
 export type LogEntry = {
   id: string;

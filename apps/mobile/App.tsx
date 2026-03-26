@@ -7,12 +7,15 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { RootNavigator, AuthNavigator } from "./src/navigation";
 import { AuthProvider, useAuth } from "./src/contexts/AuthContext";
 import { theme } from "./src/theme";
+import { usePushNotifications } from "./src/hooks/usePushNotifications";
+import { flushPendingNavigationActions, navigationRef } from "./src/navigation/navigation-service";
 
 /**
  * Main navigation wrapper that renders auth or main navigation
  */
 function AppNavigator() {
   const { isAuthenticated, needsOnboarding, isLoading } = useAuth();
+  usePushNotifications();
 
   if (isLoading) {
     return (
@@ -23,7 +26,7 @@ function AppNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef} onReady={flushPendingNavigationActions}>
       {!isAuthenticated || needsOnboarding ? <AuthNavigator /> : <RootNavigator />}
     </NavigationContainer>
   );

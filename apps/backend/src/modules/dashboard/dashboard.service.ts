@@ -113,9 +113,9 @@ export class DashboardService {
           })
         : 0;
 
-    // Count upcoming appointments (in next 7 days)
-    const sevenDaysFromNow = new Date();
-    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+    // Count upcoming appointments in the selected dashboard period
+    const appointmentsUntil = new Date();
+    appointmentsUntil.setDate(appointmentsUntil.getDate() + days);
     const now = new Date();
 
     const upcomingAppointmentsCount = await this.prisma.appointment.count({
@@ -123,7 +123,7 @@ export class DashboardService {
         doctorId,
         scheduledAt: {
           gte: now,
-          lte: sevenDaysFromNow,
+          lte: appointmentsUntil,
         },
         status: {
           in: ["SCHEDULED", "CONFIRMED"],
@@ -292,6 +292,7 @@ export class DashboardService {
         recordedAt: { gte: startDate },
       },
       select: {
+        userId: true,
         units: true,
       },
     });
@@ -306,14 +307,15 @@ export class DashboardService {
     }
 
     const totalUnits = doses.reduce((sum, dose) => sum + dose.units, 0);
-    // Calculate average units per day
-    const averageDose = totalUnits / days;
+    const patientsWithDoses = new Set(doses.map((dose) => dose.userId)).size;
+    const averageDose = patientsWithDoses > 0 ? totalUnits / (days * patientsWithDoses) : 0;
+    const roundedAverageDose = Math.round(averageDose * 10) / 10;
 
     return {
-      averageDose: Math.round(averageDose * 10) / 10, // Round to 1 decimal
+      averageDose: roundedAverageDose,
       unit: "unidades/día",
       days,
-      description: `En los últimos ${days} días, sus pacientes promedian ${Math.round(averageDose * 10) / 10} unidades/día.`,
+      description: `En los últimos ${days} días, sus pacientes con registros promedian ${roundedAverageDose} unidades/día por paciente.`,
     };
   }
 
