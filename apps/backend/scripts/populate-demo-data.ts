@@ -49,6 +49,35 @@ class DemoDataPopulator {
   private encryption: EncryptionService;
   private startTime: number;
 
+  private getAvatarUrl(avatarPath: string): string {
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3001";
+    return new URL(avatarPath, frontendUrl).toString();
+  }
+
+  private async syncDemoUserProfile(
+    userId: string,
+    profile: PatientProfile,
+    birthDate: Date,
+  ): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        avatarUrl: this.getAvatarUrl(profile.avatarPath),
+        birthDate,
+        weight: profile.weight,
+        diabetesType: profile.diabetesType,
+        icRatioBreakfast: profile.icRatioBreakfast,
+        icRatioLunch: profile.icRatioLunch,
+        icRatioDinner: profile.icRatioDinner,
+        insulinSensitivityFactor: profile.insulinSensitivityFactor,
+        minTargetGlucose: profile.minTarget,
+        maxTargetGlucose: profile.maxTarget,
+      },
+    });
+  }
+
   async initialize() {
     console.log("=================================================");
     console.log("Demo Data Population Script");
@@ -189,6 +218,8 @@ class DemoDataPopulator {
       endDate = today;
 
       if (startDate > endDate) {
+        const birthDate = generateBirthDate(profile.age);
+        await this.syncDemoUserProfile(existing.userId, profile, birthDate);
         console.log("  ✓ Patient data is up to date. Skipping.\n");
         return {
           logEntriesCreated: 0,
@@ -238,6 +269,7 @@ class DemoDataPopulator {
         // 1. Upsert user
         const hashedPassword = await bcrypt.hash(profile.password, 10);
         const birthDate = generateBirthDate(profile.age);
+        const avatarUrl = this.getAvatarUrl(profile.avatarPath);
 
         const user = await tx.user.upsert({
           where: { email: profile.email },
@@ -246,6 +278,7 @@ class DemoDataPopulator {
             password: hashedPassword,
             firstName: profile.firstName,
             lastName: profile.lastName,
+            avatarUrl,
             emailVerified: true,
             birthDate,
             weight: profile.weight,
@@ -259,11 +292,14 @@ class DemoDataPopulator {
             role: "PATIENT",
           },
           update: existingUserId
-            ? {}
+            ? {
+                avatarUrl,
+              }
             : {
                 // Update profile if not incremental
                 firstName: profile.firstName,
                 lastName: profile.lastName,
+                avatarUrl,
                 birthDate,
                 weight: profile.weight,
                 diabetesType: profile.diabetesType,

@@ -8,6 +8,7 @@ export interface PatientProfile {
   password: string; // Will be hashed
   firstName: string;
   lastName: string;
+  avatarPath: string;
   age: number;
   gender: "M" | "F";
   weight: number; // kg
@@ -54,6 +55,7 @@ export const DEMO_PATIENTS: PatientProfile[] = [
     password: "Demo123!",
     firstName: "Ana",
     lastName: "Martínez",
+    avatarPath: "/demo-avatars/ana-martinez.svg",
     age: 25,
     gender: "F",
     weight: 62,
@@ -83,6 +85,7 @@ export const DEMO_PATIENTS: PatientProfile[] = [
     password: "Demo123!",
     firstName: "Carlos",
     lastName: "González",
+    avatarPath: "/demo-avatars/carlos-gonzalez.svg",
     age: 26,
     gender: "M",
     weight: 78,
@@ -113,6 +116,7 @@ export const DEMO_PATIENTS: PatientProfile[] = [
     password: "Demo123!",
     firstName: "María",
     lastName: "López",
+    avatarPath: "/demo-avatars/maria-lopez.svg",
     age: 45,
     gender: "F",
     weight: 68,
@@ -142,6 +146,7 @@ export const DEMO_PATIENTS: PatientProfile[] = [
     password: "Demo123!",
     firstName: "Roberto",
     lastName: "Fernández",
+    avatarPath: "/demo-avatars/roberto-fernandez.svg",
     age: 40,
     gender: "M",
     weight: 82,
@@ -172,6 +177,7 @@ export const DEMO_PATIENTS: PatientProfile[] = [
     password: "Demo123!",
     firstName: "Elena",
     lastName: "Rodríguez",
+    avatarPath: "/demo-avatars/elena-rodriguez.svg",
     age: 60,
     gender: "F",
     weight: 75,
@@ -201,6 +207,7 @@ export const DEMO_PATIENTS: PatientProfile[] = [
     password: "Demo123!",
     firstName: "Jorge",
     lastName: "Sánchez",
+    avatarPath: "/demo-avatars/jorge-sanchez.svg",
     age: 58,
     gender: "M",
     weight: 71,
@@ -231,6 +238,7 @@ export const DEMO_PATIENTS: PatientProfile[] = [
     password: "Demo123!",
     firstName: "Isabel",
     lastName: "Torres",
+    avatarPath: "/demo-avatars/isabel-torres.svg",
     age: 77,
     gender: "F",
     weight: 58,
@@ -261,6 +269,7 @@ export const DEMO_PATIENTS: PatientProfile[] = [
     password: "Demo123!",
     firstName: "Pedro",
     lastName: "Ramírez",
+    avatarPath: "/demo-avatars/pedro-ramirez.svg",
     age: 73,
     gender: "M",
     weight: 70,
@@ -290,6 +299,7 @@ export const DEMO_PATIENTS: PatientProfile[] = [
     password: "Demo123!",
     firstName: "Laura",
     lastName: "Díaz",
+    avatarPath: "/demo-avatars/laura-diaz.svg",
     age: 33,
     gender: "F",
     weight: 65,
@@ -320,6 +330,7 @@ export const DEMO_PATIENTS: PatientProfile[] = [
     password: "Demo123!",
     firstName: "Miguel",
     lastName: "Morales",
+    avatarPath: "/demo-avatars/miguel-morales.svg",
     age: 51,
     gender: "M",
     weight: 88,

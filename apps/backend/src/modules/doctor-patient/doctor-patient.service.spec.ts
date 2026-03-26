@@ -308,6 +308,29 @@ describe("DoctorPatientService", () => {
       });
     });
 
+    it("should calculate real activity status for global search results", async () => {
+      const searchDto = { q: "John" };
+      const patients = [
+        createMockUser({
+          id: "patient-456",
+          firstName: "John",
+          role: UserRole.PATIENT,
+        }),
+      ];
+
+      (prismaService.doctorPatient.findMany as jest.Mock).mockResolvedValue([]);
+      (prismaService.user.findMany as jest.Mock).mockResolvedValue(patients);
+      (prismaService.glucoseEntry.findFirst as jest.Mock).mockResolvedValue({ id: "entry-1" });
+      (prismaService.glucoseReading.findFirst as jest.Mock).mockResolvedValue(null);
+      (prismaService.insulinDose.findFirst as jest.Mock).mockResolvedValue(null);
+      (prismaService.meal.findFirst as jest.Mock).mockResolvedValue(null);
+
+      const result = await service.searchGlobalPatients(doctorId, searchDto);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].activityStatus).toBe("Activo");
+    });
+
     it("should exclude already assigned patients", async () => {
       const searchDto = { q: "test" };
       const assignedPatientIds = [patientId];

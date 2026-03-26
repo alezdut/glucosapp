@@ -12,6 +12,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
   api:
     build:
       context: .
@@ -19,6 +21,12 @@ services:
     environment:
       PORT: 3000
       DATABASE_URL: postgresql://postgres:postgres@db:5432/glucosapp?schema=public
+      JWT_ACCESS_SECRET: dev-access-secret-at-least-32-characters-long
+      JWT_REFRESH_SECRET: dev-refresh-secret-at-least-32-characters-long
+      ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      FRONTEND_URL: http://localhost:3001
+      ALLOWED_ORIGINS: http://localhost:3001,http://localhost:8082
+      CORS_ORIGIN: http://localhost:3001,http://localhost:8082
     depends_on:
       db:
         condition: service_healthy
@@ -28,11 +36,14 @@ services:
     image: node:20-alpine
     working_dir: /repo
     environment:
-      NEXT_PUBLIC_API_BASE_URL: http://api:3000
-    command: sh -lc "corepack enable && corepack prepare pnpm@9.12.2 --activate && pnpm install && pnpm -C apps/web dev -p 3001"
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:3000
+    command: sh -lc "corepack enable && corepack prepare pnpm@9.12.2 --activate && pnpm install --frozen-lockfile && pnpm -C apps/web dev"
     ports:
-      - "3003:3001"
+      - "3001:3001"
     volumes:
       - .:/repo
     depends_on:
       - api
+
+volumes:
+  postgres-data:
