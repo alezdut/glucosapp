@@ -8,6 +8,7 @@ import {
   clearTokens,
 } from "../lib/api";
 import * as Linking from "expo-linking";
+import { unregisterCurrentPushDevice } from "../lib/push-notifications";
 
 // Enable web browser to properly dismiss after auth
 WebBrowser.maybeCompleteAuthSession();
@@ -19,6 +20,7 @@ interface User {
   firstName?: string;
   lastName?: string;
   emailVerified: boolean;
+  role: "DOCTOR" | "PATIENT";
   createdAt: string;
 }
 
@@ -61,7 +63,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // If we got an error response, check if it's an auth error
       if (response.error) {
         // If it's a 401, tokens were already cleared by the API client
-        if (response.error.status === 401) {
+        if (
+          typeof response.error === "object" &&
+          response.error !== null &&
+          "status" in response.error &&
+          response.error.status === 401
+        ) {
           console.log("Authentication failed, clearing user state");
           setUser(null);
         }
@@ -233,6 +240,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Get refresh token before clearing
       const refreshToken = await getRefreshToken();
+      await unregisterCurrentPushDevice();
 
       // Call logout endpoint with refresh token
       if (refreshToken) {

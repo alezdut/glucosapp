@@ -19,6 +19,7 @@ import { AppointmentsModule } from "./modules/appointments/appointments.module";
 import { AlertsModule } from "./modules/alerts/alerts.module";
 import { ReportsModule } from "./modules/reports/reports.module";
 import { MessagesModule } from "./modules/messages/messages.module";
+import { NotificationsModule } from "./modules/notifications/notifications.module";
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { MessagesModule } from "./modules/messages/messages.module";
     AlertsModule,
     ReportsModule,
     MessagesModule,
+    NotificationsModule,
   ],
   providers: [PrismaService],
 })

@@ -50,6 +50,9 @@ Setup
 
    # Google OAuth Client ID (from Google Cloud Console)
    EXPO_PUBLIC_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+
+   # Expo EAS Project UUID for push notifications
+   EXPO_PUBLIC_EAS_PROJECT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
    ```
 
    For real devices, use your machine's LAN IP:
@@ -71,7 +74,13 @@ Development
   pnpm -C apps/mobile dev
 
 - Start with environment variables:
-  EXPO_PUBLIC_API_BASE_URL=http://192.168.1.XXX:3000 EXPO_PUBLIC_GOOGLE_CLIENT_ID=your-client-id pnpm -C apps/mobile dev
+  EXPO_PUBLIC_API_BASE_URL=http://192.168.1.XXX:3000 EXPO_PUBLIC_GOOGLE_CLIENT_ID=your-client-id EXPO_PUBLIC_EAS_PROJECT_ID=your-eas-project-uuid pnpm -C apps/mobile dev
+
+Push Notifications
+
+- `apps/mobile/app.config.ts` reads the EAS project UUID from `EXPO_PUBLIC_EAS_PROJECT_ID`
+- The value must be the real EAS project UUID, not the app slug
+- You can get it from the Expo dashboard project settings or `eas project:info`
 
 Scripts (package.json)
 

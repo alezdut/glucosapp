@@ -4,17 +4,20 @@
     "slug": "glucosapp-mobile",
     "version": "1.0.0",
     "sdkVersion": "54.0.0",
-    "extra": {
-      "eas": {
-        "projectId": "glucosapp-mobile"
-      }
-    },
     "scheme": "glucosapp",
     "platforms": ["ios", "android", "web"],
     "orientation": "portrait",
     "newArchEnabled": false,
     "plugins": [
       "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp",
+          "color": "#2563EB",
+          "defaultChannel": "default"
+        }
+      ],
       [
         "expo-camera",
         {
@@ -39,23 +42,9 @@
     "runtimeVersion": {
       "policy": "sdkVersion"
     },
-    "ios": {
-      "bundleIdentifier": "com.glucosapp.mobile",
-      "supportsTablet": true,
-      "infoPlist": {
-        "CFBundleURLTypes": [
-          {
-            "CFBundleURLSchemes": ["glucosapp"]
-          }
-        ],
-        "NFCReaderUsageDescription": "Glucosapp necesita acceso a NFC para leer datos de tu sensor FreeStyle Libre."
-      },
-      "entitlements": {
-        "com.apple.developer.nfc.readersession.formats": ["TAG"]
-      }
-    },
     "android": {
       "package": "com.glucosapp.mobile",
+      "permissions": ["POST_NOTIFICATIONS"],
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF"
       },
@@ -73,6 +62,23 @@
           "category": ["BROWSABLE", "DEFAULT"]
         }
       ]
+    },
+    "ios": {
+      "bundleIdentifier": "com.glucosapp.mobile",
+      "supportsTablet": true,
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": ["glucosapp"]
+          }
+        ],
+        "NFCReaderUsageDescription": "Glucosapp necesita acceso a NFC para leer datos de tu sensor FreeStyle Libre.",
+        "UIBackgroundModes": ["remote-notification"]
+      },
+      "entitlements": {
+        "aps-environment": "development",
+        "com.apple.developer.nfc.readersession.formats": ["TAG"]
+      }
     }
   }
 }

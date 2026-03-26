@@ -10,10 +10,10 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { AppointmentsService } from "./appointments.service";
 import { DoctorUtilsService } from "../../common/services/doctor-utils.service";
 import { createMockPrismaService } from "../../common/test-helpers/prisma.mock";
-import { createMockConfigService } from "../../common/test-helpers/config.mock";
 import { CreateAppointmentDto } from "./dto/create-appointment.dto";
 import { UpdateAppointmentDto } from "./dto/update-appointment.dto";
-import { MessagesGateway } from "../messages/messages.gateway";
+import { RealtimeNotificationsService } from "../notifications/realtime-notifications.service";
+import { NotificationsService } from "../notifications/notifications.service";
 
 describe("AppointmentsService", () => {
   let service: AppointmentsService;
@@ -54,15 +54,16 @@ describe("AppointmentsService", () => {
 
   beforeEach(async () => {
     const mockPrisma = createMockPrismaService();
-    const mockConfig = createMockConfigService();
     const mockDoctorUtilsService = {
       verifyDoctor: jest.fn().mockResolvedValue(undefined),
       getDoctorPatientIds: jest.fn().mockResolvedValue([patientId]),
     };
-    const mockMessagesGateway = {
-      server: {
-        fetchSockets: jest.fn().mockResolvedValue([]),
-      },
+    const mockRealtimeNotificationsService = {
+      emitToUser: jest.fn(),
+    };
+    const mockNotificationsService = {
+      sendToUser: jest.fn(),
+      createAppointmentPayload: jest.fn().mockImplementation((input) => input),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -77,12 +78,12 @@ describe("AppointmentsService", () => {
           useValue: mockDoctorUtilsService,
         },
         {
-          provide: MessagesGateway,
-          useValue: mockMessagesGateway,
+          provide: RealtimeNotificationsService,
+          useValue: mockRealtimeNotificationsService,
         },
         {
-          provide: "ConfigService",
-          useValue: mockConfig,
+          provide: NotificationsService,
+          useValue: mockNotificationsService,
         },
       ],
     }).compile();

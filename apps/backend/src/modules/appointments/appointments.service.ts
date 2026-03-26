@@ -25,7 +25,8 @@ import { UpdateAppointmentDto } from "./dto/update-appointment.dto";
 import { AppointmentResponseDto } from "./dto/appointment-response.dto";
 import { GetAppointmentsQueryDto } from "./dto/get-appointments-query.dto";
 import { CalendarDayResponseDto } from "./dto/calendar-day-response.dto";
-import { MessagesGateway } from "../messages/messages.gateway";
+import { RealtimeNotificationsService } from "../notifications/realtime-notifications.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import {
   formatDateInTimezone,
   getCurrentTimeInTimezone,
@@ -41,6 +42,7 @@ type AppointmentWithRelations = Prisma.AppointmentGetPayload<{
         email: true;
         firstName: true;
         lastName: true;
+        timezone: true;
       };
     };
     doctor: {
@@ -81,7 +83,8 @@ export class AppointmentsService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly doctorUtils: DoctorUtilsService,
-    private readonly messagesGateway: MessagesGateway,
+    private readonly realtimeNotifications: RealtimeNotificationsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   onModuleInit() {
@@ -139,6 +142,7 @@ export class AppointmentsService implements OnModuleInit, OnModuleDestroy {
           email: true,
           firstName: true,
           lastName: true,
+          timezone: true,
         },
       },
       doctor: {
@@ -379,29 +383,32 @@ export class AppointmentsService implements OnModuleInit, OnModuleDestroy {
     return isTimeInRange(currentTime.totalMinutes, startTimeMinutes, endTimeMinutes);
   }
 
-  private async createReminderAlertIfEnabled(
+  private async getReminderDeliveryDecision(
     appointment: AppointmentWithRelations,
-    message: string,
-  ): Promise<boolean> {
+  ): Promise<{ sendInApp: boolean; deferUntilLater: boolean }> {
     const settings = await this.prisma.alertSettings.findUnique({
       where: { userId: appointment.patientId },
     });
     const channels = this.parseNotificationChannels(settings);
-    const doctorTimezone = appointment.doctor.timezone || "UTC";
+    const patientTimezone = appointment.patient.timezone || appointment.doctor.timezone || "UTC";
 
     if (
       settings?.quietHoursEnabled &&
       settings.quietHoursStart &&
       settings.quietHoursEnd &&
-      this.isInQuietHours(settings.quietHoursStart, settings.quietHoursEnd, doctorTimezone)
+      this.isInQuietHours(settings.quietHoursStart, settings.quietHoursEnd, patientTimezone)
     ) {
-      return false;
+      return { sendInApp: false, deferUntilLater: true };
     }
 
     if (channels.dashboard === false) {
-      return true;
+      return { sendInApp: false, deferUntilLater: false };
     }
 
+    return { sendInApp: true, deferUntilLater: false };
+  }
+
+  private async createReminderAlert(appointment: AppointmentWithRelations, message: string) {
     await this.prisma.alert.create({
       data: {
         userId: appointment.patientId,
@@ -410,8 +417,6 @@ export class AppointmentsService implements OnModuleInit, OnModuleDestroy {
         message,
       },
     });
-
-    return true;
   }
 
   private async emitAppointmentEvent(
@@ -419,20 +424,7 @@ export class AppointmentsService implements OnModuleInit, OnModuleDestroy {
     event: "appointment:updated" | "appointment:reminder",
     payload: Record<string, unknown>,
   ): Promise<void> {
-    const server = this.messagesGateway.server;
-    if (!server) {
-      return;
-    }
-
-    const remoteSockets = await server.fetchSockets();
-    await Promise.all(
-      remoteSockets.map(async (remoteSocket) => {
-        const socketUser = remoteSocket.data.user as { id?: string } | undefined;
-        if (socketUser?.id === userId) {
-          remoteSocket.emit(event, payload);
-        }
-      }),
-    );
+    this.realtimeNotifications.emitToUser(userId, event, payload);
   }
 
   private buildReminderMessage(appointment: AppointmentWithRelations): string {
@@ -468,21 +460,32 @@ export class AppointmentsService implements OnModuleInit, OnModuleDestroy {
 
     for (const appointment of appointments) {
       const message = this.buildReminderMessage(appointment);
-      const created = await this.createReminderAlertIfEnabled(appointment, message);
+      const decision = await this.getReminderDeliveryDecision(appointment);
 
-      if (!created) {
+      if (decision.deferUntilLater) {
         continue;
+      }
+
+      if (decision.sendInApp) {
+        await this.createReminderAlert(appointment, message);
+        await this.emitAppointmentEvent(appointment.patientId, "appointment:reminder", {
+          appointmentId: appointment.id,
+          message,
+          appointment: this.mapAppointmentToDto(appointment),
+        });
+        await this.notificationsService.sendToUser(
+          appointment.patientId,
+          this.notificationsService.createAppointmentPayload({
+            type: "appointment_reminder",
+            appointmentId: appointment.id,
+            message,
+          }),
+        );
       }
 
       await this.prisma.appointment.update({
         where: { id: appointment.id },
         data: { reminderSentAt: new Date() },
-      });
-
-      await this.emitAppointmentEvent(appointment.patientId, "appointment:reminder", {
-        appointmentId: appointment.id,
-        message,
-        appointment: this.mapAppointmentToDto(appointment),
       });
     }
   }
@@ -615,6 +618,14 @@ export class AppointmentsService implements OnModuleInit, OnModuleDestroy {
       message: "Tu médico programó una nueva cita.",
       appointment: this.mapAppointmentToDto(appointment),
     });
+    await this.notificationsService.sendToUser(
+      appointment.patientId,
+      this.notificationsService.createAppointmentPayload({
+        type: "appointment_created",
+        appointmentId: appointment.id,
+        message: "Tu médico programó una nueva cita.",
+      }),
+    );
 
     return this.mapAppointmentToDto(appointment);
   }
@@ -691,6 +702,14 @@ export class AppointmentsService implements OnModuleInit, OnModuleDestroy {
         message,
         appointment: this.mapAppointmentToDto(updated),
       });
+      await this.notificationsService.sendToUser(
+        updated.patientId,
+        this.notificationsService.createAppointmentPayload({
+          type: "appointment_updated",
+          appointmentId: updated.id,
+          message,
+        }),
+      );
     }
 
     return this.mapAppointmentToDto(updated);

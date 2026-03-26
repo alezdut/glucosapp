@@ -7,42 +7,24 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Alert,
-  Share,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import {
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  Droplet,
-  Syringe,
-  Stethoscope,
-  Mail,
-  Info,
-  XCircle,
-} from "lucide-react-native";
+import { CalendarDays, Droplet, Syringe, Stethoscope, Mail, Info } from "lucide-react-native";
 import { theme } from "../theme";
 import { createApiClient } from "../lib/api";
 import { GlucoseChart, type GlucoseDataPoint } from "../components/GlucoseChart";
-import Button from "../components/Button";
+import AppointmentCard from "../components/AppointmentCard";
 import { formatTimeFromMinutes } from "@glucosapp/utils";
-import {
-  AppointmentModality,
-  AppointmentStatus,
-  type PatientAppointment,
-  type UserProfile,
-} from "@glucosapp/types";
+import { AppointmentStatus, type UserProfile } from "@glucosapp/types";
 import type { RootStackParamList } from "../navigation/types";
-import { isAppointmentCancelable, isAppointmentConfirmable } from "../lib/appointments-api";
 import {
   useCancelAppointment,
   useConfirmAppointment,
   useMyAppointments,
 } from "../hooks/useAppointments";
-import { useSocket } from "../hooks/useSocket";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -195,14 +177,9 @@ export default function DoctorScreen() {
     refetchOnWindowFocus: false,
   });
 
-  const {
-    data: appointments = [],
-    isLoading: isLoadingAppointments,
-    refetch: refetchAppointments,
-  } = useMyAppointments(true);
+  const { data: appointments = [], isLoading: isLoadingAppointments } = useMyAppointments(true);
   const confirmAppointmentMutation = useConfirmAppointment();
   const cancelAppointmentMutation = useCancelAppointment();
-  const { socket } = useSocket();
 
   const isLoading =
     isLoadingDoctor ||
@@ -215,23 +192,20 @@ export default function DoctorScreen() {
 
   const upcomingAppointments = React.useMemo(
     () =>
-      appointments.filter(
-        (appointment) => new Date(appointment.scheduledAt).getTime() >= currentTime,
-      ),
-    [appointments, currentTime],
-  );
-
-  const recentAppointments = React.useMemo(
-    () =>
       appointments
-        .filter((appointment) => new Date(appointment.scheduledAt).getTime() < currentTime)
+        .filter(
+          (appointment) =>
+            new Date(appointment.scheduledAt).getTime() >= currentTime &&
+            (appointment.status === AppointmentStatus.SCHEDULED ||
+              appointment.status === AppointmentStatus.CONFIRMED),
+        )
         .sort(
           (left, right) =>
-            new Date(right.scheduledAt).getTime() - new Date(left.scheduledAt).getTime(),
-        )
-        .slice(0, 3),
+            new Date(left.scheduledAt).getTime() - new Date(right.scheduledAt).getTime(),
+        ),
     [appointments, currentTime],
   );
+  const nextAppointment = upcomingAppointments[0];
 
   // Transform glucose trend data from backend (daily averages for last 7 days)
   const chartData: GlucoseDataPoint[] = React.useMemo(() => {
@@ -253,25 +227,6 @@ export default function DoctorScreen() {
       .filter((point): point is GlucoseDataPoint => point !== null);
   }, [glucoseTrend]);
 
-  React.useEffect(() => {
-    if (!socket) return;
-
-    const handleAppointmentNotification = (payload?: { message?: string }) => {
-      refetchAppointments();
-      if (payload?.message) {
-        Alert.alert("Actualización de cita", payload.message);
-      }
-    };
-
-    socket.on("appointment:updated", handleAppointmentNotification);
-    socket.on("appointment:reminder", handleAppointmentNotification);
-
-    return () => {
-      socket.off("appointment:updated", handleAppointmentNotification);
-      socket.off("appointment:reminder", handleAppointmentNotification);
-    };
-  }, [refetchAppointments, socket]);
-
   // Get target glucose range for chart
   const targetRange = profile
     ? {
@@ -291,48 +246,6 @@ export default function DoctorScreen() {
     });
   };
 
-  const formatAppointmentDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return dateString;
-    return date.toLocaleString("es-ES", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const getAppointmentStatusLabel = (status: AppointmentStatus): string => {
-    if (status === AppointmentStatus.SCHEDULED) return "Programada";
-    if (status === AppointmentStatus.CONFIRMED) return "Confirmada";
-    if (status === AppointmentStatus.COMPLETED) return "Completada";
-    return "Cancelada";
-  };
-
-  const getAppointmentStatusColor = (status: AppointmentStatus): string => {
-    if (status === AppointmentStatus.SCHEDULED) return theme.colors.primary;
-    if (status === AppointmentStatus.CONFIRMED) return theme.colors.success;
-    if (status === AppointmentStatus.COMPLETED) return theme.colors.textSecondary;
-    return theme.colors.error;
-  };
-
-  const getAppointmentModalityLabel = (modality: AppointmentModality): string => {
-    if (modality === AppointmentModality.VIRTUAL) return "Virtual";
-    return "Presencial";
-  };
-
-  const handleMeetingUrlPress = async (meetingUrl: string) => {
-    try {
-      await Share.share({
-        message: meetingUrl,
-        url: meetingUrl,
-      });
-    } catch {
-      Alert.alert("No se pudo compartir el enlace", "Intenta nuevamente.");
-    }
-  };
-
   const handleConfirmAppointment = (appointmentId: string) => {
     Alert.alert("Confirmar cita", "¿Quieres confirmar esta cita?", [
       { text: "Volver", style: "cancel" },
@@ -341,7 +254,6 @@ export default function DoctorScreen() {
         onPress: async () => {
           try {
             await confirmAppointmentMutation.mutateAsync(appointmentId);
-            refetchAppointments();
           } catch (error) {
             Alert.alert(
               "No se pudo confirmar",
@@ -362,7 +274,6 @@ export default function DoctorScreen() {
         onPress: async () => {
           try {
             await cancelAppointmentMutation.mutateAsync(appointmentId);
-            refetchAppointments();
           } catch (error) {
             Alert.alert(
               "No se pudo cancelar",
@@ -373,106 +284,6 @@ export default function DoctorScreen() {
       },
     ]);
   };
-
-  const renderAppointmentCard = (appointment: PatientAppointment) => (
-    <View key={appointment.id} style={styles.appointmentCard}>
-      <View style={styles.appointmentHeader}>
-        <View style={styles.appointmentHeaderLeft}>
-          <View style={styles.appointmentIcon}>
-            <CalendarDays size={18} color={theme.colors.primary} />
-          </View>
-          <View style={styles.appointmentMeta}>
-            <Text style={styles.appointmentDate}>
-              {formatAppointmentDate(appointment.scheduledAt)}
-            </Text>
-            <Text style={styles.appointmentDoctorName}>
-              {appointment.doctor?.firstName || appointment.doctor?.lastName
-                ? `${appointment.doctor?.firstName || ""} ${appointment.doctor?.lastName || ""}`.trim()
-                : doctorInfo?.doctor.email || "Tu médico"}
-            </Text>
-          </View>
-        </View>
-        <View
-          style={[
-            styles.appointmentStatusBadge,
-            { backgroundColor: `${getAppointmentStatusColor(appointment.status)}15` },
-          ]}
-        >
-          <Text
-            style={[
-              styles.appointmentStatusText,
-              { color: getAppointmentStatusColor(appointment.status) },
-            ]}
-          >
-            {getAppointmentStatusLabel(appointment.status)}
-          </Text>
-        </View>
-      </View>
-
-      {appointment.notes ? <Text style={styles.appointmentNotes}>{appointment.notes}</Text> : null}
-
-      <View style={styles.appointmentInfoRow}>
-        <Clock3 size={16} color={theme.colors.textSecondary} />
-        <Text style={styles.appointmentInfoText}>Bloque estimado de 60 minutos</Text>
-      </View>
-
-      <View style={styles.appointmentInfoRow}>
-        <Info size={16} color={theme.colors.textSecondary} />
-        <Text style={styles.appointmentInfoText}>
-          Modalidad: {getAppointmentModalityLabel(appointment.modality)}
-        </Text>
-      </View>
-
-      {appointment.modality === AppointmentModality.IN_PERSON && appointment.location ? (
-        <View style={styles.appointmentInfoRow}>
-          <Stethoscope size={16} color={theme.colors.textSecondary} />
-          <Text style={styles.appointmentInfoText}>{appointment.location}</Text>
-        </View>
-      ) : null}
-
-      {appointment.modality === AppointmentModality.VIRTUAL && appointment.meetingUrl ? (
-        <TouchableOpacity
-          onPress={() => handleMeetingUrlPress(appointment.meetingUrl!)}
-          style={styles.appointmentLinkRow}
-          activeOpacity={0.8}
-        >
-          <Mail size={16} color={theme.colors.primary} />
-          <View style={styles.appointmentLinkContent}>
-            <Text numberOfLines={1} style={styles.appointmentLinkText}>
-              {appointment.meetingUrl}
-            </Text>
-            <Text style={styles.appointmentLinkHint}>Toca para copiar o compartir el enlace</Text>
-          </View>
-        </TouchableOpacity>
-      ) : null}
-
-      {(isAppointmentConfirmable(appointment.status) ||
-        isAppointmentCancelable(appointment.status)) && (
-        <View style={styles.appointmentActions}>
-          {isAppointmentConfirmable(appointment.status) && (
-            <Button
-              title="Confirmar"
-              variant="primary"
-              loading={confirmAppointmentMutation.isPending}
-              onPress={() => handleConfirmAppointment(appointment.id)}
-              style={styles.appointmentActionButton}
-              icon={<CheckCircle2 size={16} color={theme.colors.background} />}
-            />
-          )}
-          {isAppointmentCancelable(appointment.status) && (
-            <Button
-              title="Cancelar"
-              variant="outlined"
-              loading={cancelAppointmentMutation.isPending}
-              onPress={() => handleCancelAppointment(appointment.id)}
-              style={styles.appointmentActionButton}
-              icon={<XCircle size={16} color={theme.colors.primary} />}
-            />
-          )}
-        </View>
-      )}
-    </View>
-  );
 
   if (isLoading) {
     return (
@@ -574,7 +385,12 @@ export default function DoctorScreen() {
 
       {hasDoctor && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Tus Citas</Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Tus Citas</Text>
+            <TouchableOpacity onPress={() => navigation.navigate("Appointments")}>
+              <Text style={styles.sectionLink}>Ver todas</Text>
+            </TouchableOpacity>
+          </View>
 
           {isLoadingAppointments ? (
             <View style={styles.infoCard}>
@@ -592,25 +408,20 @@ export default function DoctorScreen() {
           ) : (
             <>
               <View style={styles.sectionSubheader}>
-                <Text style={styles.sectionSubtitle}>Próximas</Text>
-                <Text style={styles.sectionCount}>{upcomingAppointments.length}</Text>
+                <Text style={styles.sectionSubtitle}>Próxima cita</Text>
               </View>
-              {upcomingAppointments.length > 0 ? (
-                upcomingAppointments.map(renderAppointmentCard)
+              {nextAppointment ? (
+                <AppointmentCard
+                  appointment={nextAppointment}
+                  confirmLoading={confirmAppointmentMutation.isPending}
+                  cancelLoading={cancelAppointmentMutation.isPending}
+                  onConfirm={handleConfirmAppointment}
+                  onCancel={handleCancelAppointment}
+                />
               ) : (
                 <View style={styles.emptyMiniCard}>
                   <Text style={styles.emptyMiniText}>No tienes citas futuras pendientes.</Text>
                 </View>
-              )}
-
-              {recentAppointments.length > 0 && (
-                <>
-                  <View style={styles.sectionSubheader}>
-                    <Text style={styles.sectionSubtitle}>Recientes</Text>
-                    <Text style={styles.sectionCount}>{recentAppointments.length}</Text>
-                  </View>
-                  {recentAppointments.map(renderAppointmentCard)}
-                </>
               )}
             </>
           )}
@@ -805,6 +616,17 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     marginBottom: theme.spacing.md,
   },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: theme.spacing.md,
+  },
+  sectionLink: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: "600",
+    color: theme.colors.primary,
+  },
   reportCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -910,108 +732,6 @@ const styles = StyleSheet.create({
   emptyMiniText: {
     fontSize: theme.fontSize.sm,
     color: theme.colors.textSecondary,
-  },
-  appointmentCard: {
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.md,
-    shadowColor: theme.colors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  appointmentHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    marginBottom: theme.spacing.sm,
-  },
-  appointmentHeaderLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-    marginRight: theme.spacing.sm,
-  },
-  appointmentIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: `${theme.colors.primary}15`,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: theme.spacing.sm,
-  },
-  appointmentMeta: {
-    flex: 1,
-  },
-  appointmentDate: {
-    fontSize: theme.fontSize.md,
-    fontWeight: "600",
-    color: theme.colors.text,
-    marginBottom: 2,
-  },
-  appointmentDoctorName: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.textSecondary,
-  },
-  appointmentStatusBadge: {
-    borderRadius: 999,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
-  },
-  appointmentStatusText: {
-    fontSize: theme.fontSize.xs,
-    fontWeight: "700",
-  },
-  appointmentNotes: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.text,
-    lineHeight: 20,
-    marginBottom: theme.spacing.sm,
-  },
-  appointmentInfoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  appointmentInfoText: {
-    marginLeft: theme.spacing.xs,
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.textSecondary,
-  },
-  appointmentLinkRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: theme.spacing.sm,
-    marginTop: theme.spacing.sm,
-    padding: theme.spacing.sm,
-    borderRadius: theme.borderRadius.sm,
-    backgroundColor: `${theme.colors.primary}10`,
-  },
-  appointmentLinkContent: {
-    flex: 1,
-  },
-  appointmentLinkText: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: "600",
-    color: theme.colors.primary,
-    marginBottom: 2,
-  },
-  appointmentLinkHint: {
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.textSecondary,
-  },
-  appointmentActions: {
-    flexDirection: "row",
-    gap: theme.spacing.sm,
-    marginTop: theme.spacing.md,
-  },
-  appointmentActionButton: {
-    flex: 1,
   },
   infoRow: {
     flexDirection: "row",

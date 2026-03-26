@@ -4,6 +4,7 @@ import {
   SubscribeMessage,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
   MessageBody,
   ConnectedSocket,
 } from "@nestjs/websockets";
@@ -24,6 +25,8 @@ import {
 import { UserResponseDto } from "../auth/dto/auth-response.dto";
 import { JwtPayload } from "../auth/strategies/jwt.strategy";
 import { UserRole } from "@prisma/client";
+import { RealtimeNotificationsService } from "../notifications/realtime-notifications.service";
+import { NotificationsService } from "../notifications/notifications.service";
 
 /**
  * Helper function to generate room name for a conversation
@@ -47,7 +50,7 @@ function getConversationRoom(doctorId: string, patientId: string): string {
   },
   namespace: "/messages",
 })
-export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit {
   @WebSocketServer()
   server!: Server;
 
@@ -59,7 +62,13 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly authService: AuthService,
+    private readonly realtimeNotifications: RealtimeNotificationsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
+
+  afterInit(server: Server) {
+    this.realtimeNotifications.registerServer(server);
+  }
 
   /**
    * Handle client connection
@@ -97,6 +106,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       // Attach user to socket data
       client.data.user = user;
       client.data.userId = user.id;
+      this.realtimeNotifications.joinUserRoom(client, user.id);
 
       // Log connection with socket count
       try {
@@ -190,50 +200,26 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       // Emit new message to room (for users currently viewing the conversation)
       this.server.to(room).emit("message:new", message);
 
-      // Also emit directly to sender to ensure they see their own message immediately
-      client.emit("message:new", message);
-
-      // ALWAYS emit directly to receiver to ensure they receive notifications even if not in room
-      // This is critical for real-time notifications
-      // Use fetchSockets() which returns RemoteSocket objects with data
-      try {
-        const remoteSockets = await this.server.fetchSockets();
-        let receiverFound = false;
-        const connectedUserIds: string[] = [];
-
-        for (const remoteSocket of remoteSockets) {
-          // RemoteSocket has a data property that contains the user info we attached
-          const socketUser = remoteSocket.data.user as UserResponseDto | undefined;
-          if (socketUser) {
-            connectedUserIds.push(socketUser.id);
-            if (socketUser.id === dto.receiverId) {
-              // Use emit on the RemoteSocket directly
-              remoteSocket.emit("message:new", message);
-              receiverFound = true;
-              this.logger.log(
-                `Emitted message:new directly to receiver ${dto.receiverId} (socket ${remoteSocket.id})`,
-              );
-            }
-          }
-        }
-
-        if (!receiverFound) {
-          this.logger.warn(`Receiver ${dto.receiverId} not found in connected sockets.`, {
-            receiverId: dto.receiverId,
-            connectedUserIds,
-            totalSockets: remoteSockets.length,
-          });
-        }
-      } catch (error) {
-        this.logger.error(
-          `Error emitting to receiver: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
+      // Emit to both users' dedicated rooms so every active device/tab stays in sync
+      this.realtimeNotifications.emitToUser(user.id, "message:new", message);
+      this.realtimeNotifications.emitToUser(dto.receiverId, "message:new", message);
+      const senderName =
+        `${message.sender.firstName || ""} ${message.sender.lastName || ""}`.trim() ||
+        message.sender.email;
+      await this.notificationsService.sendToUser(
+        dto.receiverId,
+        this.notificationsService.createMessagePayload({
+          messageId: message.id,
+          senderName,
+          body: message.content,
+          doctorId: userRole === UserRole.DOCTOR ? user.id : dto.receiverId,
+        }),
+      );
 
       // Emit conversation list update to sender
       if (userRole === UserRole.DOCTOR) {
         const conversations = await this.messagesService.getConversations(user.id);
-        client.emit("conversation:updated", conversations);
+        this.realtimeNotifications.emitToUser(user.id, "conversation:updated", conversations);
       }
 
       // Also emit conversation list update to receiver (if receiver is a doctor)
@@ -242,16 +228,11 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         const receiverUser = await this.authService.getUserById(dto.receiverId);
         if (receiverUser && receiverUser.role === UserRole.DOCTOR) {
           const receiverConversations = await this.messagesService.getConversations(dto.receiverId);
-          // Find receiver's socket and emit conversation update
-          const socketsMap = this.server.sockets.sockets;
-          if (socketsMap && typeof socketsMap.forEach === "function") {
-            socketsMap.forEach((s: Socket) => {
-              const socketUser = s.data.user as UserResponseDto | undefined;
-              if (socketUser?.id === dto.receiverId) {
-                s.emit("conversation:updated", receiverConversations);
-              }
-            });
-          }
+          this.realtimeNotifications.emitToUser(
+            dto.receiverId,
+            "conversation:updated",
+            receiverConversations,
+          );
         }
       } catch (error) {
         // If we can't update receiver's conversations, that's okay

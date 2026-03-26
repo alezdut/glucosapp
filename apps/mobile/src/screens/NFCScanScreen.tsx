@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, Alert } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, Alert, Platform } from "react-native";
 import { Animated, Easing } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Activity, Nfc } from "lucide-react-native";
@@ -30,15 +30,19 @@ type NfcTag = {
 };
 
 // Importación condicional de NFC Manager
-// En Expo Go esto no estará disponible, por lo que usaremos mocks
+// En Expo Go y en iOS usamos mocks por ahora
 let NfcManager = null;
 let NfcTech = null;
 
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const nfcModule = require("react-native-nfc-manager");
-  NfcManager = nfcModule.default || nfcModule;
-  NfcTech = nfcModule.NfcTech;
+  if (Platform.OS !== "ios") {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const nfcModule = require("react-native-nfc-manager");
+    NfcManager = nfcModule.default || nfcModule;
+    NfcTech = nfcModule.NfcTech;
+  } else {
+    console.log("NFC native module disabled on iOS - will use mock data");
+  }
 } catch (error) {
   // NFC no disponible (Expo Go)
   console.log("NFC Manager not available - will use mock data");

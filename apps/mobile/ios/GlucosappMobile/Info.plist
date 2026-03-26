@@ -64,6 +64,10 @@
 	<string>Allow Glucosapp to save scanned images to your photo library.</string>
 	<key>RCTNewArchEnabled</key>
 	<false/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>SplashScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>

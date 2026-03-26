@@ -1,9 +1,12 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { DeviceEventEmitter } from "react-native";
 import { useSocket } from "./useSocket";
 import { useAuth } from "../contexts/AuthContext";
 import { getAssignedDoctor, markMessagesAsReadBatch } from "../lib/api";
 import type { Message, Conversation } from "../lib/messages-api";
+
+const BATCH_MESSAGES_READ_EVENT = "messages:batch-read";
 
 /**
  * Hook to get conversation with doctor (for patients)
@@ -58,12 +61,40 @@ export const useConversationWithDoctor = () => {
       });
     };
 
+    const handleMessageRead = (data: { messageId: string; read: boolean }) => {
+      setMessages((prev) =>
+        prev.map((message) =>
+          message.id === data.messageId ? { ...message, read: data.read } : message,
+        ),
+      );
+    };
+
+    const handleBatchMessagesRead = ({ messageIds }: { messageIds: string[] }) => {
+      if (messageIds.length === 0) {
+        return;
+      }
+
+      const messageIdsSet = new Set(messageIds);
+      setMessages((prev) =>
+        prev.map((message) =>
+          messageIdsSet.has(message.id) ? { ...message, read: true } : message,
+        ),
+      );
+    };
+
     socket.on("conversation:messages", handleConversationMessages);
     socket.on("message:new", handleNewMessage);
+    socket.on("message:read", handleMessageRead);
+    const batchReadSubscription = DeviceEventEmitter.addListener(
+      BATCH_MESSAGES_READ_EVENT,
+      handleBatchMessagesRead,
+    );
 
     return () => {
       socket.off("conversation:messages", handleConversationMessages);
       socket.off("message:new", handleNewMessage);
+      socket.off("message:read", handleMessageRead);
+      batchReadSubscription.remove();
       // Don't leave room - useUnreadMessagesFromDoctor needs to stay in room for notifications
       // The room will be cleaned up when socket disconnects
       hasJoinedRef.current = false;
@@ -210,7 +241,10 @@ export const useMarkAsReadBatch = () => {
       }
       return markMessagesAsReadBatch(messageIds);
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      DeviceEventEmitter.emit(BATCH_MESSAGES_READ_EVENT, {
+        messageIds: result.messageIds,
+      });
       // Invalidate queries to update read status
       queryClient.invalidateQueries({ queryKey: ["messages", "conversation"] });
       queryClient.invalidateQueries({ queryKey: ["messages", "conversations"] });
@@ -294,6 +328,23 @@ export const useUnreadMessagesFromDoctor = () => {
     [user],
   );
 
+  const handleBatchMessagesRead = useCallback(
+    ({ messageIds }: { messageIds: string[] }) => {
+      if (!user || messageIds.length === 0) return;
+
+      const messageIdsSet = new Set(messageIds);
+      messagesRef.current = messagesRef.current.map((msg) =>
+        messageIdsSet.has(msg.id) ? { ...msg, read: true } : msg,
+      );
+
+      const count = messagesRef.current.filter(
+        (msg) => !msg.read && msg.receiverId === user.id,
+      ).length;
+      setUnreadCount(count);
+    },
+    [user],
+  );
+
   // Always listen for new messages (even before joining room)
   useEffect(() => {
     if (!socket || !isConnected || !user) {
@@ -303,12 +354,17 @@ export const useUnreadMessagesFromDoctor = () => {
     // Register listeners - these will fire for ALL messages received on this socket
     socket.on("message:new", handleNewMessage);
     socket.on("message:read", handleMessageRead);
+    const batchReadSubscription = DeviceEventEmitter.addListener(
+      BATCH_MESSAGES_READ_EVENT,
+      handleBatchMessagesRead,
+    );
 
     return () => {
       socket.off("message:new", handleNewMessage);
       socket.off("message:read", handleMessageRead);
+      batchReadSubscription.remove();
     };
-  }, [socket, isConnected, user, handleNewMessage, handleMessageRead]);
+  }, [socket, isConnected, user, handleNewMessage, handleMessageRead, handleBatchMessagesRead]);
 
   // Join conversation room to get initial messages and stay in room
   // This hook should ALWAYS stay in the room to receive notifications

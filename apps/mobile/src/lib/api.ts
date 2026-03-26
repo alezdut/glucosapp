@@ -367,3 +367,25 @@ export async function markMessagesAsReadBatch(
 
   return response.data as { count: number; messageIds: string[] };
 }
+
+export async function registerPushToken(input: {
+  expoPushToken: string;
+  platform: string;
+  deviceId?: string;
+}): Promise<void> {
+  const client = createApiClient();
+  const response = await client.POST("/push/register", input);
+
+  if (response.error) {
+    throwApiError(response.error, "Failed to register push token");
+  }
+}
+
+export async function unregisterPushToken(expoPushToken: string): Promise<void> {
+  const client = createApiClient();
+  const response = await client.POST("/push/unregister", { expoPushToken });
+
+  if (response.error) {
+    throwApiError(response.error, "Failed to unregister push token");
+  }
+}
