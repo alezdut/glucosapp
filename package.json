@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "prepare": "husky install",
-    "dev": "docker compose up -d db && turbo run dev --filter=backend... --filter=web...",
+    "dev": "sh -c 'docker compose up -d db >/dev/null 2>&1 || echo \"[dev] No se pudo iniciar db con docker compose; continúo con backend/web.\"; turbo run dev --filter=backend... --filter=web...'",
     "dev:all": "docker compose up -d db && turbo run dev",
     "dev:mobile": "pnpm -C apps/mobile dev",
     "dev:mobile:ios": "pnpm -C apps/mobile ios",

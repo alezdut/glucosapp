@@ -27,6 +27,6 @@ import { AuthModule } from "../auth/auth.module";
   ],
   controllers: [MessagesController],
   providers: [MessagesGateway, MessagesService, PrismaService, DoctorUtilsService],
-  exports: [MessagesService],
+  exports: [MessagesService, MessagesGateway],
 })
 export class MessagesModule {}

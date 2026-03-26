@@ -113,9 +113,9 @@ export class DashboardService {
           })
         : 0;
 
-    // Count upcoming appointments (in next 7 days)
-    const sevenDaysFromNow = new Date();
-    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+    // Count upcoming appointments in the selected dashboard period
+    const appointmentsUntil = new Date();
+    appointmentsUntil.setDate(appointmentsUntil.getDate() + days);
     const now = new Date();
 
     const upcomingAppointmentsCount = await this.prisma.appointment.count({
@@ -123,7 +123,7 @@ export class DashboardService {
         doctorId,
         scheduledAt: {
           gte: now,
-          lte: sevenDaysFromNow,
+          lte: appointmentsUntil,
         },
         status: {
           in: ["SCHEDULED", "CONFIRMED"],

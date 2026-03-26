@@ -7,6 +7,8 @@ import { UserResponseDto } from "../auth/dto/auth-response.dto";
 import { CreateAppointmentDto } from "./dto/create-appointment.dto";
 import { UpdateAppointmentDto } from "./dto/update-appointment.dto";
 import { AppointmentResponseDto } from "./dto/appointment-response.dto";
+import { GetAppointmentsQueryDto } from "./dto/get-appointments-query.dto";
+import { CalendarDayResponseDto } from "./dto/calendar-day-response.dto";
 
 /**
  * Controller handling appointments
@@ -31,9 +33,23 @@ export class AppointmentsController {
   @ApiResponse({ status: 403, description: "Forbidden - Only doctors can access" })
   async findAll(
     @AuthUser() user: UserResponseDto,
-    @Query("includePast") includePast?: string,
+    @Query() query: GetAppointmentsQueryDto,
   ): Promise<AppointmentResponseDto[]> {
-    return this.appointmentsService.findAll(user.id, includePast === "true");
+    return this.appointmentsService.findAll(user.id, query);
+  }
+
+  @Get("calendar")
+  @ApiOperation({ summary: "Get monthly appointment summary for calendar view" })
+  @ApiResponse({
+    status: 200,
+    description: "Calendar summary retrieved successfully",
+    type: [CalendarDayResponseDto],
+  })
+  async getCalendarSummary(
+    @AuthUser() user: UserResponseDto,
+    @Query("month") month: string,
+  ): Promise<CalendarDayResponseDto[]> {
+    return this.appointmentsService.getCalendarSummary(user.id, month);
   }
 
   /**
@@ -88,5 +104,48 @@ export class AppointmentsController {
     @Param("id") id: string,
   ): Promise<{ message: string }> {
     return this.appointmentsService.remove(user.id, id);
+  }
+
+  @Get("my")
+  @ApiOperation({ summary: "Get all appointments for the authenticated patient" })
+  @ApiResponse({
+    status: 200,
+    description: "Patient appointments retrieved successfully",
+    type: [AppointmentResponseDto],
+  })
+  @ApiResponse({ status: 403, description: "Forbidden - Only patients can access" })
+  async findMine(
+    @AuthUser() user: UserResponseDto,
+    @Query("includePast") includePast?: string,
+  ): Promise<AppointmentResponseDto[]> {
+    return this.appointmentsService.findMine(user.id, includePast === "true");
+  }
+
+  @Put(":id/confirm")
+  @ApiOperation({ summary: "Confirm an appointment as patient" })
+  @ApiResponse({
+    status: 200,
+    description: "Appointment confirmed successfully",
+    type: AppointmentResponseDto,
+  })
+  async confirm(
+    @AuthUser() user: UserResponseDto,
+    @Param("id") id: string,
+  ): Promise<AppointmentResponseDto> {
+    return this.appointmentsService.confirm(user.id, id);
+  }
+
+  @Put(":id/cancel")
+  @ApiOperation({ summary: "Cancel an appointment as patient" })
+  @ApiResponse({
+    status: 200,
+    description: "Appointment cancelled successfully",
+    type: AppointmentResponseDto,
+  })
+  async cancel(
+    @AuthUser() user: UserResponseDto,
+    @Param("id") id: string,
+  ): Promise<AppointmentResponseDto> {
+    return this.appointmentsService.cancel(user.id, id);
   }
 }

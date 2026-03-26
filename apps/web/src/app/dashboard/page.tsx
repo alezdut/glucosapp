@@ -117,9 +117,10 @@ export default function DashboardPage() {
             <SummaryCard
               title="Próximas Citas"
               value={summaryLoading ? "..." : summary?.upcomingAppointments || 0}
-              description="En los próximos 7 días"
+              description={`En los próximos ${dashboardDays} días`}
               icon={Calendar}
               iconColor="text-gray-500"
+              href="/dashboard/appointments"
             />
           </div>
 

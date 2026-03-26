@@ -74,6 +74,11 @@ enum AppointmentStatus {
   CANCELLED
 }
 
+enum AppointmentModality {
+  IN_PERSON
+  VIRTUAL
+}
+
 model User {
   id                       String           @id @default(cuid())
   email                    String           @unique
@@ -269,16 +274,20 @@ model DoctorPatient {
 }
 
 model Appointment {
-  id          String            @id @default(cuid())
-  doctorId    String
-  patientId   String
-  scheduledAt DateTime
-  notes       String?
-  status      AppointmentStatus @default(SCHEDULED)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  doctor      User              @relation("Doctor", fields: [doctorId], references: [id], onDelete: Cascade)
-  patient     User              @relation("Patient", fields: [patientId], references: [id], onDelete: Cascade)
+  id             String                @id @default(cuid())
+  doctorId       String
+  patientId      String
+  scheduledAt    DateTime
+  notes          String?
+  status         AppointmentStatus     @default(SCHEDULED)
+  modality       AppointmentModality   @default(IN_PERSON)
+  location       String?
+  meetingUrl     String?
+  reminderSentAt DateTime?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  doctor         User                  @relation("Doctor", fields: [doctorId], references: [id], onDelete: Cascade)
+  patient        User                  @relation("Patient", fields: [patientId], references: [id], onDelete: Cascade)
 
   @@index([doctorId])
   @@index([patientId])

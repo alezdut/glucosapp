@@ -92,6 +92,26 @@ describe("DashboardService", () => {
       });
     });
 
+    it("should scope upcoming appointments to the requested days period", async () => {
+      (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue([patientId]);
+      (prismaService.user.count as jest.Mock).mockResolvedValue(1);
+      (prismaService.alert.count as jest.Mock).mockResolvedValue(0);
+      (prismaService.appointment.count as jest.Mock).mockResolvedValue(2);
+
+      await service.getSummary(doctorId, 30);
+
+      expect(prismaService.appointment.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            scheduledAt: expect.objectContaining({
+              gte: expect.any(Date),
+              lte: expect.any(Date),
+            }),
+          }),
+        }),
+      );
+    });
+
     it("should return zero counts when no data", async () => {
       (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue([]);
       (prismaService.user.count as jest.Mock).mockResolvedValue(0);

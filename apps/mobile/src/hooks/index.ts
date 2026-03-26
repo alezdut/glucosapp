@@ -1,10 +1,10 @@
 export { useDebounce } from "./useDebounce";
+export { useMyAppointments, useConfirmAppointment, useCancelAppointment } from "./useAppointments";
 export { useDebouncedSearch } from "./useDebouncedSearch";
 export { useRealTimeDoseCalculation } from "./useRealTimeDoseCalculation";
 export { useRealTimeCorrectionCalculation } from "./useRealTimeCorrectionCalculation";
 export { useDebouncedValidation, useDebouncedValidationWithReset } from "./useDebouncedValidation";
 export {
-  useConversation,
   useConversationWithDoctor,
   useConversations,
   useSendMessage,
