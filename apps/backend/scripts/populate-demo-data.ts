@@ -218,8 +218,6 @@ class DemoDataPopulator {
       endDate = today;
 
       if (startDate > endDate) {
-        const birthDate = generateBirthDate(profile.age);
-        await this.syncDemoUserProfile(existing.userId, profile, birthDate);
         console.log("  ✓ Patient data is up to date. Skipping.\n");
         return {
           logEntriesCreated: 0,

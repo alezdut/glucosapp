@@ -203,7 +203,7 @@ export function createApiClient() {
   // Create a wrapper that automatically adds auth headers and handles token refresh
   const authenticatedClient = {
     ...client,
-    GET: async (path: string, init?: Record<string, unknown>) => {
+    GET: async <T = any>(path: string, init?: Record<string, unknown>) => {
       return executeWithAuth(
         async () => {
           const accessToken = await getAccessToken();
@@ -213,7 +213,7 @@ export function createApiClient() {
             ...((init as any)?.headers as Record<string, string>),
             ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
           };
-          return client.GET(path, { ...init, headers });
+          return client.GET<T>(path, { ...init, headers });
         },
         async () => {
           const accessToken = await getAccessToken();
@@ -223,7 +223,7 @@ export function createApiClient() {
             ...((init as any)?.headers as Record<string, string>),
             ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
           };
-          return client.GET(path, { ...init, headers });
+          return client.GET<T>(path, { ...init, headers });
         },
         path,
       );
@@ -339,13 +339,13 @@ export interface AssignedDoctor {
 
 export async function getAssignedDoctor(): Promise<AssignedDoctor | null> {
   const client = createApiClient();
-  const response = await client.GET("/profile/doctor");
+  const response = await client.GET<AssignedDoctor | null>("/profile/doctor");
 
   if (response.error) {
     throwApiError(response.error, "Failed to fetch assigned doctor");
   }
 
-  return (response.data as AssignedDoctor | null | undefined) ?? null;
+  return response.data ?? null;
 }
 
 /**
