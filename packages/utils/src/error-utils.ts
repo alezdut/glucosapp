@@ -258,5 +258,7 @@ export function getUserFriendlyMessage(error: unknown, context?: string): string
  */
 export function throwApiError(error: unknown, defaultMessage: string = "Request failed"): never {
   const apiError = parseApiError(error, defaultMessage);
-  throw new Error(apiError.message);
+  const enrichedError = new Error(apiError.message) as Error & ApiError;
+  Object.assign(enrichedError, apiError);
+  throw enrichedError;
 }
