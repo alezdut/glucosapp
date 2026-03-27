@@ -12,10 +12,20 @@ import * as path from "path";
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private transporter: Transporter | null = null;
-  private readonly templatesPath = path.join(__dirname, "..", "templates");
+  private readonly templatesPath = this.resolveTemplatesPath();
 
   constructor(private readonly configService: ConfigService) {
     this.initializeTransporter();
+  }
+
+  private resolveTemplatesPath(): string {
+    const distTemplatesPath = path.join(__dirname, "..", "templates");
+    if (fs.existsSync(distTemplatesPath)) {
+      return distTemplatesPath;
+    }
+
+    // Fallback for environments where static assets were not copied into dist.
+    return path.join(process.cwd(), "apps/backend/src/modules/auth/templates");
   }
 
   /**

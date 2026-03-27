@@ -6,6 +6,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "prebuild": "prisma generate",
     "build": "tsc -p tsconfig.json",
+    "postbuild": "mkdir -p dist/modules/auth && cp -R src/modules/auth/templates dist/modules/auth/",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "start:prod": "node dist/main.js",
     "prisma:generate": "prisma generate --schema prisma/schema.prisma",
