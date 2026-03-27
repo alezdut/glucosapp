@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, Alert, Platform } from "react-native";
 import { Animated, Easing } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -64,16 +64,16 @@ const NFCScanScreen = () => {
   );
   const [hasScanned, setHasScanned] = useState(false);
   const simulationPulse = useRef(new Animated.Value(1)).current;
-  const rippleScales = [
-    useRef(new Animated.Value(0.6)).current,
-    useRef(new Animated.Value(0.6)).current,
-    useRef(new Animated.Value(0.6)).current,
-  ];
-  const rippleOpacities = [
-    useRef(new Animated.Value(0.2)).current,
-    useRef(new Animated.Value(0.2)).current,
-    useRef(new Animated.Value(0.2)).current,
-  ];
+  const rippleScales = useRef([
+    new Animated.Value(0.6),
+    new Animated.Value(0.6),
+    new Animated.Value(0.6),
+  ]).current;
+  const rippleOpacities = useRef([
+    new Animated.Value(0.2),
+    new Animated.Value(0.2),
+    new Animated.Value(0.2),
+  ]).current;
 
   // Start/stop pulsing + ripple animations while scanning (real o simulado)
   useEffect(() => {
@@ -158,7 +158,7 @@ const NFCScanScreen = () => {
         rippleOpacities.forEach((o) => o.stopAnimation());
       };
     }
-  }, [isScanning, simulationPulse]);
+  }, [isScanning, rippleOpacities, rippleScales, simulationPulse]);
 
   /**
    * Build a uniform 5-min cadence time series across the last 8 hours.
@@ -227,43 +227,9 @@ const NFCScanScreen = () => {
   };
 
   /**
-   * Check if NFC is available on mount
-   */
-  useEffect(() => {
-    checkNfcAvailability();
-    fetchUserProfile();
-    fetchLatestReadings();
-  }, []);
-
-  // Refrescar lecturas desde DB al enfocar la pantalla
-  useFocusEffect(
-    React.useCallback(() => {
-      fetchLatestReadings();
-    }, []),
-  );
-
-  // Auto-scan al entrar: simulado si NFC no disponible, real si disponible
-  useEffect(() => {
-    if (!hasScanned && !isScanning) {
-      if (!NfcManager || isNfcAvailable === false) {
-        const id = setTimeout(() => {
-          handleScanSensor();
-        }, 100);
-        return () => clearTimeout(id);
-      }
-      if (isNfcAvailable) {
-        const id = setTimeout(() => {
-          handleScanSensor();
-        }, 100);
-        return () => clearTimeout(id);
-      }
-    }
-  }, [isNfcAvailable, hasScanned, isScanning]);
-
-  /**
    * Fetch user profile to get target glucose range
    */
-  const fetchUserProfile = async () => {
+  const fetchUserProfile = useCallback(async () => {
     try {
       const client = createApiClient();
       const response = await client.GET("/profile", {});
@@ -285,12 +251,12 @@ const NFCScanScreen = () => {
       // Use default range if fetch fails
       setTargetRange({ min: 70, max: 180 });
     }
-  };
+  }, []);
 
   /**
    * Fetch latest readings from backend to always show up-to-date chart
    */
-  const fetchLatestReadings = async () => {
+  const fetchLatestReadings = useCallback(async () => {
     try {
       const client = createApiClient();
       // Últimas 8 horas
@@ -326,9 +292,9 @@ const NFCScanScreen = () => {
     } catch (error) {
       console.log("Error fetching latest readings", error);
     }
-  };
+  }, []);
 
-  const checkNfcAvailability = async () => {
+  const checkNfcAvailability = useCallback(async () => {
     if (!NfcManager) {
       setIsNfcAvailable(false);
       return;
@@ -340,12 +306,12 @@ const NFCScanScreen = () => {
     } catch (error) {
       setIsNfcAvailable(false);
     }
-  };
+  }, []);
 
   /**
    * Initialize NFC manager
    */
-  const initializeNfc = async (): Promise<boolean> => {
+  const initializeNfc = useCallback(async (): Promise<boolean> => {
     try {
       const isSupported = await NfcManager.isSupported();
       if (!isSupported) {
@@ -359,12 +325,114 @@ const NFCScanScreen = () => {
       Alert.alert("Error", "No se pudo inicializar NFC");
       return false;
     }
-  };
+  }, []);
+
+  /**
+   * Save new readings to backend (automatically called after scan)
+   * Only saves readings that are newer than the last saved reading
+   */
+  const saveNewReadings = useCallback(
+    async (data: LibreSensorData) => {
+      setIsSaving(true);
+
+      try {
+        const client = createApiClient();
+
+        // Get the latest saved reading
+        const latestResponse = await client.GET("/sensor-readings/latest", {});
+
+        let lastSavedTimestamp: Date | null = null;
+        if (latestResponse.data && !latestResponse.error) {
+          const latest = latestResponse.data as LatestReadingResponse;
+          if (latest?.recordedAt) {
+            lastSavedTimestamp = new Date(latest.recordedAt);
+            console.log("Last saved reading:", lastSavedTimestamp.toISOString());
+          }
+        }
+
+        // Filter readings to only include new ones (after last saved timestamp)
+        const allReadings = [
+          {
+            glucose: data.currentGlucose,
+            timestamp: new Date(),
+            isHistorical: false,
+          },
+          ...data.historicalReadings.map((reading) => ({
+            glucose: reading.glucose,
+            timestamp: reading.timestamp,
+            isHistorical: true,
+          })),
+        ];
+
+        const newReadings = lastSavedTimestamp
+          ? allReadings.filter((reading) => reading.timestamp > lastSavedTimestamp)
+          : allReadings;
+
+        if (newReadings.length === 0) {
+          console.log("No new readings to save");
+          return;
+        }
+
+        const readingsToSave = newReadings.map((reading) => ({
+          glucose: reading.glucose,
+          recordedAt: reading.timestamp.toISOString(),
+          source: "LIBRE_NFC" as const,
+          isHistorical: reading.isHistorical,
+        }));
+
+        console.log(`Saving ${readingsToSave.length} new readings...`);
+
+        const response = await client.POST("/sensor-readings/batch", {
+          readings: readingsToSave,
+        });
+
+        if (response.error) {
+          throw new Error("Error al guardar lecturas");
+        }
+
+        if (!response.data) {
+          throw new Error("Error al guardar lecturas");
+        }
+
+        const result = response.data as BatchReadingsResponse;
+        const savedCount = result?.created || readingsToSave.length;
+
+        console.log(`Successfully saved ${savedCount} readings`);
+
+        queryClient.invalidateQueries({ queryKey: ["statistics"] });
+
+        setTimeout(() => {
+          fetchLatestReadings();
+        }, 500);
+      } catch (error) {
+        console.error("Error saving readings:", error);
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [fetchLatestReadings, queryClient],
+  );
+
+  /**
+   * Check if NFC is available on mount
+   */
+  useEffect(() => {
+    void checkNfcAvailability();
+    void fetchUserProfile();
+    void fetchLatestReadings();
+  }, [checkNfcAvailability, fetchLatestReadings, fetchUserProfile]);
+
+  // Refrescar lecturas desde DB al enfocar la pantalla
+  useFocusEffect(
+    React.useCallback(() => {
+      void fetchLatestReadings();
+    }, [fetchLatestReadings]),
+  );
 
   /**
    * Read FreeStyle Libre sensor via NFC (or use mock data)
    */
-  const handleScanSensor = async () => {
+  const handleScanSensor = useCallback(async () => {
     if (isScanning) return;
     setIsScanning(true);
     setSensorData(null);
@@ -477,95 +545,25 @@ const NFCScanScreen = () => {
         console.warn("Error cleaning up NFC:", cleanupError);
       }
     }
-  };
+  }, [initializeNfc, isNfcAvailable, isScanning, saveNewReadings]);
 
-  /**
-   * Save new readings to backend (automatically called after scan)
-   * Only saves readings that are newer than the last saved reading
-   */
-  const saveNewReadings = async (data: LibreSensorData) => {
-    setIsSaving(true);
-
-    try {
-      const client = createApiClient();
-
-      // Get the latest saved reading
-      const latestResponse = await client.GET("/sensor-readings/latest", {});
-
-      let lastSavedTimestamp: Date | null = null;
-      if (latestResponse.data && !latestResponse.error) {
-        const latest = latestResponse.data as LatestReadingResponse;
-        if (latest?.recordedAt) {
-          lastSavedTimestamp = new Date(latest.recordedAt);
-          console.log("Last saved reading:", lastSavedTimestamp.toISOString());
-        }
+  // Auto-scan al entrar: simulado si NFC no disponible, real si disponible
+  useEffect(() => {
+    if (!hasScanned && !isScanning) {
+      if (!NfcManager || isNfcAvailable === false) {
+        const id = setTimeout(() => {
+          void handleScanSensor();
+        }, 100);
+        return () => clearTimeout(id);
       }
-
-      // Filter readings to only include new ones (after last saved timestamp)
-      const allReadings = [
-        // Current reading
-        {
-          glucose: data.currentGlucose,
-          timestamp: new Date(),
-          isHistorical: false,
-        },
-        // Historical readings
-        ...data.historicalReadings.map((reading) => ({
-          glucose: reading.glucose,
-          timestamp: reading.timestamp,
-          isHistorical: true,
-        })),
-      ];
-
-      // Filter to only new readings
-      const newReadings = lastSavedTimestamp
-        ? allReadings.filter((reading) => reading.timestamp > lastSavedTimestamp)
-        : allReadings;
-
-      if (newReadings.length === 0) {
-        console.log("No new readings to save");
-        return; // Silently skip if no new readings
+      if (isNfcAvailable) {
+        const id = setTimeout(() => {
+          void handleScanSensor();
+        }, 100);
+        return () => clearTimeout(id);
       }
-
-      // Prepare for API
-      const readingsToSave = newReadings.map((reading) => ({
-        glucose: reading.glucose,
-        recordedAt: reading.timestamp.toISOString(),
-        source: "LIBRE_NFC" as const,
-        isHistorical: reading.isHistorical,
-      }));
-
-      console.log(`Saving ${readingsToSave.length} new readings...`);
-
-      // Send to backend (backend will encrypt the glucose values)
-      const response = await client.POST("/sensor-readings/batch", {
-        readings: readingsToSave,
-      });
-
-      if (response.error) {
-        throw new Error("Error al guardar lecturas");
-      }
-
-      const result = response.data as BatchReadingsResponse;
-      const savedCount = result?.created || readingsToSave.length;
-
-      console.log(`Successfully saved ${savedCount} readings`);
-
-      // Invalidar caché de estadísticas para que el HomeScreen se actualice
-      queryClient.invalidateQueries({ queryKey: ["statistics"] });
-
-      // Refrescar el gráfico con datos de la base
-      // Pequeño delay para asegurar que la DB haya actualizado
-      setTimeout(() => {
-        fetchLatestReadings();
-      }, 500);
-    } catch (error) {
-      console.error("Error saving readings:", error);
-      // Silently fail - don't interrupt the user experience
-    } finally {
-      setIsSaving(false);
     }
-  };
+  }, [handleScanSensor, hasScanned, isNfcAvailable, isScanning]);
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>

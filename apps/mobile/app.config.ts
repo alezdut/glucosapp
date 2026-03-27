@@ -1,6 +1,7 @@
 import type { ExpoConfig } from "expo/config";
+import appJson from "./app.json";
 
-const appJson = require("./app.json") as { expo: ExpoConfig };
+const typedAppJson = appJson as { expo: ExpoConfig };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -25,11 +26,11 @@ const resolveEasProjectId = (): string | undefined => {
 };
 
 const config: ExpoConfig = {
-  ...appJson.expo,
+  ...typedAppJson.expo,
   extra: {
-    ...(appJson.expo.extra ?? {}),
+    ...(typedAppJson.expo.extra ?? {}),
     eas: {
-      ...((appJson.expo.extra?.eas as Record<string, unknown> | undefined) ?? {}),
+      ...((typedAppJson.expo.extra?.eas as Record<string, unknown> | undefined) ?? {}),
       ...(resolveEasProjectId() ? { projectId: resolveEasProjectId() } : {}),
     },
   },

@@ -9,19 +9,21 @@ import {
 
 export const usePushNotifications = () => {
   const { isAuthenticated, user } = useAuth();
+  const userId = user?.id ?? null;
+  const userRole = user?.role ?? null;
 
   useEffect(() => {
-    if (!isAuthenticated || !user || user.role !== "PATIENT") {
+    if (!isAuthenticated || !userId || userRole !== "PATIENT") {
       return;
     }
 
     syncPushToken().catch((error) => {
       console.error("Failed to sync push token:", error);
     });
-  }, [isAuthenticated, user?.id, user?.role]);
+  }, [isAuthenticated, userId, userRole]);
 
   useEffect(() => {
-    if (!isAuthenticated || !user) {
+    if (!isAuthenticated || !userId) {
       return;
     }
 
@@ -46,5 +48,5 @@ export const usePushNotifications = () => {
     return () => {
       subscription.remove();
     };
-  }, [isAuthenticated, user?.id]);
+  }, [isAuthenticated, userId]);
 };

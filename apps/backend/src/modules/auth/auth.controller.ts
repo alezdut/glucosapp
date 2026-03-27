@@ -24,7 +24,7 @@ import { LocalAuthGuard } from "./guards/local-auth.guard";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { GoogleAuthGuard } from "./guards/google-auth.guard";
 import { GoogleMobileAuthGuard } from "./guards/google-mobile-auth.guard";
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
 
 /**
  * Controller handling authentication endpoints

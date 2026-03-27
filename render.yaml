@@ -1,0 +1,65 @@
+services:
+  - type: web
+    name: glucosapp-api
+    runtime: node
+    plan: free
+    region: ohio
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo run build --filter=backend...
+    startCommand: pnpm --filter backend start:prod
+    healthCheckPath: /v1/health
+    buildFilter:
+      paths:
+        - apps/backend/**
+        - packages/**
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+        - turbo.json
+        - tsconfig.base.json
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_EXPIRATION
+        value: 15m
+      - key: JWT_REFRESH_EXPIRATION
+        value: 7d
+      - key: ENCRYPTION_KEY
+        sync: false
+
+  - type: web
+    name: glucosapp
+    runtime: node
+    plan: free
+    region: ohio
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo run build --filter=web...
+    startCommand: pnpm --filter web exec next start -p $PORT
+    buildFilter:
+      paths:
+        - apps/web/**
+        - packages/**
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+        - turbo.json
+        - tsconfig.base.json
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_BASE_URL
+        sync: false

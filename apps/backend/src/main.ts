@@ -7,9 +7,13 @@ import { AppModule } from "./app.module";
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const logger = new Logger("Bootstrap");
-  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [];
+  const allowedOrigins =
+    process.env.ALLOWED_ORIGINS?.split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean) ?? [];
+  const isProduction = process.env.NODE_ENV === "production";
   app.enableCors({
-    origin: allowedOrigins,
+    origin: allowedOrigins.length > 0 ? allowedOrigins : !isProduction,
     credentials: true,
   });
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: "1" });

@@ -16,6 +16,8 @@ Features
 - ✅ Automatic token refresh
 - ✅ Persistent authentication
 - ✅ User profile management
+- ✅ Modo simulado de NFC para pruebas en simulador/iOS sin hardware
+- ✅ NFC real en Android development builds compatibles
 
 Requirements
 
@@ -91,6 +93,13 @@ Scripts (package.json)
 - web: expo start --web --non-interactive
 - build: echo 'Expo app is managed; no build step'
 - lint: eslint . --ext .ts,.tsx
+- typecheck: tsc --noEmit
+
+Estado actual de NFC
+
+- Android: el flujo apunta a uso real de NFC con `react-native-nfc-manager`.
+- iOS Simulator / entornos sin hardware NFC: se mantiene el modo simulado para validar UX, guardado y gráficos sin depender de un dispositivo físico.
+- La simulación no reemplaza una prueba de hardware real antes de release móvil.
 
 Key Files and Structure
 

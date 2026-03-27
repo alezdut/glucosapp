@@ -69,7 +69,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           "status" in response.error &&
           response.error.status === 401
         ) {
-          console.log("Authentication failed, clearing user state");
           setUser(null);
         }
       }
@@ -144,7 +143,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             await storeTokens(accessToken, refreshToken);
 
             // Parse and set user
-            // TODO: Check if userData is already parsed
             const parsedUser = JSON.parse(userData);
             setUser(parsedUser);
 
@@ -186,14 +184,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Use custom scheme for better iOS compatibility
       const redirectUrl = "glucosapp://auth/callback";
-      console.log("Redirect URL:", redirectUrl);
-
-      // Pass redirect URL to backend so it knows where to redirect
       const authUrl = `${API_BASE_URL}/v1/auth/google/mobile?redirect_uri=${encodeURIComponent(redirectUrl)}`;
-      console.log("Auth URL:", authUrl);
 
       const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
-      console.log("Auth result:", result);
 
       if (result.type === "success" && result.url) {
         // Parse the callback URL for tokens
@@ -203,12 +196,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const accessToken = params.get("accessToken");
         const refreshToken = params.get("refreshToken");
         const userData = params.get("user");
-
-        console.log("Tokens received:", {
-          accessToken: !!accessToken,
-          refreshToken: !!refreshToken,
-          userData: !!userData,
-        });
 
         if (accessToken && refreshToken && userData) {
           // Store tokens

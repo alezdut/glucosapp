@@ -16,6 +16,7 @@ interface UseSocketReturn {
  */
 export const useSocket = (): UseSocketReturn => {
   const { user, isAuthenticated } = useAuth();
+  const userId = user?.id ?? null;
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -37,7 +38,7 @@ export const useSocket = (): UseSocketReturn => {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated || !user) {
+    if (!isAuthenticated || !userId) {
       // Disconnect if not authenticated
       if (socketRef.current) {
         disconnectSocket();
@@ -98,7 +99,7 @@ export const useSocket = (): UseSocketReturn => {
         socketRef.current.off("connect_error", handleError);
       }
     };
-  }, [isAuthenticated, user?.id, handleConnect, handleDisconnect, handleError]);
+  }, [isAuthenticated, userId, handleConnect, handleDisconnect, handleError]);
 
   // Don't disconnect socket on unmount - let it persist
   // The socket singleton will be managed by socket-client.ts

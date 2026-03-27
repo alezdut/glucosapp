@@ -11,14 +11,14 @@ import {
   Res,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
-import { Response } from "express";
+import type { Response } from "express";
 import { SensorReadingsService } from "./sensor-readings.service";
 import { CreateSensorReadingDto } from "./dto/create-sensor-reading.dto";
 import { BatchCreateSensorReadingsDto } from "./dto/batch-create-sensor-readings.dto";
 import { ExportReadingsQueryDto, ExportFormat } from "./dto/export-readings-query.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { AuthUser } from "../auth/decorators/auth-user.decorator";
-import { UserResponseDto } from "../auth/dto/auth-response.dto";
+import type { UserResponseDto } from "../auth/dto/auth-response.dto";
 
 /**
  * Controller for sensor readings endpoints
