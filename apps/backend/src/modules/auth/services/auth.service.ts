@@ -5,6 +5,8 @@ import {
   BadRequestException,
   NotFoundException,
   Logger,
+  HttpException,
+  HttpStatus,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { UserRole } from "@prisma/client";
@@ -22,6 +24,8 @@ import { AuthResponseDto, UserResponseDto } from "../dto/auth-response.dto";
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
+  private readonly verificationEmailValidityMs = 24 * 60 * 60 * 1000;
+  private readonly verificationResendCooldownMs = 60 * 1000;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -44,7 +48,7 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
     const verificationToken = this.tokenService.generateVerificationToken();
-    const verificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    const verificationTokenExpiry = new Date(Date.now() + this.verificationEmailValidityMs);
 
     await this.prisma.user.create({
       data: {
@@ -128,9 +132,12 @@ export class AuthService {
         email,
         emailVerified: user.emailVerified,
       });
-      throw new UnauthorizedException(
-        "Email not verified. Please verify your email before logging in.",
-      );
+      throw new UnauthorizedException({
+        message: "Email not verified. Please verify your email before logging in.",
+        code: "EMAIL_NOT_VERIFIED",
+        email,
+        canResendVerification: true,
+      });
     }
 
     this.logger.log("🔍 [BACKEND] AuthService.validateLocalUser - Validation successful", {
@@ -206,8 +213,22 @@ export class AuthService {
       throw new BadRequestException("Email already verified");
     }
 
+    const retryAfterSeconds = this.getVerificationResendRetryAfterSeconds(
+      user.verificationTokenExpiry,
+    );
+    if (retryAfterSeconds > 0) {
+      throw new HttpException(
+        {
+          message: `Please wait ${retryAfterSeconds} seconds before requesting another verification email.`,
+          code: "VERIFICATION_EMAIL_RESEND_RATE_LIMIT",
+          retryAfterSeconds,
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
     const verificationToken = this.tokenService.generateVerificationToken();
-    const verificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const verificationTokenExpiry = new Date(Date.now() + this.verificationEmailValidityMs);
 
     await this.prisma.user.update({
       where: { id: user.id },
@@ -220,6 +241,24 @@ export class AuthService {
     await this.emailService.sendVerificationEmail(email, verificationToken);
 
     return { message: "Verification email sent. Please check your inbox." };
+  }
+
+  private getVerificationResendRetryAfterSeconds(verificationTokenExpiry: Date | null): number {
+    if (!verificationTokenExpiry) {
+      return 0;
+    }
+
+    const lastVerificationEmailSentAt = new Date(
+      verificationTokenExpiry.getTime() - this.verificationEmailValidityMs,
+    );
+    const elapsedMs = Date.now() - lastVerificationEmailSentAt.getTime();
+    const remainingMs = this.verificationResendCooldownMs - elapsedMs;
+
+    if (remainingMs <= 0) {
+      return 0;
+    }
+
+    return Math.ceil(remainingMs / 1000);
   }
 
   /**
