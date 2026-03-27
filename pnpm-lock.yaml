@@ -7,10 +7,6 @@ settings:
 importers:
 
   .:
-    dependencies:
-      mdi-insulin-algorithm:
-        specifier: link:/Users/alejandrozdut/Documents/mdi-insulin-algorithm
-        version: link:../mdi-insulin-algorithm
     devDependencies:
       '@commitlint/cli':
         specifier: ^19.4.0
