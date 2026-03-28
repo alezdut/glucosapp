@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, ServiceUnavailableException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as nodemailer from "nodemailer";
 import type { Transporter } from "nodemailer";
@@ -13,8 +13,14 @@ export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private transporter: Transporter | null = null;
   private readonly templatesPath = this.resolveTemplatesPath();
+  private readonly smtpHost?: string;
+  private readonly smtpPort?: string;
+  private readonly smtpUser?: string;
 
   constructor(private readonly configService: ConfigService) {
+    this.smtpHost = this.configService.get<string>("SMTP_HOST");
+    this.smtpPort = this.configService.get<string>("SMTP_PORT");
+    this.smtpUser = this.configService.get<string>("SMTP_USER");
     this.initializeTransporter();
   }
 
@@ -32,9 +38,9 @@ export class EmailService {
    * Initializes email transporter if SMTP configuration is available
    */
   private initializeTransporter(): void {
-    const smtpHost = this.configService.get<string>("SMTP_HOST");
-    const smtpPort = this.configService.get<string>("SMTP_PORT");
-    const smtpUser = this.configService.get<string>("SMTP_USER");
+    const smtpHost = this.smtpHost;
+    const smtpPort = this.smtpPort;
+    const smtpUser = this.smtpUser;
     const smtpPass = this.configService.get<string>("SMTP_PASS");
 
     if (!smtpHost || !smtpPort || !smtpUser || !smtpPass) {
@@ -48,13 +54,21 @@ export class EmailService {
       host: smtpHost,
       port: parseInt(smtpPort, 10),
       secure: parseInt(smtpPort, 10) === 465,
+      requireTLS: parseInt(smtpPort, 10) === 587,
       auth: {
         user: smtpUser,
         pass: smtpPass,
       },
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 20000,
     });
 
-    this.logger.log("Email transporter initialized successfully");
+    this.logger.log("Email transporter initialized", {
+      host: smtpHost,
+      port: parseInt(smtpPort, 10),
+      user: smtpUser,
+    });
   }
 
   /**
@@ -98,9 +112,7 @@ export class EmailService {
    */
   async sendVerificationEmail(email: string, token: string): Promise<void> {
     if (!this.transporter) {
-      this.logger.warn(
-        `Skipping verification email to ${email}. SMTP not configured. Verification token: ${token}`,
-      );
+      this.logger.warn(`Skipping verification email to ${email}. SMTP not configured.`);
       return;
     }
 
@@ -112,7 +124,7 @@ export class EmailService {
     });
 
     const mailOptions = {
-      from: this.configService.get<string>("SMTP_USER"),
+      from: this.smtpUser,
       to: email,
       subject: "Verifica tu correo electrónico - Glucosapp",
       html,
@@ -122,8 +134,7 @@ export class EmailService {
       await this.transporter.sendMail(mailOptions);
       this.logger.log(`Verification email sent to ${email}`);
     } catch (error) {
-      this.logger.error(`Failed to send verification email to ${email}`, error);
-      throw error;
+      this.handleEmailDeliveryError("verification", email, error);
     }
   }
 
@@ -132,9 +143,7 @@ export class EmailService {
    */
   async sendPasswordResetEmail(email: string, token: string): Promise<void> {
     if (!this.transporter) {
-      this.logger.warn(
-        `Skipping password reset email to ${email}. SMTP not configured. Reset token: ${token}`,
-      );
+      this.logger.warn(`Skipping password reset email to ${email}. SMTP not configured.`);
       return;
     }
 
@@ -146,7 +155,7 @@ export class EmailService {
     });
 
     const mailOptions = {
-      from: this.configService.get<string>("SMTP_USER"),
+      from: this.smtpUser,
       to: email,
       subject: "Restablece tu contraseña - Glucosapp",
       html,
@@ -156,8 +165,7 @@ export class EmailService {
       await this.transporter.sendMail(mailOptions);
       this.logger.log(`Password reset email sent to ${email}`);
     } catch (error) {
-      this.logger.error(`Failed to send password reset email to ${email}`, error);
-      throw error;
+      this.handleEmailDeliveryError("password reset", email, error);
     }
   }
 
@@ -310,7 +318,7 @@ export class EmailService {
     });
 
     const mailOptions = {
-      from: this.configService.get<string>("SMTP_USER"),
+      from: this.smtpUser,
       to: email,
       subject: `${config.icon} ${alertTypeName} - Glucosapp`,
       html,
@@ -320,8 +328,22 @@ export class EmailService {
       await this.transporter.sendMail(mailOptions);
       this.logger.log(`Alert email sent to ${email} for ${alertType} (${severity})`);
     } catch (error) {
-      this.logger.error(`Failed to send alert email to ${email}`, error);
-      throw error;
+      this.handleEmailDeliveryError("alert", email, error);
     }
+  }
+
+  private handleEmailDeliveryError(type: string, recipientEmail: string, error: unknown): never {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    this.logger.error(`Failed to send ${type} email`, {
+      to: recipientEmail,
+      host: this.smtpHost,
+      port: this.smtpPort ? parseInt(this.smtpPort, 10) : undefined,
+      error: errorMessage,
+    });
+
+    throw new ServiceUnavailableException(
+      "Email delivery is currently unavailable. Please try again later.",
+    );
   }
 }
