@@ -35,6 +35,9 @@ Si vas a usar esas funciones, agregalas manualmente en el servicio backend:
 - `SMTP_PORT`
 - `SMTP_USER`
 - `SMTP_PASS`
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL`
+- `RESEND_REPLY_TO`
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
 - `GOOGLE_CALLBACK_URL`
