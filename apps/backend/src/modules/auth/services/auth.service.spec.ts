@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
   BadRequestException,
   NotFoundException,
+  HttpException,
 } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { AuthService } from "./auth.service";
@@ -200,9 +201,13 @@ describe("AuthService", () => {
 
       (prismaService.user.findUnique as jest.Mock).mockResolvedValue(user);
 
-      await expect(service.validateLocalUser(email, password)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(service.validateLocalUser(email, password)).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "EMAIL_NOT_VERIFIED",
+          canResendVerification: true,
+          email,
+        }),
+      });
     });
 
     it("should throw UnauthorizedException if user has no password (OAuth only)", async () => {
@@ -311,6 +316,7 @@ describe("AuthService", () => {
       const user = createMockUser({
         email,
         emailVerified: false,
+        verificationTokenExpiry: new Date(Date.now() - 5 * 60 * 1000),
       });
 
       (prismaService.user.findUnique as jest.Mock).mockResolvedValue(user);
@@ -325,6 +331,23 @@ describe("AuthService", () => {
       });
       expect(prismaService.user.update).toHaveBeenCalled();
       expect(emailService.sendVerificationEmail).toHaveBeenCalled();
+    });
+
+    it("should enforce resend cooldown", async () => {
+      const user = createMockUser({
+        email,
+        emailVerified: false,
+        verificationTokenExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      });
+
+      (prismaService.user.findUnique as jest.Mock).mockResolvedValue(user);
+
+      await expect(service.resendVerificationEmail(email)).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "VERIFICATION_EMAIL_RESEND_RATE_LIMIT",
+        }),
+        status: 429,
+      });
     });
 
     it("should throw NotFoundException if user not found", async () => {
