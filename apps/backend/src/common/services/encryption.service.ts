@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as crypto from "crypto";
 
@@ -10,6 +10,7 @@ import * as crypto from "crypto";
  */
 @Injectable()
 export class EncryptionService {
+  private readonly logger = new Logger(EncryptionService.name);
   private readonly algorithm = "aes-256-gcm";
   private readonly keyLength = 32; // 256 bits
   private readonly ivLength = 16; // 128 bits
@@ -64,7 +65,6 @@ export class EncryptionService {
       // Return as hex string
       return combined.toString("hex");
     } catch (error) {
-      console.error("Encryption error:", error);
       throw new Error("Failed to encrypt data");
     }
   }
@@ -98,7 +98,6 @@ export class EncryptionService {
 
       return decrypted.toString("utf8");
     } catch (error) {
-      console.error("Decryption error:", error);
       throw new Error("Failed to decrypt data");
     }
   }
@@ -132,6 +131,29 @@ export class EncryptionService {
     }
 
     return glucoseValue;
+  }
+
+  /**
+   * Decrypt multiple glucose values in batch
+   * Filters out any values that fail to decrypt
+   *
+   * @param encryptedValues - Array of encrypted hex strings
+   * @returns Array of decrypted glucose values (excluding failed decryptions)
+   */
+  decryptGlucoseValues(encryptedValues: string[]): number[] {
+    return encryptedValues
+      .map((encrypted, index) => {
+        try {
+          return this.decryptGlucoseValue(encrypted);
+        } catch (error) {
+          this.logger.warn(
+            `Failed to decrypt glucose value at index ${index}`,
+            error instanceof Error ? error.stack : String(error),
+          );
+          return null;
+        }
+      })
+      .filter((value): value is number => value !== null);
   }
 
   /**

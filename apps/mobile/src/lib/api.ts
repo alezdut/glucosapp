@@ -1,4 +1,6 @@
 import { makeApiClient } from "@glucosapp/api-client";
+import { isTokenExpiringSoon } from "@glucosapp/auth-utils";
+import { throwApiError } from "@glucosapp/utils";
 import * as SecureStore from "expo-secure-store";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:3000";
@@ -10,33 +12,6 @@ const REFRESH_TOKEN_KEY = "refreshToken";
 // Flag to prevent multiple simultaneous refresh attempts
 let isRefreshing = false;
 let refreshPromise: Promise<{ accessToken: string; refreshToken: string } | null> | null = null;
-
-/**
- * Decode JWT to get expiration time
- */
-const getTokenExpiration = (token: string): number | null => {
-  try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return payload.exp ? payload.exp * 1000 : null;
-  } catch {
-    return null;
-  }
-};
-
-/**
- * Check if token is expired or about to expire
- */
-const isTokenExpiringSoon = (token: string): boolean => {
-  const expiration = getTokenExpiration(token);
-  if (!expiration) return true;
-
-  const now = Date.now();
-  const timeUntilExpiry = expiration - now;
-  const oneMinute = 60 * 1000;
-
-  // Consider token expiring if it expires in less than 1 minute
-  return timeUntilExpiry < oneMinute;
-};
 
 /**
  * Store authentication tokens securely
@@ -101,16 +76,23 @@ export async function refreshAccessToken(): Promise<{
         return { accessToken, refreshToken };
       }
 
-      // If refresh fails, clear tokens
+      // If refresh fails, clear tokens only for certain errors
       if (response.error) {
         console.error("Token refresh failed:", response.error);
-        await clearTokens();
+        // Only clear tokens for 401/403 errors (invalid token), not for network/server errors
+        const status = (response.error as { status?: number })?.status;
+        if (status === 401 || status === 403) {
+          await clearTokens();
+        }
       }
 
       return null;
     } catch (error) {
       console.error("Failed to refresh token:", error);
-      await clearTokens();
+      // Don't clear tokens on network/server errors, only on auth errors
+      if (error instanceof Error && error.message.includes("401")) {
+        await clearTokens();
+      }
       return null;
     } finally {
       isRefreshing = false;
@@ -147,6 +129,22 @@ type ApiError =
     }
   | Error
   | unknown;
+
+type AuthenticatedHeaders = Record<string, string>;
+type GetRequestOptions = Record<string, unknown> & {
+  headers?: AuthenticatedHeaders;
+};
+type MutationRequestOptions = RequestInit & {
+  headers?: HeadersInit;
+};
+
+const getRequestHeaders = (
+  headers: HeadersInit | AuthenticatedHeaders | undefined,
+  accessToken: string | null,
+): AuthenticatedHeaders => ({
+  ...((headers as AuthenticatedHeaders | undefined) ?? {}),
+  ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+});
 
 /**
  * Create API client with automatic token injection and refresh handling
@@ -185,16 +183,11 @@ export function createApiClient() {
       "status" in response.error &&
       response.error.status === 401
     ) {
-      console.log("Received 401, attempting to refresh token...");
       const refreshResult = await refreshAccessToken();
 
       if (refreshResult) {
         // Retry the request with the new token
         response = await retryFn();
-      } else {
-        // Refresh failed, clear tokens
-        console.error("Token refresh failed, clearing tokens");
-        await clearTokens();
       }
     }
 
@@ -204,71 +197,77 @@ export function createApiClient() {
   // Create a wrapper that automatically adds auth headers and handles token refresh
   const authenticatedClient = {
     ...client,
-    GET: async (path: string, init?: Record<string, unknown>) => {
+    GET: async <T = unknown>(path: string, init?: GetRequestOptions) => {
       return executeWithAuth(
         async () => {
           const accessToken = await getAccessToken();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const headers: Record<string, string> = {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            ...((init as any)?.headers as Record<string, string>),
-            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-          };
-          return client.GET(path, { ...init, headers });
+          const headers = getRequestHeaders(init?.headers, accessToken);
+          return client.GET<T>(path, { ...init, headers });
         },
         async () => {
           const accessToken = await getAccessToken();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const headers: Record<string, string> = {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            ...((init as any)?.headers as Record<string, string>),
-            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-          };
-          return client.GET(path, { ...init, headers });
+          const headers = getRequestHeaders(init?.headers, accessToken);
+          return client.GET<T>(path, { ...init, headers });
         },
         path,
       );
     },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    POST: async (path: string, body?: any, init?: RequestInit) => {
+    POST: async <TBody = unknown>(path: string, body?: TBody, init?: MutationRequestOptions) => {
       return executeWithAuth(
         async () => {
           const accessToken = await getAccessToken();
-          const headers: Record<string, string> = {
-            ...((init?.headers as Record<string, string>) || {}),
-            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-          };
+          const headers = getRequestHeaders(init?.headers, accessToken);
           return client.POST(path, body, { ...init, headers });
         },
         async () => {
           const accessToken = await getAccessToken();
-          const headers: Record<string, string> = {
-            ...((init?.headers as Record<string, string>) || {}),
-            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-          };
+          const headers = getRequestHeaders(init?.headers, accessToken);
           return client.POST(path, body, { ...init, headers });
         },
         path,
       );
     },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    PATCH: async (path: string, body?: any, init?: RequestInit) => {
+    PATCH: async <TBody = unknown>(path: string, body?: TBody, init?: MutationRequestOptions) => {
       return executeWithAuth(
         async () => {
           const accessToken = await getAccessToken();
-          const headers: Record<string, string> = {
-            ...((init?.headers as Record<string, string>) || {}),
-            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-          };
+          const headers = getRequestHeaders(init?.headers, accessToken);
           return client.PATCH(path, body, { ...init, headers });
         },
         async () => {
           const accessToken = await getAccessToken();
-          const headers: Record<string, string> = {
-            ...((init?.headers as Record<string, string>) || {}),
-            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-          };
+          const headers = getRequestHeaders(init?.headers, accessToken);
           return client.PATCH(path, body, { ...init, headers });
+        },
+        path,
+      );
+    },
+    PUT: async <TBody = unknown>(path: string, body?: TBody, init?: MutationRequestOptions) => {
+      return executeWithAuth(
+        async () => {
+          const accessToken = await getAccessToken();
+          const headers = getRequestHeaders(init?.headers, accessToken);
+          return client.PUT(path, body, { ...init, headers });
+        },
+        async () => {
+          const accessToken = await getAccessToken();
+          const headers = getRequestHeaders(init?.headers, accessToken);
+          return client.PUT(path, body, { ...init, headers });
+        },
+        path,
+      );
+    },
+    DELETE: async (path: string, init?: MutationRequestOptions) => {
+      return executeWithAuth(
+        async () => {
+          const accessToken = await getAccessToken();
+          const headers = getRequestHeaders(init?.headers, accessToken);
+          return client.DELETE(path, { ...init, headers });
+        },
+        async () => {
+          const accessToken = await getAccessToken();
+          const headers = getRequestHeaders(init?.headers, accessToken);
+          return client.DELETE(path, { ...init, headers });
         },
         path,
       );
@@ -276,4 +275,74 @@ export function createApiClient() {
   };
 
   return authenticatedClient;
+}
+
+/**
+ * Get doctor assigned to the current patient
+ */
+export interface AssignedDoctor {
+  id: string;
+  doctorId: string;
+  patientId: string;
+  createdAt: string;
+  doctor: {
+    id: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    avatarUrl?: string;
+  };
+}
+
+export async function getAssignedDoctor(): Promise<AssignedDoctor | null> {
+  const client = createApiClient();
+  const response = await client.GET<AssignedDoctor | null>("/profile/doctor");
+
+  if (response.error) {
+    throwApiError(response.error, "Failed to fetch assigned doctor");
+  }
+
+  return response.data ?? null;
+}
+
+/**
+ * Mark multiple messages as read (batch operation)
+ */
+export async function markMessagesAsReadBatch(
+  messageIds: string[],
+): Promise<{ count: number; messageIds: string[] }> {
+  const client = createApiClient();
+  const response = await client.POST("/messages/mark-read-batch", { messageIds });
+
+  if (response.error) {
+    throwApiError(response.error, "Failed to mark messages as read");
+  }
+
+  if (!response.data) {
+    throw new Error("No data returned from mark-read-batch endpoint");
+  }
+
+  return response.data as { count: number; messageIds: string[] };
+}
+
+export async function registerPushToken(input: {
+  expoPushToken: string;
+  platform: string;
+  deviceId?: string;
+}): Promise<void> {
+  const client = createApiClient();
+  const response = await client.POST("/push/register", input);
+
+  if (response.error) {
+    throwApiError(response.error, "Failed to register push token");
+  }
+}
+
+export async function unregisterPushToken(expoPushToken: string): Promise<void> {
+  const client = createApiClient();
+  const response = await client.POST("/push/unregister", { expoPushToken });
+
+  if (response.error) {
+    throwApiError(response.error, "Failed to unregister push token");
+  }
 }

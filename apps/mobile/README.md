@@ -16,6 +16,8 @@ Features
 - ✅ Automatic token refresh
 - ✅ Persistent authentication
 - ✅ User profile management
+- ✅ Modo simulado de NFC para pruebas en simulador/iOS sin hardware
+- ✅ NFC real en Android development builds compatibles
 
 Requirements
 
@@ -50,6 +52,9 @@ Setup
 
    # Google OAuth Client ID (from Google Cloud Console)
    EXPO_PUBLIC_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+
+   # Expo EAS Project UUID for push notifications
+   EXPO_PUBLIC_EAS_PROJECT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
    ```
 
    For real devices, use your machine's LAN IP:
@@ -71,7 +76,13 @@ Development
   pnpm -C apps/mobile dev
 
 - Start with environment variables:
-  EXPO_PUBLIC_API_BASE_URL=http://192.168.1.XXX:3000 EXPO_PUBLIC_GOOGLE_CLIENT_ID=your-client-id pnpm -C apps/mobile dev
+  EXPO_PUBLIC_API_BASE_URL=http://192.168.1.XXX:3000 EXPO_PUBLIC_GOOGLE_CLIENT_ID=your-client-id EXPO_PUBLIC_EAS_PROJECT_ID=your-eas-project-uuid pnpm -C apps/mobile dev
+
+Push Notifications
+
+- `apps/mobile/app.config.ts` reads the EAS project UUID from `EXPO_PUBLIC_EAS_PROJECT_ID`
+- The value must be the real EAS project UUID, not the app slug
+- You can get it from the Expo dashboard project settings or `eas project:info`
 
 Scripts (package.json)
 
@@ -82,6 +93,13 @@ Scripts (package.json)
 - web: expo start --web --non-interactive
 - build: echo 'Expo app is managed; no build step'
 - lint: eslint . --ext .ts,.tsx
+- typecheck: tsc --noEmit
+
+Estado actual de NFC
+
+- Android: el flujo apunta a uso real de NFC con `react-native-nfc-manager`.
+- iOS Simulator / entornos sin hardware NFC: se mantiene el modo simulado para validar UX, guardado y gráficos sin depender de un dispositivo físico.
+- La simulación no reemplaza una prueba de hardware real antes de release móvil.
 
 Key Files and Structure
 

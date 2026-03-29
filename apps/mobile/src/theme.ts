@@ -17,6 +17,7 @@ export const theme = {
     tabBarIconActive: sharedColors.tabBarIconActive,
     tabBarIconInactive: sharedColors.tabBarIconInactive,
     secondary: sharedColors.secondary,
+    white: "#FFFFFF",
     success: sharedColors.success,
     warning: sharedColors.warning,
     error: sharedColors.error,

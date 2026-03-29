@@ -6,15 +6,25 @@ import {
   ScrollView,
   ActivityIndicator,
   TouchableOpacity,
+  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
-import { Droplet, Syringe, Stethoscope, Mail, Info } from "lucide-react-native";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { CalendarDays, Droplet, Syringe, Stethoscope, Mail, Info } from "lucide-react-native";
 import { theme } from "../theme";
 import { createApiClient } from "../lib/api";
 import { GlucoseChart, type GlucoseDataPoint } from "../components/GlucoseChart";
+import AppointmentCard from "../components/AppointmentCard";
 import { formatTimeFromMinutes } from "@glucosapp/utils";
-import { type UserProfile } from "@glucosapp/types";
+import { AppointmentStatus, type UserProfile } from "@glucosapp/types";
+import type { RootStackParamList } from "../navigation/types";
+import {
+  useCancelAppointment,
+  useConfirmAppointment,
+  useMyAppointments,
+} from "../hooks/useAppointments";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -47,11 +57,14 @@ type GlucoseTrend = {
   }>;
 };
 
+type DoctorScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
 /**
  * DoctorScreen component - Display doctor information, reports, and treatment parameters
  */
 export default function DoctorScreen() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<DoctorScreenNavigationProp>();
 
   // Fetch doctor information
   const { data: doctorInfo, isLoading: isLoadingDoctor } = useQuery<DoctorInfo | null>({
@@ -164,6 +177,10 @@ export default function DoctorScreen() {
     refetchOnWindowFocus: false,
   });
 
+  const { data: appointments = [], isLoading: isLoadingAppointments } = useMyAppointments(true);
+  const confirmAppointmentMutation = useConfirmAppointment();
+  const cancelAppointmentMutation = useCancelAppointment();
+
   const isLoading =
     isLoadingDoctor ||
     isLoadingWeeklyGlucose ||
@@ -171,6 +188,24 @@ export default function DoctorScreen() {
     isLoadingTrend ||
     isLoadingProfile;
   const hasDoctor = !!doctorInfo;
+  const currentTime = React.useMemo(() => Date.now(), []);
+
+  const upcomingAppointments = React.useMemo(
+    () =>
+      appointments
+        .filter(
+          (appointment) =>
+            new Date(appointment.scheduledAt).getTime() >= currentTime &&
+            (appointment.status === AppointmentStatus.SCHEDULED ||
+              appointment.status === AppointmentStatus.CONFIRMED),
+        )
+        .sort(
+          (left, right) =>
+            new Date(left.scheduledAt).getTime() - new Date(right.scheduledAt).getTime(),
+        ),
+    [appointments, currentTime],
+  );
+  const nextAppointment = upcomingAppointments[0];
 
   // Transform glucose trend data from backend (daily averages for last 7 days)
   const chartData: GlucoseDataPoint[] = React.useMemo(() => {
@@ -209,6 +244,45 @@ export default function DoctorScreen() {
       month: "long",
       day: "numeric",
     });
+  };
+
+  const handleConfirmAppointment = (appointmentId: string) => {
+    Alert.alert("Confirmar cita", "¿Quieres confirmar esta cita?", [
+      { text: "Volver", style: "cancel" },
+      {
+        text: "Confirmar",
+        onPress: async () => {
+          try {
+            await confirmAppointmentMutation.mutateAsync(appointmentId);
+          } catch (error) {
+            Alert.alert(
+              "No se pudo confirmar",
+              error instanceof Error ? error.message : "Intenta nuevamente.",
+            );
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleCancelAppointment = (appointmentId: string) => {
+    Alert.alert("Cancelar cita", "La cita cambiará al estado cancelada.", [
+      { text: "Volver", style: "cancel" },
+      {
+        text: "Cancelar cita",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await cancelAppointmentMutation.mutateAsync(appointmentId);
+          } catch (error) {
+            Alert.alert(
+              "No se pudo cancelar",
+              error instanceof Error ? error.message : "Intenta nuevamente.",
+            );
+          }
+        },
+      },
+    ]);
   };
 
   if (isLoading) {
@@ -306,6 +380,51 @@ export default function DoctorScreen() {
               </View>
             </View>
           </View>
+        </View>
+      )}
+
+      {hasDoctor && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Tus Citas</Text>
+            <TouchableOpacity onPress={() => navigation.navigate("Appointments")}>
+              <Text style={styles.sectionLink}>Ver todas</Text>
+            </TouchableOpacity>
+          </View>
+
+          {isLoadingAppointments ? (
+            <View style={styles.infoCard}>
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+            </View>
+          ) : appointments.length === 0 ? (
+            <View style={styles.noAppointmentsCard}>
+              <CalendarDays size={28} color={theme.colors.textSecondary} />
+              <Text style={styles.noAppointmentsTitle}>Sin citas programadas</Text>
+              <Text style={styles.noAppointmentsText}>
+                Cuando tu médico cargue una cita, aparecerá aquí para que puedas confirmarla o
+                cancelarla.
+              </Text>
+            </View>
+          ) : (
+            <>
+              <View style={styles.sectionSubheader}>
+                <Text style={styles.sectionSubtitle}>Próxima cita</Text>
+              </View>
+              {nextAppointment ? (
+                <AppointmentCard
+                  appointment={nextAppointment}
+                  confirmLoading={confirmAppointmentMutation.isPending}
+                  cancelLoading={cancelAppointmentMutation.isPending}
+                  onConfirm={handleConfirmAppointment}
+                  onCancel={handleCancelAppointment}
+                />
+              ) : (
+                <View style={styles.emptyMiniCard}>
+                  <Text style={styles.emptyMiniText}>No tienes citas futuras pendientes.</Text>
+                </View>
+              )}
+            </>
+          )}
         </View>
       )}
 
@@ -436,7 +555,12 @@ export default function DoctorScreen() {
       {hasDoctor && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Comunicación</Text>
-          <TouchableOpacity style={styles.communicationButton} disabled={true}>
+          <TouchableOpacity
+            style={styles.communicationButton}
+            onPress={() => {
+              navigation.navigate("Communication");
+            }}
+          >
             <Mail size={20} color={theme.colors.primary} />
             <Text style={styles.communicationButtonText}>Enviar mensaje al doctor</Text>
           </TouchableOpacity>
@@ -492,6 +616,17 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     marginBottom: theme.spacing.md,
   },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: theme.spacing.md,
+  },
+  sectionLink: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: "600",
+    color: theme.colors.primary,
+  },
   reportCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -545,6 +680,58 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  noAppointmentsCard: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.lg,
+    alignItems: "center",
+    shadowColor: theme.colors.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  noAppointmentsTitle: {
+    fontSize: theme.fontSize.lg,
+    fontWeight: "600",
+    color: theme.colors.text,
+    marginTop: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
+  },
+  noAppointmentsText: {
+    fontSize: theme.fontSize.sm,
+    lineHeight: 20,
+    color: theme.colors.textSecondary,
+    textAlign: "center",
+  },
+  sectionSubheader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: theme.spacing.sm,
+  },
+  sectionSubtitle: {
+    fontSize: theme.fontSize.md,
+    fontWeight: "600",
+    color: theme.colors.text,
+  },
+  sectionCount: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.textSecondary,
+  },
+  emptyMiniCard: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+  },
+  emptyMiniText: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.textSecondary,
   },
   infoRow: {
     flexDirection: "row",
@@ -679,7 +866,6 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
     borderWidth: 1,
     borderColor: theme.colors.primary,
-    opacity: 0.6,
   },
   communicationButtonText: {
     fontSize: theme.fontSize.md,

@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PassportStrategy } from "@nestjs/passport";
 import { Strategy, Profile, VerifyCallback } from "passport-google-oauth20";
@@ -9,20 +9,29 @@ import { AuthService } from "../services/auth.service";
  */
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
+  private static readonly logger = new Logger(GoogleStrategy.name);
+
   constructor(
     private readonly configService: ConfigService,
     private readonly authService: AuthService,
   ) {
-    const clientID = configService.get<string>("GOOGLE_CLIENT_ID", "");
-    const clientSecret = configService.get<string>("GOOGLE_CLIENT_SECRET", "");
+    const configuredClientID = configService.get<string>("GOOGLE_CLIENT_ID", "");
+    const configuredClientSecret = configService.get<string>("GOOGLE_CLIENT_SECRET", "");
     const callbackURL = configService.get<string>(
       "GOOGLE_CALLBACK_URL",
       "http://localhost:3000/v1/auth/google/callback",
     );
+    const oauthConfigured = Boolean(configuredClientID && configuredClientSecret);
+
+    if (!oauthConfigured) {
+      GoogleStrategy.logger.warn(
+        "Google OAuth is disabled because GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is not configured.",
+      );
+    }
 
     super({
-      clientID,
-      clientSecret,
+      clientID: configuredClientID || "disabled-google-oauth-client-id",
+      clientSecret: configuredClientSecret || "disabled-google-oauth-client-secret",
       callbackURL,
       scope: ["email", "profile"],
     });

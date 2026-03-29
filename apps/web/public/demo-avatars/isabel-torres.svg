@@ -1,0 +1,10 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="256" height="256" rx="48" fill="#FFF0F6"/>
+  <circle cx="128" cy="100" r="52" fill="#F0C6A4"/>
+  <path d="M64 228C64 186 94 162 128 162C162 162 192 186 192 228V256H64V228Z" fill="#D6336C"/>
+  <path d="M70 92C70 50 95 30 128 30C161 30 186 50 186 92V116C177 102 162 94 146 94H110C94 94 79 102 70 116V92Z" fill="#6F4B3E"/>
+  <circle cx="108" cy="102" r="5" fill="#37221A"/>
+  <circle cx="148" cy="102" r="5" fill="#37221A"/>
+  <path d="M112 126C119 133 137 133 144 126" stroke="#B06E58" stroke-width="6" stroke-linecap="round"/>
+  <text x="128" y="230" text-anchor="middle" font-size="28" font-family="Arial, sans-serif" font-weight="700" fill="#FFFFFF">IT</text>
+</svg>

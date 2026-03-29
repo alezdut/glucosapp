@@ -19,6 +19,9 @@ export const EnvSchema = z.object({
   SMTP_PORT: z.string().optional(),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_FROM_EMAIL: z.string().optional(),
+  RESEND_REPLY_TO: z.string().optional(),
   FRONTEND_URL: z.string().url().optional(),
   GEMINI_API_KEY: z.string().optional(),
 });

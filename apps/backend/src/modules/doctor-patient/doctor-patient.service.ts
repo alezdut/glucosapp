@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   NotFoundException,
   ConflictException,
+  Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { UserRole, DiabetesType, GlucoseEntry } from "@prisma/client";
@@ -41,6 +42,8 @@ type LogEntryWithDecryptedGlucose = Omit<
 
 @Injectable()
 export class DoctorPatientService {
+  private readonly logger = new Logger(DoctorPatientService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly doctorUtils: DoctorUtilsService,
@@ -72,9 +75,9 @@ export class DoctorPatientService {
           recordedAt: lastGlucoseEntry.recordedAt,
         };
       } catch (error) {
-        console.error(
-          `[DoctorPatient] Failed to decrypt glucose entry for patient ${patientId}:`,
-          error,
+        this.logger.error(
+          `Failed to decrypt glucose entry for patient ${patientId}`,
+          error instanceof Error ? error.stack : String(error),
         );
       }
     }
@@ -96,9 +99,9 @@ export class DoctorPatientService {
           recordedAt: lastGlucoseReadingRecord.recordedAt,
         };
       } catch (error) {
-        console.error(
-          `[DoctorPatient] Failed to decrypt glucose reading for patient ${patientId}:`,
-          error,
+        this.logger.error(
+          `Failed to decrypt glucose reading for patient ${patientId}`,
+          error instanceof Error ? error.stack : String(error),
         );
       }
     }
@@ -154,7 +157,6 @@ export class DoctorPatientService {
     // Apply age range filter
     if (filters?.ageRange) {
       const now = new Date();
-      const currentYear = now.getFullYear();
       let minAge: number | undefined;
       let maxAge: number | undefined;
 
@@ -173,16 +175,18 @@ export class DoctorPatientService {
       }
 
       if (minAge !== undefined) {
-        // For minimum age: person must have been born ON OR BEFORE (currentYear - minAge)
-        // Example: to be at least 31 years old in 2025, must be born on or before Dec 31, 1994
-        const maxBirthYear = currentYear - minAge;
-        const maxBirthDate = new Date(maxBirthYear, 11, 31, 23, 59, 59, 999);
+        // For minimum age: person must have been born ON OR BEFORE (now - minAge years)
+        // Clone now, subtract minAge years, set to end-of-day for lte comparison
+        const maxBirthDate = new Date(now);
+        maxBirthDate.setFullYear(now.getFullYear() - minAge);
+        maxBirthDate.setHours(23, 59, 59, 999);
 
         if (maxAge !== undefined) {
-          // For maximum age: person must have been born ON OR AFTER (currentYear - maxAge)
-          // Example: to be at most 50 years old in 2025, must be born on or after Jan 1, 1975
-          const minBirthYear = currentYear - maxAge;
-          const minBirthDate = new Date(minBirthYear, 0, 1);
+          // For maximum age: person must have been born ON OR AFTER (now - maxAge years)
+          // Clone now, subtract maxAge years, set to start-of-day for gte comparison
+          const minBirthDate = new Date(now);
+          minBirthDate.setFullYear(now.getFullYear() - maxAge);
+          minBirthDate.setHours(0, 0, 0, 0);
           where.birthDate = {
             gte: minBirthDate, // Born on or after this date (to be at most maxAge)
             lte: maxBirthDate, // Born on or before this date (to be at least minAge)
@@ -369,9 +373,9 @@ export class DoctorPatientService {
             recordedAt: glucoseEntry.recordedAt,
           };
         } catch (error) {
-          console.error(
-            `[DoctorPatient] Failed to decrypt glucose entry for patient ${patient.id}:`,
-            error,
+          this.logger.error(
+            `Failed to decrypt glucose entry for patient ${patient.id}`,
+            error instanceof Error ? error.stack : String(error),
           );
         }
       } else {
@@ -387,9 +391,9 @@ export class DoctorPatientService {
               recordedAt: glucoseReading.recordedAt,
             };
           } catch (error) {
-            console.error(
-              `[DoctorPatient] Failed to decrypt glucose reading for patient ${patient.id}:`,
-              error,
+            this.logger.error(
+              `Failed to decrypt glucose reading for patient ${patient.id}`,
+              error instanceof Error ? error.stack : String(error),
             );
           }
         }
@@ -473,7 +477,7 @@ export class DoctorPatientService {
 
   /**
    * Search for patients globally (all patients, not just assigned)
-   * Returns only patients not yet assigned to the doctor
+   * Returns only patients without any assignment (1:1 relationship enforced)
    */
   async searchGlobalPatients(
     doctorId: string,
@@ -481,15 +485,18 @@ export class DoctorPatientService {
   ): Promise<PatientListItemDto[]> {
     await this.doctorUtils.verifyDoctor(doctorId);
 
-    // Get assigned patient IDs to exclude them
-    const assignedPatientIds = await this.doctorUtils.getDoctorPatientIds(doctorId);
+    // Get all assigned patient IDs (from any doctor) to exclude them
+    const allAssignedPatients = await this.prisma.doctorPatient.findMany({
+      select: { patientId: true },
+    });
+    const assignedPatientIds = allAssignedPatients.map((r) => r.patientId);
 
     // Build search query
     const searchTerm = searchDto.q.trim();
 
     const where: Prisma.UserWhereInput = {
       role: UserRole.PATIENT,
-      // Exclude already assigned patients
+      // Exclude all patients already assigned to any doctor
       ...(assignedPatientIds.length > 0 && { id: { notIn: assignedPatientIds } }),
       OR: [
         { firstName: { contains: searchTerm, mode: "insensitive" } },
@@ -516,7 +523,17 @@ export class DoctorPatientService {
       },
     });
 
-    // Build result with basic info (no need for full status calculation in search)
+    const activityStatuses = await Promise.all(
+      patients.map(async (patient) => ({
+        patientId: patient.id,
+        activityStatus: await this.calculatePatientActivityStatus(patient.id),
+      })),
+    );
+
+    const activityStatusMap = new Map(
+      activityStatuses.map((status) => [status.patientId, status.activityStatus]),
+    );
+
     return patients.map((patient) => ({
       id: patient.id,
       email: patient.email,
@@ -524,9 +541,9 @@ export class DoctorPatientService {
       lastName: patient.lastName || undefined,
       avatarUrl: patient.avatarUrl || undefined,
       diabetesType: patient.diabetesType || undefined,
-      lastGlucoseReading: undefined, // Not needed for search results
-      status: "Estable" as const, // Default clinical status for search
-      activityStatus: "Inactivo" as const, // Default activity status for search
+      lastGlucoseReading: undefined,
+      status: "Estable" as const,
+      activityStatus: activityStatusMap.get(patient.id) || ("Inactivo" as const),
       registrationDate: patient.createdAt.toISOString(),
     }));
   }
@@ -572,29 +589,13 @@ export class DoctorPatientService {
       }),
     ]);
 
-    // Decrypt glucose entries
-    const decryptedEntries = glucoseEntries
-      .map((entry) => {
-        try {
-          return this.encryptionService.decryptGlucoseValue(entry.mgdlEncrypted);
-        } catch (error) {
-          console.error(`Failed to decrypt glucose entry for patient ${patientId}:`, error);
-          return null;
-        }
-      })
-      .filter((entry) => entry !== null) as number[];
-
-    // Decrypt glucose readings
-    const decryptedReadings = glucoseReadings
-      .map((reading) => {
-        try {
-          return this.encryptionService.decryptGlucoseValue(reading.glucoseEncrypted);
-        } catch (error) {
-          console.error(`Failed to decrypt glucose reading for patient ${patientId}:`, error);
-          return null;
-        }
-      })
-      .filter((reading) => reading !== null) as number[];
+    // Decrypt glucose entries and readings using batch method
+    const decryptedEntries = this.encryptionService.decryptGlucoseValues(
+      glucoseEntries.map((e) => e.mgdlEncrypted),
+    );
+    const decryptedReadings = this.encryptionService.decryptGlucoseValues(
+      glucoseReadings.map((r) => r.glucoseEncrypted),
+    );
 
     // Combine all glucose values
     const allGlucoseValues = [...decryptedEntries, ...decryptedReadings];
@@ -698,6 +699,7 @@ export class DoctorPatientService {
 
   /**
    * Assign a patient to a doctor
+   * Enforces 1:1 relationship - a patient can only be assigned to one doctor
    */
   async assignPatient(
     doctorId: string,
@@ -719,18 +721,19 @@ export class DoctorPatientService {
       throw new ConflictException("User is not a patient");
     }
 
-    // Check if relationship already exists
-    const existing = await this.prisma.doctorPatient.findUnique({
+    // Check if patient is already assigned to any doctor (1:1 relationship)
+    const existingAssignment = await this.prisma.doctorPatient.findUnique({
       where: {
-        doctorId_patientId: {
-          doctorId,
-          patientId: createDto.patientId,
-        },
+        patientId: createDto.patientId,
       },
     });
 
-    if (existing) {
-      throw new ConflictException("Patient is already assigned to this doctor");
+    if (existingAssignment) {
+      if (existingAssignment.doctorId === doctorId) {
+        throw new ConflictException("Patient is already assigned to this doctor");
+      } else {
+        throw new ConflictException("Patient is already assigned to another doctor");
+      }
     }
 
     const relation = await this.prisma.doctorPatient.create({
@@ -1013,9 +1016,9 @@ export class DoctorPatientService {
             },
           } as LogEntryWithDecryptedGlucose;
         } catch (error) {
-          console.error(
-            `[DoctorPatient] Failed to decrypt glucose entry ${entry.glucoseEntry.id}:`,
-            error,
+          this.logger.error(
+            `Failed to decrypt glucose entry ${entry.glucoseEntry.id}`,
+            error instanceof Error ? error.stack : String(error),
           );
           // Return entry without decrypted value if decryption fails
           return entry as LogEntryWithDecryptedGlucose;
@@ -1146,7 +1149,7 @@ export class DoctorPatientService {
   }
 
   /**
-   * Get the doctor assigned to a patient
+   * Get the doctor assigned to a patient (1:1 relationship)
    * @param patientId - Patient ID
    * @returns Doctor information or null if no doctor assigned
    */
@@ -1163,7 +1166,7 @@ export class DoctorPatientService {
       avatarUrl?: string;
     };
   } | null> {
-    const relation = await this.prisma.doctorPatient.findFirst({
+    const relation = await this.prisma.doctorPatient.findUnique({
       where: { patientId },
       include: {
         doctor: {
@@ -1175,9 +1178,6 @@ export class DoctorPatientService {
             avatarUrl: true,
           },
         },
-      },
-      orderBy: {
-        createdAt: "desc",
       },
     });
 

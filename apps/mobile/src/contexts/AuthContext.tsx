@@ -8,6 +8,7 @@ import {
   clearTokens,
 } from "../lib/api";
 import * as Linking from "expo-linking";
+import { unregisterCurrentPushDevice } from "../lib/push-notifications";
 
 // Enable web browser to properly dismiss after auth
 WebBrowser.maybeCompleteAuthSession();
@@ -19,6 +20,7 @@ interface User {
   firstName?: string;
   lastName?: string;
   emailVerified: boolean;
+  role: "DOCTOR" | "PATIENT";
   createdAt: string;
 }
 
@@ -61,8 +63,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // If we got an error response, check if it's an auth error
       if (response.error) {
         // If it's a 401, tokens were already cleared by the API client
-        if (response.error.status === 401) {
-          console.log("Authentication failed, clearing user state");
+        if (
+          typeof response.error === "object" &&
+          response.error !== null &&
+          "status" in response.error &&
+          response.error.status === 401
+        ) {
           setUser(null);
         }
       }
@@ -137,7 +143,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             await storeTokens(accessToken, refreshToken);
 
             // Parse and set user
-            // TODO: Check if userData is already parsed
             const parsedUser = JSON.parse(userData);
             setUser(parsedUser);
 
@@ -179,14 +184,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Use custom scheme for better iOS compatibility
       const redirectUrl = "glucosapp://auth/callback";
-      console.log("Redirect URL:", redirectUrl);
-
-      // Pass redirect URL to backend so it knows where to redirect
       const authUrl = `${API_BASE_URL}/v1/auth/google/mobile?redirect_uri=${encodeURIComponent(redirectUrl)}`;
-      console.log("Auth URL:", authUrl);
 
       const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
-      console.log("Auth result:", result);
 
       if (result.type === "success" && result.url) {
         // Parse the callback URL for tokens
@@ -196,12 +196,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const accessToken = params.get("accessToken");
         const refreshToken = params.get("refreshToken");
         const userData = params.get("user");
-
-        console.log("Tokens received:", {
-          accessToken: !!accessToken,
-          refreshToken: !!refreshToken,
-          userData: !!userData,
-        });
 
         if (accessToken && refreshToken && userData) {
           // Store tokens
@@ -233,6 +227,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Get refresh token before clearing
       const refreshToken = await getRefreshToken();
+      await unregisterCurrentPushDevice();
 
       // Call logout endpoint with refresh token
       if (refreshToken) {

@@ -9,6 +9,7 @@ import { EncryptionService } from "../../common/services/encryption.service";
 import { EmailService } from "../auth/services/email.service";
 import { AlertResponseDto } from "./dto/alert-response.dto";
 import { AlertSettingsResponseDto, UpdateAlertSettingsDto } from "./dto/alert-settings.dto";
+import { AcknowledgeBatchDto } from "./dto/acknowledge-batch.dto";
 import {
   parseTimeString,
   getCurrentTimeInTimezone,
@@ -331,8 +332,8 @@ export class AlertsService {
       return; // Email notifications disabled
     }
 
-    // Get doctor assigned to this patient
-    const doctorRelation = await this.prisma.doctorPatient.findFirst({
+    // Get doctor assigned to this patient (1:1 relationship)
+    const doctorRelation = await this.prisma.doctorPatient.findUnique({
       where: { patientId },
       include: {
         doctor: {
@@ -344,9 +345,6 @@ export class AlertsService {
             timezone: true,
           },
         },
-      },
-      orderBy: {
-        createdAt: "desc",
       },
     });
 
@@ -501,7 +499,7 @@ export class AlertsService {
             recentHighReadings++;
           }
         } catch (error) {
-          console.error("[Alerts] Failed to decrypt glucose entry:", error);
+          // Silently handle decryption errors
         }
       }
 
@@ -515,7 +513,7 @@ export class AlertsService {
             recentHighReadings++;
           }
         } catch (error) {
-          console.error("[Alerts] Failed to decrypt glucose reading:", error);
+          // Silently handle decryption errors
         }
       }
 
@@ -629,92 +627,99 @@ export class AlertsService {
   }
 
   /**
-   * Get all alerts for doctor's patients
+   * Get alerts with optional filters
+   * Replaces findAll, getCritical, and getRecent methods
    */
-  async findAll(doctorId: string, limit: number = 50): Promise<AlertResponseDto[]> {
+  async findAllWithFilters(
+    doctorId: string,
+    filters: {
+      limit?: number;
+      acknowledged?: boolean;
+      severity?: AlertSeverity[];
+      sinceHours?: number;
+      patientId?: string;
+    } = {},
+  ): Promise<AlertResponseDto[]> {
+    // Verify doctor role
     await this.doctorUtils.verifyDoctor(doctorId);
 
+    // Get doctor's patient IDs
     const patientIds = await this.doctorUtils.getDoctorPatientIds(doctorId);
     if (patientIds.length === 0) {
       return [];
     }
 
-    const alerts = await this.prisma.alert.findMany({
-      where: {
-        userId: { in: patientIds },
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      take: limit,
-    });
-
-    return alerts.map((alert) => this.mapAlertToDto(alert));
-  }
-
-  /**
-   * Get critical alerts (not acknowledged, severity CRITICAL or HIGH)
-   */
-  async getCritical(doctorId: string): Promise<AlertResponseDto[]> {
-    await this.doctorUtils.verifyDoctor(doctorId);
-
-    const patientIds = await this.doctorUtils.getDoctorPatientIds(doctorId);
-    if (patientIds.length === 0) {
-      return [];
+    // If patientId filter is provided, verify doctor owns this patient
+    if (filters.patientId) {
+      if (!patientIds.includes(filters.patientId)) {
+        throw new ForbiddenException("You can only access alerts for patients assigned to you");
+      }
     }
 
-    const alerts = await this.prisma.alert.findMany({
-      where: {
-        userId: { in: patientIds },
-        acknowledged: false,
-        severity: { in: [AlertSeverity.CRITICAL, AlertSeverity.HIGH] },
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+    // Get alert settings to filter by enabled alert types
+    const firstPatientId = patientIds[0];
+    const settings = await this.getOrCreateDefaultSettings(firstPatientId);
 
-    return alerts.map((alert) => this.mapAlertToDto(alert));
-  }
+    // Build dynamic where clause
+    const where: {
+      userId: { in: string[] } | string;
+      acknowledged?: boolean;
+      severity?: { in: AlertSeverity[] };
+      type?: { in: AlertType[] };
+      createdAt?: { gte: Date };
+    } = {
+      userId: filters.patientId ? filters.patientId : { in: patientIds },
+    };
 
-  /**
-   * Get recent alerts (last 24 hours)
-   */
-  async getRecent(doctorId: string, limit: number = 10): Promise<AlertResponseDto[]> {
-    await this.doctorUtils.verifyDoctor(doctorId);
-
-    const patientIds = await this.doctorUtils.getDoctorPatientIds(doctorId);
-    if (patientIds.length === 0) {
-      return [];
+    // Apply acknowledged filter
+    if (filters.acknowledged !== undefined) {
+      where.acknowledged = filters.acknowledged;
     }
 
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    // Apply severity filter (if explicitly provided)
+    if (filters.severity && filters.severity.length > 0) {
+      where.severity = { in: filters.severity };
+    }
 
+    // Apply alert type filter based on user settings (only if severity not explicitly provided)
+    // This ensures we only show alerts that the user has enabled in their settings
+    if (!filters.severity || filters.severity.length === 0) {
+      const enabledAlertTypes: AlertType[] = [];
+
+      if (settings.severeHypoglycemiaEnabled) {
+        enabledAlertTypes.push(AlertType.SEVERE_HYPOGLYCEMIA);
+      }
+      if (settings.hypoglycemiaEnabled) {
+        enabledAlertTypes.push(AlertType.HYPOGLYCEMIA);
+      }
+      if (settings.hyperglycemiaEnabled) {
+        enabledAlertTypes.push(AlertType.HYPERGLYCEMIA);
+      }
+      if (settings.persistentHyperglycemiaEnabled) {
+        enabledAlertTypes.push(AlertType.PERSISTENT_HYPERGLYCEMIA);
+      }
+
+      // If at least one alert type is enabled, filter by those types
+      if (enabledAlertTypes.length > 0) {
+        where.type = { in: enabledAlertTypes };
+      } else {
+        // If no alert types are enabled, return empty array
+        return [];
+      }
+    }
+
+    // Apply time filter (sinceHours)
+    if (filters.sinceHours) {
+      const sinceTime = new Date(Date.now() - filters.sinceHours * 60 * 60 * 1000);
+      where.createdAt = { gte: sinceTime };
+    }
+
+    // Apply limit (default 50, max 100)
+    const limit = Math.min(filters.limit ?? 50, 100);
+
+    // Query alerts
     const alerts = await this.prisma.alert.findMany({
-      where: {
-        userId: { in: patientIds },
-        createdAt: { gte: twentyFourHoursAgo },
-      },
+      where,
       include: {
         user: {
           select: {
@@ -783,5 +788,71 @@ export class AlertsService {
     });
 
     return this.mapAlertToDto(updated);
+  }
+
+  /**
+   * Acknowledge multiple alerts at once
+   * Can acknowledge specific alerts by IDs or all enabled alerts
+   */
+  async acknowledgeBatch(
+    doctorId: string,
+    dto: AcknowledgeBatchDto,
+  ): Promise<{ acknowledgedCount: number }> {
+    await this.doctorUtils.verifyDoctor(doctorId);
+    const patientIds = await this.doctorUtils.getDoctorPatientIds(doctorId);
+
+    if (patientIds.length === 0) {
+      return { acknowledgedCount: 0 };
+    }
+
+    let where: any = {
+      userId: { in: patientIds },
+      acknowledged: false,
+    };
+
+    if (dto.acknowledgeAll) {
+      // Get alert settings to determine which alert types are enabled
+      const firstPatientId = patientIds[0];
+      const settings = await this.getOrCreateDefaultSettings(firstPatientId);
+
+      // Build list of enabled alert types
+      const enabledAlertTypes: AlertType[] = [];
+      if (settings.severeHypoglycemiaEnabled) {
+        enabledAlertTypes.push(AlertType.SEVERE_HYPOGLYCEMIA);
+      }
+      if (settings.hypoglycemiaEnabled) {
+        enabledAlertTypes.push(AlertType.HYPOGLYCEMIA);
+      }
+      if (settings.hyperglycemiaEnabled) {
+        enabledAlertTypes.push(AlertType.HYPERGLYCEMIA);
+      }
+      if (settings.persistentHyperglycemiaEnabled) {
+        enabledAlertTypes.push(AlertType.PERSISTENT_HYPERGLYCEMIA);
+      }
+
+      // Only acknowledge alerts that are enabled in settings
+      if (enabledAlertTypes.length > 0) {
+        where.type = { in: enabledAlertTypes };
+      } else {
+        // If no alert types are enabled, nothing to acknowledge
+        return { acknowledgedCount: 0 };
+      }
+    } else if (dto.alertIds && dto.alertIds.length > 0) {
+      // Reconocer alertas específicas por ID
+      where.id = { in: dto.alertIds };
+    } else {
+      // Si no se especifica nada, no hacer nada
+      return { acknowledgedCount: 0 };
+    }
+
+    const result = await this.prisma.alert.updateMany({
+      where,
+      data: {
+        acknowledged: true,
+        acknowledgedAt: new Date(),
+      },
+    });
+
+    return { acknowledgedCount: result.count };
   }
 }

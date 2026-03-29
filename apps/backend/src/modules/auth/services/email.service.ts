@@ -1,9 +1,170 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, ServiceUnavailableException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as nodemailer from "nodemailer";
 import type { Transporter } from "nodemailer";
 import * as fs from "fs";
 import * as path from "path";
+
+type EmailPayload = {
+  to: string;
+  subject: string;
+  html: string;
+  replyTo?: string;
+};
+
+interface EmailProvider {
+  readonly name: "smtp" | "resend";
+  isConfigured(): boolean;
+  send(payload: EmailPayload): Promise<void>;
+}
+
+class EmailDeliveryError extends Error {
+  constructor(
+    message: string,
+    readonly provider: EmailProvider["name"],
+    readonly fallbackAllowed: boolean,
+  ) {
+    super(message);
+  }
+}
+
+class SmtpEmailProvider implements EmailProvider {
+  readonly name = "smtp" as const;
+  private readonly transporter: Transporter | null;
+  private readonly port?: number;
+  private readonly fromEmail?: string;
+
+  constructor(
+    private readonly logger: Logger,
+    smtpHost?: string,
+    smtpPort?: string,
+    smtpUser?: string,
+    smtpPass?: string,
+  ) {
+    this.port = smtpPort ? parseInt(smtpPort, 10) : undefined;
+    this.fromEmail = smtpUser;
+
+    if (!smtpHost || !this.port || !smtpUser || !smtpPass) {
+      this.transporter = null;
+      return;
+    }
+
+    this.transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: this.port,
+      secure: this.port === 465,
+      requireTLS: this.port === 587,
+      auth: {
+        user: smtpUser,
+        pass: smtpPass,
+      },
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 20000,
+    });
+  }
+
+  isConfigured(): boolean {
+    return this.transporter !== null;
+  }
+
+  async send(payload: EmailPayload): Promise<void> {
+    if (!this.transporter) {
+      throw new EmailDeliveryError("SMTP is not configured", this.name, true);
+    }
+
+    try {
+      await this.transporter.sendMail({
+        from: this.fromEmail,
+        ...payload,
+      });
+    } catch (error) {
+      const fallbackAllowed = this.isFallbackAllowed(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new EmailDeliveryError(errorMessage, this.name, fallbackAllowed);
+    }
+  }
+
+  private isFallbackAllowed(error: unknown): boolean {
+    if (!error || typeof error !== "object") {
+      return false;
+    }
+
+    const smtpError = error as { code?: string; message?: string; responseCode?: number };
+    const retryableCodes = new Set([
+      "ETIMEDOUT",
+      "ESOCKET",
+      "ECONNECTION",
+      "ECONNRESET",
+      "ECONNREFUSED",
+      "ENOTFOUND",
+      "EHOSTUNREACH",
+      "ETLS",
+    ]);
+
+    if (smtpError.code && retryableCodes.has(smtpError.code)) {
+      return true;
+    }
+
+    const message = smtpError.message?.toLowerCase() ?? "";
+    if (
+      message.includes("timeout") ||
+      message.includes("connection") ||
+      message.includes("greeting") ||
+      message.includes("socket")
+    ) {
+      return true;
+    }
+
+    return typeof smtpError.responseCode === "number" && smtpError.responseCode >= 500;
+  }
+}
+
+class ResendEmailProvider implements EmailProvider {
+  readonly name = "resend" as const;
+
+  constructor(
+    private readonly apiKey?: string,
+    private readonly fromEmail?: string,
+  ) {}
+
+  isConfigured(): boolean {
+    return Boolean(this.apiKey && this.fromEmail);
+  }
+
+  async send(payload: EmailPayload): Promise<void> {
+    if (!this.apiKey || !this.fromEmail) {
+      throw new EmailDeliveryError("Resend is not configured", this.name, false);
+    }
+
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: this.fromEmail,
+        to: [payload.to],
+        subject: payload.subject,
+        html: payload.html,
+        ...(payload.replyTo ? { reply_to: payload.replyTo } : {}),
+      }),
+    }).catch((error) => {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new EmailDeliveryError(errorMessage, this.name, false);
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text().catch(() => "");
+      throw new EmailDeliveryError(
+        `Resend API error (${response.status}): ${errorBody || response.statusText}`,
+        this.name,
+        false,
+      );
+    }
+  }
+}
 
 /**
  * Service for sending emails
@@ -11,40 +172,47 @@ import * as path from "path";
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private transporter: Transporter | null = null;
-  private readonly templatesPath = path.join(__dirname, "..", "templates");
+  private readonly templatesPath = this.resolveTemplatesPath();
+  private readonly smtpProvider: SmtpEmailProvider;
+  private readonly resendProvider: ResendEmailProvider;
+  private readonly smtpUser?: string;
+  private readonly resendReplyTo?: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.initializeTransporter();
-  }
-
-  /**
-   * Initializes email transporter if SMTP configuration is available
-   */
-  private initializeTransporter(): void {
     const smtpHost = this.configService.get<string>("SMTP_HOST");
     const smtpPort = this.configService.get<string>("SMTP_PORT");
     const smtpUser = this.configService.get<string>("SMTP_USER");
     const smtpPass = this.configService.get<string>("SMTP_PASS");
+    this.smtpUser = smtpUser;
+    this.resendReplyTo = this.configService.get<string>("RESEND_REPLY_TO");
 
-    if (!smtpHost || !smtpPort || !smtpUser || !smtpPass) {
-      this.logger.warn(
-        "SMTP configuration incomplete. Email sending will be disabled. Configure SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASS.",
-      );
-      return;
+    this.smtpProvider = new SmtpEmailProvider(this.logger, smtpHost, smtpPort, smtpUser, smtpPass);
+    this.resendProvider = new ResendEmailProvider(
+      this.configService.get<string>("RESEND_API_KEY"),
+      this.configService.get<string>("RESEND_FROM_EMAIL"),
+    );
+
+    if (this.smtpProvider.isConfigured()) {
+      this.logger.log("SMTP email provider initialized");
+    } else {
+      this.logger.warn("SMTP email provider is not configured");
     }
 
-    this.transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: parseInt(smtpPort, 10),
-      secure: parseInt(smtpPort, 10) === 465,
-      auth: {
-        user: smtpUser,
-        pass: smtpPass,
-      },
-    });
+    if (this.resendProvider.isConfigured()) {
+      this.logger.log("Resend email provider initialized");
+    } else {
+      this.logger.warn("Resend email provider is not configured");
+    }
+  }
 
-    this.logger.log("Email transporter initialized successfully");
+  private resolveTemplatesPath(): string {
+    const distTemplatesPath = path.join(__dirname, "..", "templates");
+    if (fs.existsSync(distTemplatesPath)) {
+      return distTemplatesPath;
+    }
+
+    // Fallback for environments where static assets were not copied into dist.
+    return path.join(process.cwd(), "apps/backend/src/modules/auth/templates");
   }
 
   /**
@@ -70,7 +238,6 @@ export class EmailService {
       const templatePath = path.join(this.templatesPath, `${templateName}.html`);
       let template = fs.readFileSync(templatePath, "utf-8");
 
-      // Replace all placeholders
       Object.entries(variables).forEach(([key, value]) => {
         const placeholder = `{{${key}}}`;
         template = template.replace(new RegExp(placeholder, "g"), value);
@@ -87,13 +254,6 @@ export class EmailService {
    * Sends email verification link to user
    */
   async sendVerificationEmail(email: string, token: string): Promise<void> {
-    if (!this.transporter) {
-      this.logger.warn(
-        `Skipping verification email to ${email}. SMTP not configured. Verification token: ${token}`,
-      );
-      return;
-    }
-
     const frontendUrl = this.configService.get<string>("FRONTEND_URL", "http://localhost:3001");
     const verificationUrl = `${frontendUrl}/verify-email?token=${token}`;
 
@@ -101,33 +261,18 @@ export class EmailService {
       verificationUrl,
     });
 
-    const mailOptions = {
-      from: this.configService.get<string>("SMTP_USER"),
+    await this.deliverEmail("verification", {
       to: email,
-      subject: "Verifica tu correo electrónico - Glucosapp",
+      subject: "Verifica tu correo electronico - Glucosapp",
       html,
-    };
-
-    try {
-      await this.transporter.sendMail(mailOptions);
-      this.logger.log(`Verification email sent to ${email}`);
-    } catch (error) {
-      this.logger.error(`Failed to send verification email to ${email}`, error);
-      throw error;
-    }
+      replyTo: this.resendReplyTo,
+    });
   }
 
   /**
    * Sends password reset link to user
    */
   async sendPasswordResetEmail(email: string, token: string): Promise<void> {
-    if (!this.transporter) {
-      this.logger.warn(
-        `Skipping password reset email to ${email}. SMTP not configured. Reset token: ${token}`,
-      );
-      return;
-    }
-
     const frontendUrl = this.configService.get<string>("FRONTEND_URL", "http://localhost:3001");
     const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
 
@@ -135,20 +280,12 @@ export class EmailService {
       resetUrl,
     });
 
-    const mailOptions = {
-      from: this.configService.get<string>("SMTP_USER"),
+    await this.deliverEmail("password reset", {
       to: email,
-      subject: "Restablece tu contraseña - Glucosapp",
+      subject: "Restablece tu contrasena - Glucosapp",
       html,
-    };
-
-    try {
-      await this.transporter.sendMail(mailOptions);
-      this.logger.log(`Password reset email sent to ${email}`);
-    } catch (error) {
-      this.logger.error(`Failed to send password reset email to ${email}`, error);
-      throw error;
-    }
+      replyTo: this.resendReplyTo,
+    });
   }
 
   /**
@@ -169,17 +306,9 @@ export class EmailService {
       alertTimezone: string;
     },
   ): Promise<void> {
-    if (!this.transporter) {
-      this.logger.warn(
-        `Skipping alert email to ${email}. SMTP not configured. Alert type: ${alertType}`,
-      );
-      return;
-    }
-
     const frontendUrl = this.configService.get<string>("FRONTEND_URL", "http://localhost:3001");
     const alertDashboardUrl = dashboardUrl || `${frontendUrl}/dashboard`;
 
-    // Map alert types to Spanish names
     const alertTypeNames: Record<string, string> = {
       SEVERE_HYPOGLYCEMIA: "Hipoglucemia Severa",
       HYPOGLYCEMIA: "Hipoglucemia",
@@ -188,7 +317,6 @@ export class EmailService {
       OTHER: "Alerta de Glucosa",
     };
 
-    // Map severity to colors and icons
     const severityConfig: Record<
       string,
       {
@@ -201,63 +329,59 @@ export class EmailService {
       }
     > = {
       CRITICAL: {
-        title: "🚨 Alerta Crítica",
+        title: "Alerta Critica",
         headerColor: "linear-gradient(135deg, #dc3545 0%, #c82333 100%)",
         bgColor: "#f8d7da",
         borderColor: "#dc3545",
         textColor: "#721c24",
-        icon: "🚨",
+        icon: "CRITICAL",
       },
       HIGH: {
-        title: "⚠️ Alerta Importante",
+        title: "Alerta Importante",
         headerColor: "linear-gradient(135deg, #fd7e14 0%, #e55a00 100%)",
         bgColor: "#fff3cd",
         borderColor: "#ffc107",
         textColor: "#856404",
-        icon: "⚠️",
+        icon: "HIGH",
       },
       MEDIUM: {
-        title: "ℹ️ Alerta",
+        title: "Alerta",
         headerColor: "linear-gradient(135deg, #17a2b8 0%, #138496 100%)",
         bgColor: "#d1ecf1",
         borderColor: "#17a2b8",
         textColor: "#0c5460",
-        icon: "ℹ️",
+        icon: "MEDIUM",
       },
       LOW: {
-        title: "📋 Notificación",
+        title: "Notificacion",
         headerColor: "linear-gradient(135deg, #6c757d 0%, #5a6268 100%)",
         bgColor: "#e2e3e5",
         borderColor: "#6c757d",
         textColor: "#383d41",
-        icon: "📋",
+        icon: "LOW",
       },
     };
 
     const config = severityConfig[severity] || severityConfig.MEDIUM;
     const alertTypeName = alertTypeNames[alertType] || alertTypeNames.OTHER;
-
-    // Build greeting (escape firstName to prevent XSS)
     const greeting = firstName ? `Hola ${this.escapeHtml(firstName)},` : "Hola,";
 
-    // Critical alert notice (only for CRITICAL severity)
     const criticalAlertNotice =
       severity === "CRITICAL"
         ? `<div style="margin: 30px 0; padding: 20px; background-color: #f8d7da; border-left: 4px solid #dc3545; border-radius: 4px;">
             <p style="margin: 0; color: #721c24; font-size: 14px; font-weight: bold;">
-              🚨 ALERTA CRÍTICA - Requiere atención inmediata
+              ALERTA CRITICA - Requiere atencion inmediata
             </p>
             <p style="margin: 10px 0 0; color: #721c24; font-size: 14px;">
-              Esta es una alerta de máxima prioridad. Por favor, revisa el dashboard y contacta con el paciente o servicios de emergencia si es necesario.
+              Esta es una alerta de maxima prioridad. Por favor, revisa el dashboard y contacta con el paciente o servicios de emergencia si es necesario.
             </p>
           </div>`
         : "";
 
-    // Build patient information section (escape all user-controlled values to prevent XSS)
     const patientInfoSection = patientInfo
       ? `<div style="margin: 30px 0; padding: 20px; background-color: #f8f9fa; border-radius: 6px; border: 1px solid #dee2e6;">
           <p style="margin: 0 0 15px; color: #333333; font-size: 16px; font-weight: bold;">
-            👤 Información del Paciente
+            Informacion del Paciente
           </p>
           <table style="width: 100%; border-collapse: collapse;">
             <tr>
@@ -299,19 +423,75 @@ export class EmailService {
       patientInfoSection,
     });
 
-    const mailOptions = {
-      from: this.configService.get<string>("SMTP_USER"),
+    await this.deliverEmail("alert", {
       to: email,
       subject: `${config.icon} ${alertTypeName} - Glucosapp`,
       html,
-    };
+      replyTo: this.resendReplyTo,
+    });
+  }
 
-    try {
-      await this.transporter.sendMail(mailOptions);
-      this.logger.log(`Alert email sent to ${email} for ${alertType} (${severity})`);
-    } catch (error) {
-      this.logger.error(`Failed to send alert email to ${email}`, error);
-      throw error;
+  private async deliverEmail(type: string, payload: EmailPayload): Promise<void> {
+    if (this.smtpProvider.isConfigured()) {
+      try {
+        await this.smtpProvider.send({
+          ...payload,
+          replyTo: payload.replyTo,
+        });
+        this.logger.log(`Email sent via smtp`, { type, to: payload.to });
+        return;
+      } catch (error) {
+        if (!(error instanceof EmailDeliveryError)) {
+          throw error;
+        }
+
+        if (error.fallbackAllowed && this.resendProvider.isConfigured()) {
+          this.logger.warn("SMTP delivery failed, trying Resend fallback", {
+            type,
+            to: payload.to,
+            primaryProvider: "smtp",
+            fallbackProvider: "resend",
+            reason: error.message,
+          });
+          return this.sendViaResend(type, payload);
+        }
+
+        this.handleFinalDeliveryFailure(type, payload.to, error);
+      }
     }
+
+    if (this.resendProvider.isConfigured()) {
+      return this.sendViaResend(type, payload);
+    }
+
+    this.logger.error("No email provider is configured", { type, to: payload.to });
+    throw new ServiceUnavailableException(
+      "Email delivery is currently unavailable. Please try again later.",
+    );
+  }
+
+  private async sendViaResend(type: string, payload: EmailPayload): Promise<void> {
+    try {
+      await this.resendProvider.send(payload);
+      this.logger.log(`Email sent via resend`, { type, to: payload.to });
+    } catch (error) {
+      this.handleFinalDeliveryFailure(type, payload.to, error);
+    }
+  }
+
+  private handleFinalDeliveryFailure(type: string, recipientEmail: string, error: unknown): never {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const provider = error instanceof EmailDeliveryError ? error.provider : "unknown";
+
+    this.logger.error("Email delivery failed", {
+      type,
+      to: recipientEmail,
+      provider,
+      error: errorMessage,
+    });
+
+    throw new ServiceUnavailableException(
+      "Email delivery is currently unavailable. Please try again later.",
+    );
   }
 }

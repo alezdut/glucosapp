@@ -8,7 +8,16 @@
   ],
   "scripts": {
     "prepare": "husky install",
-    "dev": "turbo run dev",
+    "dev": "sh -c 'docker compose up -d db >/dev/null 2>&1 || echo \"[dev] No se pudo iniciar db con docker compose; continúo con backend/web.\"; turbo run dev --filter=backend... --filter=web...'",
+    "dev:all": "docker compose up -d db && turbo run dev",
+    "dev:mobile": "pnpm -C apps/mobile dev",
+    "dev:mobile:ios": "pnpm -C apps/mobile ios",
+    "dev:mobile:android": "pnpm -C apps/mobile android",
+    "dev:mobile:web": "pnpm -C apps/mobile web",
+    "db:start": "docker compose up -d db",
+    "db:stop": "docker compose stop db",
+    "docker:dev": "docker compose up --build",
+    "docker:down": "docker compose down",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test",
@@ -42,7 +51,5 @@
       "@commitlint/config-conventional"
     ]
   },
-  "dependencies": {
-    "mdi-insulin-algorithm": "link:/Users/alejandrozdut/Documents/mdi-insulin-algorithm"
-  }
+  "dependencies": {}
 }

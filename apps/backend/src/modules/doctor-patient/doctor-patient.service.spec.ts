@@ -27,6 +27,12 @@ describe("DoctorPatientService", () => {
         const match = encrypted.match(/encrypted-(\d+)/);
         return match ? parseInt(match[1], 10) : 100;
       }),
+      decryptGlucoseValues: jest.fn((encryptedValues: string[]) => {
+        return encryptedValues.map((encrypted) => {
+          const match = encrypted.match(/encrypted-(\d+)/);
+          return match ? parseInt(match[1], 10) : 100;
+        });
+      }),
     };
     const mockDoctorUtilsService = {
       verifyDoctor: jest.fn().mockResolvedValue(undefined),
@@ -290,7 +296,7 @@ describe("DoctorPatientService", () => {
         }),
       ];
 
-      (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue([patientId]);
+      (prismaService.doctorPatient.findMany as jest.Mock).mockResolvedValue([]);
       (prismaService.user.findMany as jest.Mock).mockResolvedValue(patients);
 
       const result = await service.searchGlobalPatients(doctorId, searchDto);
@@ -302,11 +308,36 @@ describe("DoctorPatientService", () => {
       });
     });
 
+    it("should calculate real activity status for global search results", async () => {
+      const searchDto = { q: "John" };
+      const patients = [
+        createMockUser({
+          id: "patient-456",
+          firstName: "John",
+          role: UserRole.PATIENT,
+        }),
+      ];
+
+      (prismaService.doctorPatient.findMany as jest.Mock).mockResolvedValue([]);
+      (prismaService.user.findMany as jest.Mock).mockResolvedValue(patients);
+      (prismaService.glucoseEntry.findFirst as jest.Mock).mockResolvedValue({ id: "entry-1" });
+      (prismaService.glucoseReading.findFirst as jest.Mock).mockResolvedValue(null);
+      (prismaService.insulinDose.findFirst as jest.Mock).mockResolvedValue(null);
+      (prismaService.meal.findFirst as jest.Mock).mockResolvedValue(null);
+
+      const result = await service.searchGlobalPatients(doctorId, searchDto);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].activityStatus).toBe("Activo");
+    });
+
     it("should exclude already assigned patients", async () => {
       const searchDto = { q: "test" };
       const assignedPatientIds = [patientId];
 
-      (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(assignedPatientIds);
+      (prismaService.doctorPatient.findMany as jest.Mock).mockResolvedValue([
+        { patientId: patientId },
+      ]);
       (prismaService.user.findMany as jest.Mock).mockResolvedValue([]);
 
       await service.searchGlobalPatients(doctorId, searchDto);
@@ -597,7 +628,7 @@ describe("DoctorPatientService", () => {
         doctor,
       };
 
-      (prismaService.doctorPatient.findFirst as jest.Mock).mockResolvedValue(relation);
+      (prismaService.doctorPatient.findUnique as jest.Mock).mockResolvedValue(relation);
 
       const result = await service.getPatientDoctor(patientId);
 
@@ -612,7 +643,7 @@ describe("DoctorPatientService", () => {
     });
 
     it("should return null if no doctor assigned", async () => {
-      (prismaService.doctorPatient.findFirst as jest.Mock).mockResolvedValue(null);
+      (prismaService.doctorPatient.findUnique as jest.Mock).mockResolvedValue(null);
 
       const result = await service.getPatientDoctor(patientId);
 

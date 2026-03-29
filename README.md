@@ -46,6 +46,77 @@ pnpm install
 pnpm -r --filter "@glucosapp/*" build
 ```
 
+## Comandos de desarrollo
+
+### Stack principal: backend + web
+
+El flujo recomendado para desarrollo diario es:
+
+```bash
+pnpm dev
+```
+
+Ese comando:
+
+- levanta PostgreSQL con Docker
+- arranca `backend`, `web` y los packages compartidos necesarios
+- deja `mobile` fuera del stack principal
+
+URLs esperadas:
+
+- Backend: `http://localhost:3000`
+- Swagger: `http://localhost:3000/docs`
+- Web: `http://localhost:3001`
+
+### Mobile por separado
+
+La app mobile debe correrse aparte:
+
+```bash
+pnpm dev:mobile
+```
+
+Ese comando corre Expo directamente, sin pasar por `turbo`, para que la consola interactiva funcione bien y puedas usar atajos como:
+
+- `i` para abrir iOS Simulator
+- `a` para abrir Android Emulator
+- `w` para abrir la versión web
+- `shift+i` para cambiar entre Expo Go y development build cuando aplique
+
+Si quieres abrir el simulador directamente sin entrar primero en la consola interactiva:
+
+```bash
+pnpm dev:mobile:ios
+pnpm dev:mobile:android
+pnpm dev:mobile:web
+```
+
+Si quieres levantar todo el monorepo, incluyendo mobile:
+
+```bash
+pnpm dev:all
+```
+
+### Comandos útiles
+
+```bash
+pnpm db:start
+pnpm db:stop
+pnpm docker:dev
+pnpm docker:down
+```
+
+Validaciones de calidad:
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+`typecheck` ahora cubre backend, web, mobile y los packages compartidos que participan del runtime.
+
 ## Configuración
 
 ### Base de Datos
@@ -54,6 +125,12 @@ Inicia la base de datos PostgreSQL con Docker:
 
 ```bash
 docker compose up -d db
+```
+
+También puedes usar:
+
+```bash
+pnpm db:start
 ```
 
 ### Backend
@@ -75,6 +152,8 @@ ENCRYPTION_KEY="tu-clave-hex-de-64-caracteres"
 pnpm -C apps/backend prisma:generate
 pnpm -C apps/backend prisma:migrate
 ```
+
+Esto sigue siendo necesario al menos una vez en una base nueva.
 
 ### Web
 
@@ -205,6 +284,20 @@ EXPO_PUBLIC_GOOGLE_CLIENT_ID="tu-client-id.apps.googleusercontent.com"
 - Para dispositivos físicos, usa la IP de tu máquina: `http://192.168.1.XXX:3000`
 - Para desarrollo con ngrok, usa la URL de ngrok: `https://abc123.ngrok-free.app`
 - El Client ID debe coincidir con el configurado en Google Cloud Console
+
+## Dockerización
+
+El repositorio ya soporta una opción Docker para `db + api + web`:
+
+```bash
+pnpm docker:dev
+```
+
+Notas:
+
+- Es útil para un entorno reproducible o para onboarding rápido.
+- No es la mejor opción para la app mobile; Expo/simulators conviene correrlos fuera de Docker.
+- Para desarrollo diario, `pnpm dev` suele ser más práctico porque deja `backend + web` en modo watch y mantiene `mobile` separado.
 
 ### Variables de Entorno Globales
 
@@ -548,6 +641,11 @@ pnpm lint
 # Type check en todo el monorepo
 pnpm typecheck
 ```
+
+Nota sobre mobile NFC:
+
+- En Android con development build se usa NFC real.
+- En iOS Simulator o entornos sin acceso al hardware se mantiene el modo simulado para pruebas de flujo.
 
 ### Base de Datos
 

@@ -8,6 +8,7 @@ import {
   HttpCode,
   HttpStatus,
   Res,
+  Logger,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from "@nestjs/swagger";
 import { AuthService } from "./services/auth.service";
@@ -23,7 +24,7 @@ import { LocalAuthGuard } from "./guards/local-auth.guard";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { GoogleAuthGuard } from "./guards/google-auth.guard";
 import { GoogleMobileAuthGuard } from "./guards/google-mobile-auth.guard";
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
 
 /**
  * Controller handling authentication endpoints
@@ -31,6 +32,8 @@ import { Request, Response } from "express";
 @ApiTags("auth")
 @Controller({ path: "auth", version: "1" })
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(private readonly authService: AuthService) {}
 
   /**
@@ -62,9 +65,14 @@ export class AuthController {
     type: AuthResponseDto,
   })
   @ApiResponse({ status: 401, description: "Invalid credentials or email not verified" })
-  async login(@Req() req: Request): Promise<AuthResponseDto> {
-    const user = req.user as UserResponseDto;
-    return this.authService.login(user);
+  async login(@Req() req: Request, @Body() loginDto: LoginDto): Promise<AuthResponseDto> {
+    try {
+      const user = req.user as UserResponseDto;
+      const result = await this.authService.login(user);
+      return result;
+    } catch (error) {
+      throw error;
+    }
   }
 
   /**

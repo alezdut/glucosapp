@@ -87,6 +87,8 @@ pnpm -C apps/backend dev
 
 Server runs on http://localhost:3000
 
+Si `ALLOWED_ORIGINS` no está configurado, en desarrollo el backend habilita CORS abierto para simplificar pruebas locales. En producción se debe definir explícitamente.
+
 ## API Endpoints
 
 ### Public Endpoints
@@ -200,6 +202,7 @@ apps/backend/
 
 - `dev` - Start development server with hot reload
 - `build` - Compile TypeScript to JavaScript
+- `typecheck` - Run TypeScript validation without emitting files
 - `start:prod` - Run production build
 - `prisma:generate` - Generate Prisma Client
 - `prisma:migrate` - Create and run database migration

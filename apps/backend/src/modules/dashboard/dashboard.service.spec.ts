@@ -66,6 +66,13 @@ describe("DashboardService", () => {
   describe("getSummary", () => {
     beforeEach(() => {
       (doctorUtilsService.verifyDoctor as jest.Mock).mockResolvedValue(undefined);
+      (prismaService.alertSettings.findUnique as jest.Mock).mockResolvedValue({
+        alertsEnabled: true,
+        hypoglycemiaEnabled: true,
+        severeHypoglycemiaEnabled: true,
+        hyperglycemiaEnabled: true,
+        persistentHyperglycemiaEnabled: true,
+      });
     });
 
     it("should return dashboard summary with correct counts", async () => {
@@ -83,6 +90,26 @@ describe("DashboardService", () => {
         criticalAlerts: 5,
         upcomingAppointments: 3,
       });
+    });
+
+    it("should scope upcoming appointments to the requested days period", async () => {
+      (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue([patientId]);
+      (prismaService.user.count as jest.Mock).mockResolvedValue(1);
+      (prismaService.alert.count as jest.Mock).mockResolvedValue(0);
+      (prismaService.appointment.count as jest.Mock).mockResolvedValue(2);
+
+      await service.getSummary(doctorId, 30);
+
+      expect(prismaService.appointment.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            scheduledAt: expect.objectContaining({
+              gte: expect.any(Date),
+              lte: expect.any(Date),
+            }),
+          }),
+        }),
+      );
     });
 
     it("should return zero counts when no data", async () => {
@@ -214,17 +241,22 @@ describe("DashboardService", () => {
     });
 
     it("should calculate average dose correctly", async () => {
-      const patientIds = [patientId];
-      const doses = [{ units: 10 }, { units: 15 }, { units: 20 }];
+      const patientIds = [patientId, "patient-456"];
+      const doses = [
+        { userId: patientId, units: 10 },
+        { userId: patientId, units: 20 },
+        { userId: "patient-456", units: 30 },
+      ];
 
       (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(patientIds);
       (prismaService.insulinDose.findMany as jest.Mock).mockResolvedValue(doses);
 
-      const result = await service.getInsulinStats(doctorId, 30);
+      const result = await service.getInsulinStats(doctorId, 10);
 
-      expect(result.averageDose).toBeGreaterThan(0);
+      expect(result.averageDose).toBe(3);
       expect(result.unit).toBe("unidades/día");
-      expect(result.days).toBe(30);
+      expect(result.days).toBe(10);
+      expect(result.description).toContain("3 unidades/día por paciente");
     });
 
     it("should handle zero days", async () => {
@@ -262,7 +294,7 @@ describe("DashboardService", () => {
       const patientIds = [patientId];
 
       (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(patientIds);
-      (prismaService.meal.count as jest.Mock).mockResolvedValue(25);
+      (prismaService.logEntry.count as jest.Mock).mockResolvedValue(25);
 
       const result = await service.getMealStats(doctorId, 30);
 
@@ -277,7 +309,7 @@ describe("DashboardService", () => {
       const patientIds = [patientId];
 
       (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(patientIds);
-      (prismaService.meal.count as jest.Mock).mockResolvedValue(10);
+      (prismaService.logEntry.count as jest.Mock).mockResolvedValue(10);
 
       const result = await service.getMealStats(doctorId, 30);
 
@@ -288,7 +320,7 @@ describe("DashboardService", () => {
       const patientIds = [patientId];
 
       (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(patientIds);
-      (prismaService.meal.count as jest.Mock).mockResolvedValue(10);
+      (prismaService.logEntry.count as jest.Mock).mockResolvedValue(10);
 
       const result = await service.getMealStats(doctorId, 15);
 

@@ -1,16 +1,13 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { DashboardController } from "./dashboard.controller";
 import { DashboardService } from "./dashboard.service";
-import { AlertsService } from "../alerts/alerts.service";
 import { createMockUserResponse } from "../../common/test-helpers/fixtures";
 import { GetStatsQueryDto } from "./dto/get-stats-query.dto";
-import { GetRecentAlertsQueryDto } from "./dto/get-recent-alerts-query.dto";
 import { GetPatientStatsQueryDto } from "./dto/get-patient-stats-query.dto";
 
 describe("DashboardController", () => {
   let controller: DashboardController;
   let dashboardService: DashboardService;
-  let alertsService: AlertsService;
 
   const mockUser = createMockUserResponse();
 
@@ -23,9 +20,6 @@ describe("DashboardController", () => {
       getPatientGlucoseEvolution: jest.fn(),
       getPatientInsulinStats: jest.fn(),
     };
-    const mockAlertsService = {
-      getRecent: jest.fn(),
-    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [DashboardController],
@@ -34,16 +28,11 @@ describe("DashboardController", () => {
           provide: DashboardService,
           useValue: mockDashboardService,
         },
-        {
-          provide: AlertsService,
-          useValue: mockAlertsService,
-        },
       ],
     }).compile();
 
     controller = module.get<DashboardController>(DashboardController);
     dashboardService = module.get<DashboardService>(DashboardService);
-    alertsService = module.get<AlertsService>(AlertsService);
   });
 
   it("should be defined", () => {
@@ -60,10 +49,11 @@ describe("DashboardController", () => {
 
       (dashboardService.getSummary as jest.Mock).mockResolvedValue(expectedResult);
 
-      const result = await controller.getSummary(mockUser);
+      const query: GetStatsQueryDto = {};
+      const result = await controller.getSummary(mockUser, query);
 
       expect(result).toEqual(expectedResult);
-      expect(dashboardService.getSummary).toHaveBeenCalledWith(mockUser.id);
+      expect(dashboardService.getSummary).toHaveBeenCalledWith(mockUser.id, 7);
     });
   });
 
@@ -73,10 +63,11 @@ describe("DashboardController", () => {
 
       (dashboardService.getGlucoseEvolution as jest.Mock).mockResolvedValue(expectedResult);
 
-      const result = await controller.getGlucoseEvolution(mockUser);
+      const query: GetStatsQueryDto = {};
+      const result = await controller.getGlucoseEvolution(mockUser, query);
 
       expect(result).toEqual(expectedResult);
-      expect(dashboardService.getGlucoseEvolution).toHaveBeenCalledWith(mockUser.id);
+      expect(dashboardService.getGlucoseEvolution).toHaveBeenCalledWith(mockUser.id, 15);
     });
   });
 
@@ -129,32 +120,6 @@ describe("DashboardController", () => {
 
       expect(result).toEqual(expectedResult);
       expect(dashboardService.getMealStats).toHaveBeenCalledWith(mockUser.id, 30);
-    });
-  });
-
-  describe("getRecentAlerts", () => {
-    it("should return recent alerts with default limit", async () => {
-      const query: GetRecentAlertsQueryDto = {};
-      const expectedResult: any[] = [];
-
-      (alertsService.getRecent as jest.Mock).mockResolvedValue(expectedResult);
-
-      const result = await controller.getRecentAlerts(mockUser, query);
-
-      expect(result).toEqual(expectedResult);
-      expect(alertsService.getRecent).toHaveBeenCalledWith(mockUser.id, 10);
-    });
-
-    it("should return recent alerts with custom limit", async () => {
-      const query: GetRecentAlertsQueryDto = { limit: 20 };
-      const expectedResult: any[] = [];
-
-      (alertsService.getRecent as jest.Mock).mockResolvedValue(expectedResult);
-
-      const result = await controller.getRecentAlerts(mockUser, query);
-
-      expect(result).toEqual(expectedResult);
-      expect(alertsService.getRecent).toHaveBeenCalledWith(mockUser.id, 20);
     });
   });
 

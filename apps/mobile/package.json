@@ -10,11 +10,13 @@
     "ios": "expo run:ios --non-interactive",
     "web": "expo start --web --non-interactive",
     "build": "echo 'Expo app is managed; no build step'",
-    "lint": "eslint . --ext .ts,.tsx"
+    "lint": "eslint . --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@babel/runtime": "^7.28.4",
     "@glucosapp/api-client": "workspace:*",
+    "@glucosapp/auth-utils": "workspace:*",
     "@glucosapp/theme": "workspace:*",
     "@glucosapp/types": "workspace:*",
     "@glucosapp/utils": "workspace:*",
@@ -26,14 +28,16 @@
     "expo": "~54.0.12",
     "expo-auth-session": "~7.0.8",
     "expo-camera": "^17.0.8",
+    "expo-constants": "~18.0.9",
     "expo-crypto": "~15.0.7",
-    "expo-dev-client": "^6.0.16",
+    "expo-dev-client": "~6.0.16",
     "expo-file-system": "^18.0.9",
     "expo-image-manipulator": "^14.0.7",
     "expo-image-picker": "^17.0.8",
     "expo-linear-gradient": "^15.0.7",
     "expo-linking": "^8.0.8",
     "expo-media-library": "^18.2.0",
+    "expo-notifications": "~0.32.16",
     "expo-secure-store": "^15.0.7",
     "expo-sharing": "^13.0.3",
     "expo-web-browser": "~15.0.8",
@@ -45,12 +49,13 @@
     "react-native-gesture-handler": "^2.28.0",
     "react-native-gifted-charts": "^1.4.50",
     "react-native-nfc-manager": "^3.16.0",
-    "react-native-reanimated": "~3.15.0",
+    "react-native-reanimated": "~3.19.0",
     "react-native-safe-area-context": "^5.6.1",
     "react-native-screens": "^4.16.0",
     "react-native-share": "^11.0.4",
     "react-native-svg": "^15.8.0",
-    "react-native-web": "^0.21.1"
+    "react-native-web": "^0.21.1",
+    "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
     "@types/react": "^19.1.17",

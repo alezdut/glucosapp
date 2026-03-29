@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, MessageSquare, Settings } from "lucide-react";
+import { Home, Users, MessageSquare, Settings, CalendarDays } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { colors } from "@glucosapp/theme";
 
@@ -15,6 +15,7 @@ interface SidebarItem {
 const menuItems: SidebarItem[] = [
   { label: "Inicio", href: "/dashboard", icon: Home },
   { label: "Pacientes", href: "/dashboard/patients", icon: Users },
+  { label: "Citas", href: "/dashboard/appointments", icon: CalendarDays },
   { label: "Comunicacion", href: "/dashboard/communication", icon: MessageSquare },
   { label: "Ajustes & Reportes", href: "/dashboard/settings", icon: Settings },
 ];

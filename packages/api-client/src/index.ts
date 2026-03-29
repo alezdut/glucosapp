@@ -11,7 +11,7 @@ export function makeApiClient(baseUrl: string) {
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           const message = errorData.message || response.statusText;
-          return { error: { status: response.status, message } };
+          return { error: { status: response.status, message, ...errorData } };
         }
         // Handle 204 No Content - no body to parse
         if (response.status === 204) {
@@ -38,7 +38,7 @@ export function makeApiClient(baseUrl: string) {
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           const message = errorData.message || response.statusText;
-          return { error: { status: response.status, message } };
+          return { error: { status: response.status, message, ...errorData } };
         }
         // Handle 204 No Content - no body to parse
         if (response.status === 204) {
@@ -65,7 +65,7 @@ export function makeApiClient(baseUrl: string) {
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           const message = errorData.message || response.statusText;
-          return { error: { status: response.status, message } };
+          return { error: { status: response.status, message, ...errorData } };
         }
         // Handle 204 No Content - no body to parse
         if (response.status === 204) {
@@ -92,7 +92,7 @@ export function makeApiClient(baseUrl: string) {
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           const message = errorData.message || response.statusText;
-          return { error: { status: response.status, message } };
+          return { error: { status: response.status, message, ...errorData } };
         }
         // Handle 204 No Content - no body to parse
         if (response.status === 204) {
@@ -114,7 +114,7 @@ export function makeApiClient(baseUrl: string) {
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           const message = errorData.message || response.statusText;
-          return { error: { status: response.status, message } };
+          return { error: { status: response.status, message, ...errorData } };
         }
         // Handle 204 No Content - no body to parse
         if (response.status === 204) {

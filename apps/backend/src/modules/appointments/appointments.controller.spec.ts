@@ -17,6 +17,9 @@ describe("AppointmentsController", () => {
       create: jest.fn(),
       update: jest.fn(),
       remove: jest.fn(),
+      findMine: jest.fn(),
+      confirm: jest.fn(),
+      cancel: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -38,26 +41,16 @@ describe("AppointmentsController", () => {
   });
 
   describe("findAll", () => {
-    it("should return appointments without past by default", async () => {
+    it("should return appointments with query filters", async () => {
       const expectedResult: any[] = [];
+      const query = { includePast: true, patientId: "patient-123" };
 
       (service.findAll as jest.Mock).mockResolvedValue(expectedResult);
 
-      const result = await controller.findAll(mockUser);
+      const result = await controller.findAll(mockUser, query);
 
       expect(result).toEqual(expectedResult);
-      expect(service.findAll).toHaveBeenCalledWith(mockUser.id, false);
-    });
-
-    it("should return appointments including past when includePast is true", async () => {
-      const expectedResult: any[] = [];
-
-      (service.findAll as jest.Mock).mockResolvedValue(expectedResult);
-
-      const result = await controller.findAll(mockUser, "true");
-
-      expect(result).toEqual(expectedResult);
-      expect(service.findAll).toHaveBeenCalledWith(mockUser.id, true);
+      expect(service.findAll).toHaveBeenCalledWith(mockUser.id, query);
     });
   });
 
@@ -113,6 +106,45 @@ describe("AppointmentsController", () => {
 
       expect(result).toEqual(expectedResult);
       expect(service.remove).toHaveBeenCalledWith(mockUser.id, appointmentId);
+    });
+  });
+
+  describe("findMine", () => {
+    it("should return patient appointments", async () => {
+      const expectedResult: any[] = [];
+
+      (service.findMine as jest.Mock).mockResolvedValue(expectedResult);
+
+      const result = await controller.findMine(mockUser, "true");
+
+      expect(result).toEqual(expectedResult);
+      expect(service.findMine).toHaveBeenCalledWith(mockUser.id, true);
+    });
+  });
+
+  describe("confirm", () => {
+    it("should confirm appointment", async () => {
+      const expectedResult = { id: "apt-1", status: "CONFIRMED" } as any;
+
+      (service.confirm as jest.Mock).mockResolvedValue(expectedResult);
+
+      const result = await controller.confirm(mockUser, "apt-1");
+
+      expect(result).toEqual(expectedResult);
+      expect(service.confirm).toHaveBeenCalledWith(mockUser.id, "apt-1");
+    });
+  });
+
+  describe("cancel", () => {
+    it("should cancel appointment", async () => {
+      const expectedResult = { id: "apt-1", status: "CANCELLED" } as any;
+
+      (service.cancel as jest.Mock).mockResolvedValue(expectedResult);
+
+      const result = await controller.cancel(mockUser, "apt-1");
+
+      expect(result).toEqual(expectedResult);
+      expect(service.cancel).toHaveBeenCalledWith(mockUser.id, "apt-1");
     });
   });
 });
