@@ -1,4 +1,4 @@
-import { makeApiClient } from "@glucosapp/api-client";
+import { makeApiClient, type ApiClientError } from "@glucosapp/api-client";
 import { isTokenExpiringSoon } from "@glucosapp/auth-utils";
 import { throwApiError } from "@glucosapp/utils";
 import * as SecureStore from "expo-secure-store";
@@ -66,9 +66,12 @@ export async function refreshAccessToken(): Promise<{
       }
 
       const { client } = makeApiClient(`${API_BASE_URL}/v1`);
-      const response = await client.POST("/auth/refresh", {
-        refreshToken: currentRefreshToken,
-      });
+      const response = await client.POST<{ accessToken: string; refreshToken: string }>(
+        "/auth/refresh",
+        {
+          refreshToken: currentRefreshToken,
+        },
+      );
 
       if (response.data) {
         const { accessToken, refreshToken } = response.data;
@@ -122,13 +125,8 @@ const refreshTokenIfNeeded = async (): Promise<boolean> => {
  * Type for API error responses
  * Can be an HTTP error with status and message, or a caught error
  */
-type ApiError =
-  | {
-      status: number;
-      message: string;
-    }
-  | Error
-  | unknown;
+type ApiError = ApiClientError | Error | unknown;
+type RequestBody = BodyInit | object | null | undefined;
 
 type AuthenticatedHeaders = Record<string, string>;
 type GetRequestOptions = Record<string, unknown> & {
@@ -212,7 +210,11 @@ export function createApiClient() {
         path,
       );
     },
-    POST: async <TBody = unknown>(path: string, body?: TBody, init?: MutationRequestOptions) => {
+    POST: async <TBody extends RequestBody = RequestBody>(
+      path: string,
+      body?: TBody,
+      init?: MutationRequestOptions,
+    ) => {
       return executeWithAuth(
         async () => {
           const accessToken = await getAccessToken();
@@ -227,7 +229,11 @@ export function createApiClient() {
         path,
       );
     },
-    PATCH: async <TBody = unknown>(path: string, body?: TBody, init?: MutationRequestOptions) => {
+    PATCH: async <TBody extends RequestBody = RequestBody>(
+      path: string,
+      body?: TBody,
+      init?: MutationRequestOptions,
+    ) => {
       return executeWithAuth(
         async () => {
           const accessToken = await getAccessToken();
@@ -242,7 +248,11 @@ export function createApiClient() {
         path,
       );
     },
-    PUT: async <TBody = unknown>(path: string, body?: TBody, init?: MutationRequestOptions) => {
+    PUT: async <TBody extends RequestBody = RequestBody>(
+      path: string,
+      body?: TBody,
+      init?: MutationRequestOptions,
+    ) => {
       return executeWithAuth(
         async () => {
           const accessToken = await getAccessToken();
