@@ -1,4 +1,4 @@
-import type { User } from "@glucosapp/types";
+import { UserRole, type User } from "@glucosapp/types";
 import type {
   Alert,
   DashboardSummary,
@@ -13,7 +13,7 @@ export const createUser = (overrides: Partial<User> = {}): User => ({
   firstName: "Ada",
   lastName: "Lovelace",
   emailVerified: true,
-  role: "DOCTOR",
+  role: UserRole.DOCTOR,
   createdAt: "2026-01-01T00:00:00.000Z",
   ...overrides,
 });

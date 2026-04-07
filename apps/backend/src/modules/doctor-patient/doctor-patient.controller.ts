@@ -8,10 +8,9 @@ import {
   Body,
   UseGuards,
   Query,
-  NotFoundException,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
-import type { Prisma } from "@prisma/client";
+import type { GlucoseEntry, Prisma } from "@prisma/client";
 import { DoctorPatientService } from "./doctor-patient.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { AuthUser } from "../auth/decorators/auth-user.decorator";
@@ -49,7 +48,7 @@ type LogEntryWithDecryptedGlucose = Omit<
   }>,
   "glucoseEntry"
 > & {
-  glucoseEntry: (Prisma.GlucoseEntryGetPayload<{}> & { mgdl: number }) | null;
+  glucoseEntry: (GlucoseEntry & { mgdl: number }) | null;
 };
 
 /**

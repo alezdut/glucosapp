@@ -9,7 +9,7 @@ import {
   ConnectedSocket,
 } from "@nestjs/websockets";
 import { Server, Socket } from "socket.io";
-import { UseGuards, Logger, UnauthorizedException } from "@nestjs/common";
+import { UseGuards, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { MessagesService } from "./messages.service";

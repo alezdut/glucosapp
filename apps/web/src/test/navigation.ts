@@ -1,3 +1,5 @@
+import { jest } from "@jest/globals";
+
 export const createMockRouter = () => ({
   push: jest.fn(),
   replace: jest.fn(),

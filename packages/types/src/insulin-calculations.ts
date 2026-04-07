@@ -1,4 +1,4 @@
-import { CARB_GLUCOSE_IMPACT, CRITICAL_MIN_GLUCOSE, CRITICAL_MAX_GLUCOSE } from "./constants";
+import { CARB_GLUCOSE_IMPACT, CRITICAL_MAX_GLUCOSE, CRITICAL_MIN_GLUCOSE } from "./constants";
 
 /**
  * Alert level for glucose projections
@@ -36,7 +36,7 @@ export function calculateProjectedGlucose(
  */
 export function isValidGlucoseReading(glucose: number | undefined): boolean {
   if (glucose === undefined) return false;
-  return glucose >= 20 && glucose <= 600;
+  return glucose >= CRITICAL_MIN_GLUCOSE && glucose <= CRITICAL_MAX_GLUCOSE;
 }
 
 /**

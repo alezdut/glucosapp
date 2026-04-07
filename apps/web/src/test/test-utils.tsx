@@ -1,4 +1,4 @@
-import type { ReactElement, ReactNode } from "react";
+import type { PropsWithChildren, ReactElement } from "react";
 import { render } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
@@ -39,12 +39,8 @@ export const createTestQueryClient = () =>
     },
   });
 
-type WrapperProps = {
-  children: ReactNode;
-};
-
 export const createProvidersWrapper = (queryClient = createTestQueryClient()) => {
-  const Wrapper = ({ children }: WrapperProps) => (
+  const Wrapper = ({ children }: PropsWithChildren) => (
     <ThemeProvider theme={testTheme}>
       <CssBaseline />
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>

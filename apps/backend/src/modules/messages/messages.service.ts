@@ -9,15 +9,8 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { UserRole } from "@prisma/client";
 import { DoctorUtilsService } from "../../common/services/doctor-utils.service";
 import { CreateMessageDto } from "./dto/create-message.dto";
-import {
-  MessageResponseDto,
-  MessageSenderDto,
-  MessageReceiverDto,
-} from "./dto/message-response.dto";
-import {
-  ConversationResponseDto,
-  ConversationParticipantDto,
-} from "./dto/conversation-response.dto";
+import { MessageResponseDto } from "./dto/message-response.dto";
+import { ConversationResponseDto } from "./dto/conversation-response.dto";
 
 @Injectable()
 export class MessagesService {

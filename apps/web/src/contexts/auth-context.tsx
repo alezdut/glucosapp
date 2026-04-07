@@ -1,6 +1,13 @@
 "use client";
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { User } from "@glucosapp/types";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
+import { type User } from "@glucosapp/types";
 import { isTokenExpiringSoon } from "@glucosapp/auth-utils";
 import * as authApi from "@/lib/auth-api";
 
@@ -42,35 +49,35 @@ export function AuthProvider({ children }: AuthProviderProps) {
   /**
    * Get tokens from localStorage
    */
-  const getTokens = () => {
+  const getTokens = useCallback(() => {
     if (typeof window === "undefined") return { accessToken: null, refreshToken: null };
     return {
       accessToken: localStorage.getItem("accessToken"),
       refreshToken: localStorage.getItem("refreshToken"),
     };
-  };
+  }, []);
 
   /**
    * Store tokens in localStorage
    */
-  const setTokens = (accessToken: string, refreshToken: string) => {
+  const setTokens = useCallback((accessToken: string, refreshToken: string) => {
     if (typeof window === "undefined") return;
     localStorage.setItem("accessToken", accessToken);
     localStorage.setItem("refreshToken", refreshToken);
-  };
+  }, []);
 
   /**
    * Clear tokens from localStorage
    */
-  const clearTokens = () => {
+  const clearTokens = useCallback(() => {
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
-  };
+  }, []);
 
   /**
    * Refresh access token if needed
    */
-  const refreshTokenIfNeeded = async () => {
+  const refreshTokenIfNeeded = useCallback(async () => {
     const { accessToken, refreshToken } = getTokens();
 
     if (!accessToken || !refreshToken) {
@@ -92,12 +99,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     return true;
-  };
+  }, [clearTokens, getTokens, setTokens]);
 
   /**
    * Fetch current user from API
    */
-  const fetchCurrentUser = async () => {
+  const fetchCurrentUser = useCallback(async () => {
     if (typeof window === "undefined") {
       setIsLoading(false);
       return;
@@ -131,7 +138,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [clearTokens, getTokens, refreshTokenIfNeeded]);
 
   /**
    * Login user
@@ -187,19 +194,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
       return;
     }
 
-    fetchCurrentUser();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    void fetchCurrentUser();
+  }, [fetchCurrentUser]);
 
   // Set up token refresh interval
   useEffect(() => {
     const interval = setInterval(() => {
-      refreshTokenIfNeeded();
+      void refreshTokenIfNeeded();
     }, 30 * 1000); // Check every 30 seconds
 
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [refreshTokenIfNeeded]);
 
   const value: AuthContextValue = {
     user,

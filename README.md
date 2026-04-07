@@ -60,8 +60,21 @@ pnpm dev:mobile
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm test:coverage
 pnpm build
 ```
+
+## Flujo de calidad
+
+- `pre-commit`: ejecuta `prettier` y `eslint` sobre archivos staged.
+- `pre-push`: ejecuta `pnpm typecheck` para evitar pushes con tipos rotos.
+- CI ejecuta la misma base de validaciones del repositorio:
+  - `pnpm lint`
+  - `pnpm typecheck`
+  - `pnpm test`
+  - `pnpm build`
+
+Si tocás auth, cálculo clínico, alertas, reportes o sincronización entre clientes y backend, sumá o ajustá tests en la misma rama.
 
 ## Evidencia técnica para tesis
 
