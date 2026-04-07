@@ -210,59 +210,59 @@ export function createApiClient() {
         path,
       );
     },
-    POST: async <TBody extends RequestBody = RequestBody>(
+    POST: async <TResponse = unknown, TBody extends RequestBody = RequestBody>(
       path: string,
       body?: TBody,
       init?: MutationRequestOptions,
-    ) => {
-      return executeWithAuth(
+    ): Promise<{ data?: TResponse; error?: ApiError }> => {
+      return executeWithAuth<TResponse>(
         async () => {
           const accessToken = await getAccessToken();
           const headers = getRequestHeaders(init?.headers, accessToken);
-          return client.POST(path, body, { ...init, headers });
+          return client.POST<TResponse>(path, body, { ...init, headers });
         },
         async () => {
           const accessToken = await getAccessToken();
           const headers = getRequestHeaders(init?.headers, accessToken);
-          return client.POST(path, body, { ...init, headers });
+          return client.POST<TResponse>(path, body, { ...init, headers });
         },
         path,
       );
     },
-    PATCH: async <TBody extends RequestBody = RequestBody>(
+    PATCH: async <TResponse = unknown, TBody extends RequestBody = RequestBody>(
       path: string,
       body?: TBody,
       init?: MutationRequestOptions,
-    ) => {
-      return executeWithAuth(
+    ): Promise<{ data?: TResponse; error?: ApiError }> => {
+      return executeWithAuth<TResponse>(
         async () => {
           const accessToken = await getAccessToken();
           const headers = getRequestHeaders(init?.headers, accessToken);
-          return client.PATCH(path, body, { ...init, headers });
+          return client.PATCH<TResponse>(path, body, { ...init, headers });
         },
         async () => {
           const accessToken = await getAccessToken();
           const headers = getRequestHeaders(init?.headers, accessToken);
-          return client.PATCH(path, body, { ...init, headers });
+          return client.PATCH<TResponse>(path, body, { ...init, headers });
         },
         path,
       );
     },
-    PUT: async <TBody extends RequestBody = RequestBody>(
+    PUT: async <TResponse = unknown, TBody extends RequestBody = RequestBody>(
       path: string,
       body?: TBody,
       init?: MutationRequestOptions,
-    ) => {
-      return executeWithAuth(
+    ): Promise<{ data?: TResponse; error?: ApiError }> => {
+      return executeWithAuth<TResponse>(
         async () => {
           const accessToken = await getAccessToken();
           const headers = getRequestHeaders(init?.headers, accessToken);
-          return client.PUT(path, body, { ...init, headers });
+          return client.PUT<TResponse>(path, body, { ...init, headers });
         },
         async () => {
           const accessToken = await getAccessToken();
           const headers = getRequestHeaders(init?.headers, accessToken);
-          return client.PUT(path, body, { ...init, headers });
+          return client.PUT<TResponse>(path, body, { ...init, headers });
         },
         path,
       );
