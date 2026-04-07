@@ -1,5 +1,54 @@
 export type ApiClient = ReturnType<typeof makeApiClient>;
 
+const DEFAULT_REQUEST_TIMEOUT_MS = 10000;
+
+function createTimeoutSignal(timeoutMs: number, signal?: AbortSignal | null) {
+  const controller = new AbortController();
+
+  const timeoutId = setTimeout(() => {
+    controller.abort(new Error(`Request timed out after ${timeoutMs}ms`));
+  }, timeoutMs);
+
+  const abortFromCaller = () => {
+    controller.abort(signal?.reason);
+  };
+
+  if (signal) {
+    if (signal.aborted) {
+      abortFromCaller();
+    } else {
+      signal.addEventListener("abort", abortFromCaller, { once: true });
+    }
+  }
+
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      clearTimeout(timeoutId);
+      if (signal) {
+        signal.removeEventListener("abort", abortFromCaller);
+      }
+    },
+  };
+}
+
+async function fetchWithTimeout(
+  input: string,
+  init?: RequestInit,
+  timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+) {
+  const { signal, cleanup } = createTimeoutSignal(timeoutMs, init?.signal);
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal,
+    });
+  } finally {
+    cleanup();
+  }
+}
+
 /**
  * Creates an API client for the given baseUrl.
  */
@@ -7,7 +56,7 @@ export function makeApiClient(baseUrl: string) {
   const client = {
     async GET<T = any>(path: string, init?: RequestInit): Promise<{ data?: T; error?: any }> {
       try {
-        const response = await fetch(`${baseUrl}${path}`, { ...init, method: "GET" });
+        const response = await fetchWithTimeout(`${baseUrl}${path}`, { ...init, method: "GET" });
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           const message = errorData.message || response.statusText;
@@ -29,7 +78,7 @@ export function makeApiClient(baseUrl: string) {
       init?: RequestInit,
     ): Promise<{ data?: T; error?: any }> {
       try {
-        const response = await fetch(`${baseUrl}${path}`, {
+        const response = await fetchWithTimeout(`${baseUrl}${path}`, {
           ...init,
           method: "POST",
           headers: { "Content-Type": "application/json", ...init?.headers },
@@ -56,7 +105,7 @@ export function makeApiClient(baseUrl: string) {
       init?: RequestInit,
     ): Promise<{ data?: T; error?: any }> {
       try {
-        const response = await fetch(`${baseUrl}${path}`, {
+        const response = await fetchWithTimeout(`${baseUrl}${path}`, {
           ...init,
           method: "PATCH",
           headers: { "Content-Type": "application/json", ...init?.headers },
@@ -83,7 +132,7 @@ export function makeApiClient(baseUrl: string) {
       init?: RequestInit,
     ): Promise<{ data?: T; error?: any }> {
       try {
-        const response = await fetch(`${baseUrl}${path}`, {
+        const response = await fetchWithTimeout(`${baseUrl}${path}`, {
           ...init,
           method: "PUT",
           headers: { "Content-Type": "application/json", ...init?.headers },
@@ -106,7 +155,7 @@ export function makeApiClient(baseUrl: string) {
     },
     async DELETE<T = any>(path: string, init?: RequestInit): Promise<{ data?: T; error?: any }> {
       try {
-        const response = await fetch(`${baseUrl}${path}`, {
+        const response = await fetchWithTimeout(`${baseUrl}${path}`, {
           ...init,
           method: "DELETE",
           headers: { ...init?.headers },

@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import * as WebBrowser from "expo-web-browser";
 import {
   createApiClient,
   storeTokens,
@@ -7,8 +6,8 @@ import {
   getRefreshToken,
   clearTokens,
 } from "../lib/api";
-import * as Linking from "expo-linking";
 import { unregisterCurrentPushDevice } from "../lib/push-notifications";
+import { Linking, WebBrowser } from "../lib/expo-auth";
 
 // Enable web browser to properly dismiss after auth
 WebBrowser.maybeCompleteAuthSession();

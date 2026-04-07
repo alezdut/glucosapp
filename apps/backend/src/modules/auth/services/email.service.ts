@@ -79,44 +79,11 @@ class SmtpEmailProvider implements EmailProvider {
         ...payload,
       });
     } catch (error) {
-      const fallbackAllowed = this.isFallbackAllowed(error);
       const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new EmailDeliveryError(errorMessage, this.name, fallbackAllowed);
+      // If nodemailer rejected the send operation, we treat it as not delivered
+      // and allow a single fallback attempt via Resend.
+      throw new EmailDeliveryError(errorMessage, this.name, true);
     }
-  }
-
-  private isFallbackAllowed(error: unknown): boolean {
-    if (!error || typeof error !== "object") {
-      return false;
-    }
-
-    const smtpError = error as { code?: string; message?: string; responseCode?: number };
-    const retryableCodes = new Set([
-      "ETIMEDOUT",
-      "ESOCKET",
-      "ECONNECTION",
-      "ECONNRESET",
-      "ECONNREFUSED",
-      "ENOTFOUND",
-      "EHOSTUNREACH",
-      "ETLS",
-    ]);
-
-    if (smtpError.code && retryableCodes.has(smtpError.code)) {
-      return true;
-    }
-
-    const message = smtpError.message?.toLowerCase() ?? "";
-    if (
-      message.includes("timeout") ||
-      message.includes("connection") ||
-      message.includes("greeting") ||
-      message.includes("socket")
-    ) {
-      return true;
-    }
-
-    return typeof smtpError.responseCode === "number" && smtpError.responseCode >= 500;
   }
 }
 

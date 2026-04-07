@@ -13,7 +13,7 @@ import { flushPendingNavigationActions, navigationRef } from "./src/navigation/n
 /**
  * Main navigation wrapper that renders auth or main navigation
  */
-function AppNavigator() {
+export function AppNavigator() {
   const { isAuthenticated, needsOnboarding, isLoading } = useAuth();
   usePushNotifications();
 

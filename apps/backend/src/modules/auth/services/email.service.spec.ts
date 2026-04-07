@@ -132,6 +132,17 @@ describe("EmailService", () => {
       );
     });
 
+    it("should fallback to Resend when SMTP rejects credentials", async () => {
+      await createService();
+      mockTransporter.sendMail.mockRejectedValueOnce(
+        new Error("Invalid login: 535 Username and Password not accepted."),
+      );
+
+      await service.sendVerificationEmail("test@example.com", "verification-token");
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
     it("should send via Resend when SMTP is not configured", async () => {
       await createService({
         SMTP_HOST: undefined,
