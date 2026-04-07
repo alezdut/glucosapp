@@ -1,4 +1,4 @@
-import nextJest from "next/jest";
+const nextJest = require("next/jest");
 
 const createJestConfig = nextJest({
   dir: "./",
@@ -23,13 +23,13 @@ const customJestConfig = {
   ],
   coverageThreshold: {
     global: {
-      branches: 5,
-      functions: 12,
-      lines: 14,
-      statements: 14,
+      branches: 10,
+      functions: 17,
+      lines: 20,
+      statements: 20,
     },
   },
   coverageReporters: ["text", "lcov"],
 };
 
-export default createJestConfig(customJestConfig);
+module.exports = createJestConfig(customJestConfig);

@@ -50,6 +50,12 @@ import {
   generateGroupReport,
   type GetPatientsFilters,
 } from "@/lib/dashboard-api";
+import {
+  buildGroupReportFilters,
+  getSelectedReportTypes,
+  shouldEnableDailySummary,
+  validateAlertSettings,
+} from "./settings-helpers";
 
 /**
  * Settings page for application configuration and report generation
@@ -107,67 +113,7 @@ export default function SettingsPage() {
       return;
     }
     const timeoutId = setTimeout(() => {
-      const errors: Record<string, string> = {};
-      const settings = localAlertSettings;
-
-      // Hypoglycemia threshold range validation
-      if (settings.hypoglycemiaThreshold !== undefined && settings.hypoglycemiaThreshold > 0) {
-        const min = ALERT_THRESHOLD_RANGES.HYPOGLYCEMIA.min;
-        const max = ALERT_THRESHOLD_RANGES.HYPOGLYCEMIA.max;
-        if (settings.hypoglycemiaThreshold < min || settings.hypoglycemiaThreshold > max) {
-          errors.hypoglycemiaThreshold = `El valor debe estar entre ${min} y ${max} mg/dL`;
-        }
-      }
-
-      // Hypoglycemia validation (cross-field with severe)
-      if (settings.severeHypoglycemiaThreshold && settings.hypoglycemiaThreshold) {
-        if (settings.severeHypoglycemiaThreshold >= settings.hypoglycemiaThreshold) {
-          errors.severeHypoglycemiaThreshold =
-            "El umbral de hipoglucemia severa debe ser menor que el umbral de hipoglucemia";
-        }
-      }
-
-      // Hyperglycemia threshold range validation
-      if (settings.hyperglycemiaThreshold !== undefined && settings.hyperglycemiaThreshold > 0) {
-        const min = ALERT_THRESHOLD_RANGES.HYPERGLYCEMIA.min;
-        const max = ALERT_THRESHOLD_RANGES.HYPERGLYCEMIA.max;
-        if (settings.hyperglycemiaThreshold < min || settings.hyperglycemiaThreshold > max) {
-          errors.hyperglycemiaThreshold = `El valor debe estar entre ${min} y ${max} mg/dL`;
-        }
-      }
-
-      // Hyperglycemia validation (cross-field with hypoglycemia)
-      if (settings.hyperglycemiaThreshold && settings.hypoglycemiaThreshold) {
-        if (settings.hyperglycemiaThreshold <= settings.hypoglycemiaThreshold) {
-          errors.hyperglycemiaThreshold =
-            "El umbral de hiperglucemia debe ser mayor que el umbral de hipoglucemia";
-        }
-      }
-
-      // Persistent hyperglycemia threshold range validation
-      if (
-        settings.persistentHyperglycemiaThreshold !== undefined &&
-        settings.persistentHyperglycemiaThreshold > 0
-      ) {
-        const min = ALERT_THRESHOLD_RANGES.PERSISTENT_HYPERGLYCEMIA.min;
-        const max = ALERT_THRESHOLD_RANGES.PERSISTENT_HYPERGLYCEMIA.max;
-        if (
-          settings.persistentHyperglycemiaThreshold < min ||
-          settings.persistentHyperglycemiaThreshold > max
-        ) {
-          errors.persistentHyperglycemiaThreshold = `El valor debe estar entre ${min} y ${max} mg/dL`;
-        }
-      }
-
-      // Persistent hyperglycemia validation (cross-field with hypoglycemia)
-      if (settings.persistentHyperglycemiaThreshold && settings.hypoglycemiaThreshold) {
-        if (settings.persistentHyperglycemiaThreshold <= settings.hypoglycemiaThreshold) {
-          errors.persistentHyperglycemiaThreshold =
-            "El umbral de hiperglucemia persistente debe ser mayor que el umbral de hipoglucemia";
-        }
-      }
-
-      setValidationErrors(errors);
+      setValidationErrors(validateAlertSettings(localAlertSettings));
     }, 500); // 500ms delay
 
     // Cleanup timeout on unmount or when settings change
@@ -329,8 +275,7 @@ export default function SettingsPage() {
         notificationChannels: channels
           ? { ...channels, push: false } // push always false for doctors (no mobile app access)
           : undefined,
-        dailySummaryEnabled:
-          frequency === NotificationFrequency.DAILY || frequency === NotificationFrequency.WEEKLY,
+        dailySummaryEnabled: shouldEnableDailySummary(frequency),
         dailySummaryTime: getSetting("dailySummaryTime"),
         quietHoursEnabled: getSetting("quietHoursEnabled"),
         quietHoursStart: getSetting("quietHoursStart"),
@@ -391,9 +336,7 @@ export default function SettingsPage() {
       return;
     }
 
-    const selectedTypes = Object.entries(reportTypes)
-      .filter(([, selected]) => selected)
-      .map(([type]) => type);
+    const selectedTypes = getSelectedReportTypes(reportTypes);
 
     if (selectedTypes.length === 0) {
       setReportFeedback({
@@ -453,9 +396,7 @@ export default function SettingsPage() {
       return;
     }
 
-    const selectedTypes = Object.entries(reportTypes)
-      .filter(([, selected]) => selected)
-      .map(([type]) => type);
+    const selectedTypes = getSelectedReportTypes(reportTypes);
 
     if (selectedTypes.length === 0) {
       setReportFeedback({
@@ -507,18 +448,12 @@ export default function SettingsPage() {
   };
 
   const handleGenerateGroupPDF = async () => {
-    const selectedTypes = Object.entries(groupReportTypes)
-      .filter(([, selected]) => selected)
-      .map(([type]) => {
-        // Map frontend types to backend types
-        const typeMap: Record<string, string> = {
-          glucosa: "glucosa",
-          lecturas_sensor: "lecturas_sensor",
-          insulina: "insulina",
-          comidas: "comidas",
-        };
-        return typeMap[type] || type;
-      });
+    const selectedTypes = getSelectedReportTypes(groupReportTypes, {
+      glucosa: "glucosa",
+      lecturas_sensor: "lecturas_sensor",
+      insulina: "insulina",
+      comidas: "comidas",
+    });
 
     if (selectedTypes.length === 0) {
       setReportFeedback({
@@ -538,26 +473,7 @@ export default function SettingsPage() {
         throw new Error("No hay una sesión activa");
       }
 
-      const filters: GetPatientsFilters = {};
-      for (const filter of groupFilters) {
-        if (filter.type === "diabetesType") {
-          filters.diabetesType = filter.value as "TYPE_1" | "TYPE_2";
-        } else if (filter.type === "clinicalStatus") {
-          filters.clinicalStatus = filter.value as "Riesgo" | "Estable";
-        } else if (filter.type === "activityStatus") {
-          filters.activityStatus = filter.value as "Activo" | "Inactivo";
-        } else if (filter.type === "activeOnly") {
-          filters.activeOnly = filter.value === "true";
-        } else if (filter.type === "registrationDate") {
-          filters.registrationDate = filter.value;
-        } else if (filter.type === "ageRange") {
-          filters.ageRange = filter.value;
-        } else if (filter.type === "weightRange") {
-          filters.weightRange = filter.value;
-        } else if (filter.type === "search") {
-          filters.search = filter.value;
-        }
-      }
+      const filters: GetPatientsFilters = buildGroupReportFilters(groupFilters);
 
       const blob = await generateGroupReport(accessToken, {
         startDate: groupStartDate,
@@ -592,18 +508,12 @@ export default function SettingsPage() {
   };
 
   const handleGenerateGroupCSV = async () => {
-    const selectedTypes = Object.entries(groupReportTypes)
-      .filter(([, selected]) => selected)
-      .map(([type]) => {
-        // Map frontend types to backend types
-        const typeMap: Record<string, string> = {
-          glucosa: "glucosa",
-          lecturas_sensor: "lecturas_sensor",
-          insulina: "insulina",
-          comidas: "comidas",
-        };
-        return typeMap[type] || type;
-      });
+    const selectedTypes = getSelectedReportTypes(groupReportTypes, {
+      glucosa: "glucosa",
+      lecturas_sensor: "lecturas_sensor",
+      insulina: "insulina",
+      comidas: "comidas",
+    });
 
     if (selectedTypes.length === 0) {
       setReportFeedback({
@@ -623,26 +533,7 @@ export default function SettingsPage() {
         throw new Error("No hay una sesión activa");
       }
 
-      const filters: GetPatientsFilters = {};
-      for (const filter of groupFilters) {
-        if (filter.type === "diabetesType") {
-          filters.diabetesType = filter.value as "TYPE_1" | "TYPE_2";
-        } else if (filter.type === "clinicalStatus") {
-          filters.clinicalStatus = filter.value as "Riesgo" | "Estable";
-        } else if (filter.type === "activityStatus") {
-          filters.activityStatus = filter.value as "Activo" | "Inactivo";
-        } else if (filter.type === "activeOnly") {
-          filters.activeOnly = filter.value === "true";
-        } else if (filter.type === "registrationDate") {
-          filters.registrationDate = filter.value;
-        } else if (filter.type === "ageRange") {
-          filters.ageRange = filter.value;
-        } else if (filter.type === "weightRange") {
-          filters.weightRange = filter.value;
-        } else if (filter.type === "search") {
-          filters.search = filter.value;
-        }
-      }
+      const filters: GetPatientsFilters = buildGroupReportFilters(groupFilters);
 
       const blob = await generateGroupReport(accessToken, {
         startDate: groupStartDate,

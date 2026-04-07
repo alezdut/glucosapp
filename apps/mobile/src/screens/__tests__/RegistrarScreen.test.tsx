@@ -1,4 +1,5 @@
 import mockReact from "react";
+import { act } from "react";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import RegistrarScreen from "../RegistrarScreen";
 import { renderMobile } from "../../../test/render-mobile";
@@ -72,9 +73,12 @@ describe("RegistrarScreen", () => {
     navigate: jest.fn(),
     setParams: jest.fn(),
   };
+  let consoleErrorSpy: jest.SpyInstance;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
+    consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
     mockCreateApiClient.mockReturnValue({
       GET: mockGet,
       POST: jest.fn().mockResolvedValue({ data: {} }),
@@ -101,6 +105,11 @@ describe("RegistrarScreen", () => {
       hasValidData: true,
       refetch: jest.fn(),
     });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    consoleErrorSpy.mockRestore();
   });
 
   it("shows a loading state while the patient profile is being fetched", () => {
@@ -177,5 +186,79 @@ describe("RegistrarScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /calculator/i }));
 
     expect(navigation.navigate).toHaveBeenCalledWith("Calculator");
+  });
+
+  it("falls back to generic defaults when loading the profile fails", async () => {
+    mockGet.mockResolvedValue({ error: { message: "profile failed" } });
+
+    renderMobile(
+      <RegistrarScreen
+        navigation={navigation as never}
+        route={{ key: "Registrar", name: "Registrar", params: undefined } as never}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("Ej: 100")).toBeTruthy();
+    });
+
+    expect(screen.queryByText("Cargando perfil...")).toBeNull();
+  });
+
+  it("shows the real-time calculation indicator while a meal dose is being calculated", async () => {
+    mockGet.mockResolvedValue({ data: mobileFixtures.userProfile });
+    mockUseRealTimeDoseCalculation.mockReturnValue({
+      doseResult: null,
+      error: null,
+      isLoading: false,
+      isCalculating: true,
+      lastCalculationTime: 0,
+      hasValidData: true,
+      refetch: jest.fn(),
+    });
+
+    renderMobile(
+      <RegistrarScreen
+        navigation={navigation as never}
+        route={{ key: "Registrar", name: "Registrar", params: undefined } as never}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Calculando...")).toBeTruthy();
+    });
+  });
+
+  it("clears the fasting target and hides calculation context when the user resets it", async () => {
+    mockGet.mockResolvedValue({ data: mobileFixtures.userProfile });
+
+    renderMobile(
+      <RegistrarScreen
+        navigation={navigation as never}
+        route={{ key: "Registrar", name: "Registrar", params: undefined } as never}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("Ej: 60")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /ayuno/i }));
+    fireEvent.change(screen.getByLabelText("Corregir glucosa (opcional)"), {
+      target: { value: "95" },
+    });
+
+    expect(screen.getByText("Contexto Adicional")).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("Corregir glucosa (opcional)"), {
+      target: { value: "" },
+    });
+
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+
+    expect(screen.queryByText("Contexto Adicional")).toBeNull();
+    expect(screen.queryByText("Cálculo de Unidades")).toBeNull();
   });
 });
