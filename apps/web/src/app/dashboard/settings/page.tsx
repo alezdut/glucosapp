@@ -258,8 +258,9 @@ export default function SettingsPage() {
         | AlertSettings["notificationChannels"]
         | undefined;
       const frequency =
-        getSetting("notificationFrequency", NotificationFrequency.IMMEDIATE) ??
-        NotificationFrequency.IMMEDIATE;
+        (getSetting("notificationFrequency", NotificationFrequency.IMMEDIATE) as
+          | NotificationFrequency
+          | undefined) ?? NotificationFrequency.IMMEDIATE;
       const payload: UpdateAlertSettingsPayload = {
         alertsEnabled: getSetting("alertsEnabled"),
         hypoglycemiaEnabled: getSetting("hypoglycemiaEnabled"),
