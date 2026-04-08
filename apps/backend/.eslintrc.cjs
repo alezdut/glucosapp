@@ -1,6 +1,6 @@
 module.exports = {
   root: false,
-  extends: ["../../packages/config/eslint/index.cjs"],
+  extends: ["../../packages/config/eslint/base.cjs"],
   ignorePatterns: ["src/**/*.spec.ts", "src/common/test-helpers/**"],
   overrides: [
     {

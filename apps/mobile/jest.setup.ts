@@ -12,6 +12,11 @@ jest.mock("expo-linking", () => ({
   getInitialURL: jest.fn().mockResolvedValue(null),
 }));
 
+jest.mock("./src/lib/expo-auth", () => ({
+  Linking: jest.requireMock("expo-linking"),
+  WebBrowser: jest.requireMock("expo-web-browser"),
+}));
+
 jest.mock("expo-notifications", () => ({
   getLastNotificationResponseAsync: jest.fn().mockResolvedValue(null),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),

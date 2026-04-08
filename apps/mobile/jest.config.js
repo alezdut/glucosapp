@@ -11,6 +11,7 @@ module.exports = {
     "^@glucosapp/theme$": "<rootDir>/../../packages/theme/src/index.ts",
     "^@glucosapp/types$": "<rootDir>/../../packages/types/src/index.ts",
     "^@glucosapp/utils$": "<rootDir>/../../packages/utils/src/index.ts",
+    "^expo/virtual/env$": "<rootDir>/test/expo-virtual-env-mock.ts",
     "^react-native$": "<rootDir>/test/react-native-mock.tsx",
     "^react-native-gesture-handler$": "<rootDir>/test/react-native-gesture-handler-mock.tsx",
     "^expo-linking$": "<rootDir>/test/expo-linking-mock.ts",
@@ -29,10 +30,10 @@ module.exports = {
   ],
   coverageThreshold: {
     global: {
-      branches: 17,
-      functions: 17,
-      lines: 18,
-      statements: 18,
+      branches: 70,
+      functions: 82,
+      lines: 82,
+      statements: 82,
     },
   },
   coverageReporters: ["text", "lcov"],
