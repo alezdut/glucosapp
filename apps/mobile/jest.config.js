@@ -6,6 +6,11 @@ module.exports = {
     "^.+\\.[jt]sx?$": "babel-jest",
   },
   moduleNameMapper: {
+    "^@glucosapp/api-client$": "<rootDir>/../../packages/api-client/src/index.ts",
+    "^@glucosapp/auth-utils$": "<rootDir>/../../packages/auth-utils/src/index.ts",
+    "^@glucosapp/theme$": "<rootDir>/../../packages/theme/src/index.ts",
+    "^@glucosapp/types$": "<rootDir>/../../packages/types/src/index.ts",
+    "^@glucosapp/utils$": "<rootDir>/../../packages/utils/src/index.ts",
     "^react-native$": "<rootDir>/test/react-native-mock.tsx",
     "^react-native-gesture-handler$": "<rootDir>/test/react-native-gesture-handler-mock.tsx",
     "^expo-linking$": "<rootDir>/test/expo-linking-mock.ts",
