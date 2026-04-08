@@ -9,6 +9,11 @@ const customJestConfig = {
   setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
+    "^@glucosapp/api-client$": "<rootDir>/../../packages/api-client/src/index.ts",
+    "^@glucosapp/auth-utils$": "<rootDir>/../../packages/auth-utils/src/index.ts",
+    "^@glucosapp/theme$": "<rootDir>/../../packages/theme/src/index.ts",
+    "^@glucosapp/types$": "<rootDir>/../../packages/types/src/index.ts",
+    "^@glucosapp/utils$": "<rootDir>/../../packages/utils/src/index.ts",
   },
   testPathIgnorePatterns: ["<rootDir>/.next/", "<rootDir>/node_modules/"],
   collectCoverageFrom: [
