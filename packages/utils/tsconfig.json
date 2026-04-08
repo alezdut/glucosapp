@@ -1,11 +1,15 @@
 {
   "extends": "../config/tsconfig/base.json",
   "compilerOptions": {
+    "baseUrl": ".",
     "outDir": "./dist",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "paths": {
+      "@glucosapp/types": ["../types/src/index.ts"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "src/**/*.spec.ts"]
