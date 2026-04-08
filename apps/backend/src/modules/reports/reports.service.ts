@@ -12,17 +12,7 @@ import {
   ReportType,
 } from "./dto/generate-report.dto";
 import { GetPatientsQueryDto } from "../doctor-patient/dto/get-patients-query.dto";
-import {
-  IndividualReportData,
-  GroupReportData,
-  PatientDemographics,
-  DiabetesTypeDistribution,
-  AgeDistribution,
-  WeightDistribution,
-  GlucoseData,
-  InsulinData,
-  MealsData,
-} from "./interfaces/report-data.interface";
+import { PatientDemographics } from "./interfaces/report-data.interface";
 import PDFDocument from "pdfkit";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { DiabetesType } from "@prisma/client";
@@ -2032,7 +2022,7 @@ Asegúrate de que el resumen sea coherente, profesional, y fácil de interpretar
     text = text.replace(/_([^_]+)_/g, "$1");
 
     // Remove markdown links [text](url)
-    text = text.replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
+    text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
 
     // Remove lines that contain redundant information
     const redundantPatterns = [

@@ -225,7 +225,7 @@ export class AppointmentsService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  private hasOwnProperty<T extends object>(value: T, property: keyof T): boolean {
+  private hasField<T extends object>(value: T, property: keyof T): boolean {
     return Object.prototype.hasOwnProperty.call(value, property);
   }
 
@@ -652,10 +652,10 @@ export class AppointmentsService implements OnModuleInit, OnModuleDestroy {
     }
 
     const nextModality = updateDto.modality ?? appointment.modality;
-    const rawLocation = this.hasOwnProperty(updateDto, "location")
+    const rawLocation = this.hasField(updateDto, "location")
       ? updateDto.location
       : (appointment.location ?? undefined);
-    const rawMeetingUrl = this.hasOwnProperty(updateDto, "meetingUrl")
+    const rawMeetingUrl = this.hasField(updateDto, "meetingUrl")
       ? updateDto.meetingUrl
       : (appointment.meetingUrl ?? undefined);
     const normalizedFields = this.normalizeModalityFields(nextModality, rawLocation, rawMeetingUrl);
@@ -678,7 +678,7 @@ export class AppointmentsService implements OnModuleInit, OnModuleDestroy {
       where: { id: appointmentId },
       data: {
         scheduledAt: finalizedAppointment ? appointment.scheduledAt : nextScheduledAt,
-        notes: this.hasOwnProperty(updateDto, "notes")
+        notes: this.hasField(updateDto, "notes")
           ? this.sanitizeOptionalText(updateDto.notes)
           : appointment.notes,
         status: nextStatus,

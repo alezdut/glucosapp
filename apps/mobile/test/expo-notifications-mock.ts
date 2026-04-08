@@ -1,0 +1,9 @@
+export const getLastNotificationResponseAsync = jest.fn().mockResolvedValue(null);
+export const addNotificationResponseReceivedListener = jest.fn(() => ({ remove: jest.fn() }));
+export const setNotificationHandler = jest.fn();
+export const getPermissionsAsync = jest.fn();
+export const requestPermissionsAsync = jest.fn();
+export const getExpoPushTokenAsync = jest.fn();
+export const setNotificationChannelAsync = jest.fn();
+export const AndroidImportance = { HIGH: "HIGH" };
+export const AndroidNotificationVisibility = { PUBLIC: "PUBLIC" };

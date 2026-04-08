@@ -19,6 +19,8 @@ describe("AppointmentsService", () => {
   let service: AppointmentsService;
   let prismaService: PrismaService;
   let doctorUtilsService: DoctorUtilsService;
+  let realtimeNotificationsService: RealtimeNotificationsService;
+  let notificationsService: NotificationsService;
 
   const doctorId = "doctor-123";
   const patientId = "patient-123";
@@ -91,10 +93,71 @@ describe("AppointmentsService", () => {
     service = module.get<AppointmentsService>(AppointmentsService);
     prismaService = module.get<PrismaService>(PrismaService);
     doctorUtilsService = module.get<DoctorUtilsService>(DoctorUtilsService);
+    realtimeNotificationsService = module.get<RealtimeNotificationsService>(
+      RealtimeNotificationsService,
+    );
+    notificationsService = module.get<NotificationsService>(NotificationsService);
   });
 
   it("should be defined", () => {
     expect(service).toBeDefined();
+  });
+
+  describe("processDueReminders", () => {
+    it("creates alerts, emits events and marks reminders as sent", async () => {
+      const reminderAppointment = createAppointmentRecord({
+        reminderSentAt: null,
+        status: AppointmentStatus.CONFIRMED,
+      });
+
+      (prismaService.appointment.findMany as jest.Mock).mockResolvedValue([reminderAppointment]);
+      (prismaService.alertSettings.findUnique as jest.Mock).mockResolvedValue({
+        notificationChannels: { dashboard: true, email: true, push: false },
+        quietHoursEnabled: false,
+      });
+      (prismaService.alert.create as jest.Mock).mockResolvedValue({ id: "alert-1" });
+      (prismaService.appointment.update as jest.Mock).mockResolvedValue(reminderAppointment);
+
+      await service.processDueReminders();
+
+      expect(prismaService.alert.create).toHaveBeenCalled();
+      expect(realtimeNotificationsService.emitToUser).toHaveBeenCalledWith(
+        patientId,
+        "appointment:reminder",
+        expect.objectContaining({
+          appointmentId: reminderAppointment.id,
+          message: expect.stringContaining("Recordatorio de cita"),
+        }),
+      );
+      expect(notificationsService.sendToUser).toHaveBeenCalled();
+      expect(prismaService.appointment.update).toHaveBeenCalledWith({
+        where: { id: reminderAppointment.id },
+        data: { reminderSentAt: expect.any(Date) },
+      });
+    });
+
+    it("defers reminders during quiet hours without sending or marking them", async () => {
+      const reminderAppointment = createAppointmentRecord({
+        reminderSentAt: null,
+        status: AppointmentStatus.SCHEDULED,
+      });
+
+      jest.spyOn<any, any>(service as any, "isInQuietHours").mockReturnValue(true);
+      (prismaService.appointment.findMany as jest.Mock).mockResolvedValue([reminderAppointment]);
+      (prismaService.alertSettings.findUnique as jest.Mock).mockResolvedValue({
+        notificationChannels: { dashboard: true, email: false, push: false },
+        quietHoursEnabled: true,
+        quietHoursStart: "22:00",
+        quietHoursEnd: "07:00",
+      });
+
+      await service.processDueReminders();
+
+      expect(prismaService.alert.create).not.toHaveBeenCalled();
+      expect(realtimeNotificationsService.emitToUser).not.toHaveBeenCalled();
+      expect(notificationsService.sendToUser).not.toHaveBeenCalled();
+      expect(prismaService.appointment.update).not.toHaveBeenCalled();
+    });
   });
 
   describe("findAll", () => {

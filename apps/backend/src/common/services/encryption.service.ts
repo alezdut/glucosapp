@@ -81,7 +81,6 @@ export class EncryptionService {
       const combined = Buffer.from(encryptedHex, "hex");
 
       // Extract components
-      const salt = combined.subarray(0, this.saltLength);
       const iv = combined.subarray(this.saltLength, this.saltLength + this.ivLength);
       const tag = combined.subarray(
         this.saltLength + this.ivLength,

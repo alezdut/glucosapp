@@ -6,7 +6,7 @@ import {
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
-import { UserRole, DiabetesType, GlucoseEntry } from "@prisma/client";
+import { UserRole, GlucoseEntry } from "@prisma/client";
 import { DoctorUtilsService } from "../../common/services/doctor-utils.service";
 import { EncryptionService } from "../../common/services/encryption.service";
 import { CreateDoctorPatientDto } from "./dto/create-doctor-patient.dto";

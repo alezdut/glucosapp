@@ -8,6 +8,7 @@
     },
     "lint": { "outputs": [] },
     "test": { "dependsOn": [], "outputs": [] },
+    "test:coverage": { "dependsOn": [], "outputs": ["coverage/**"] },
     "typecheck": { "dependsOn": ["^typecheck"], "outputs": [] },
     "@glucosapp/config#build": { "outputs": [] },
     "mobile#build": { "outputs": [] }

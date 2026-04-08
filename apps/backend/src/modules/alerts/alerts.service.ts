@@ -805,7 +805,7 @@ export class AlertsService {
       return { acknowledgedCount: 0 };
     }
 
-    let where: any = {
+    const where: any = {
       userId: { in: patientIds },
       acknowledged: false,
     };

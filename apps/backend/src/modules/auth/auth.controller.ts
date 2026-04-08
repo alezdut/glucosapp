@@ -66,13 +66,9 @@ export class AuthController {
   })
   @ApiResponse({ status: 401, description: "Invalid credentials or email not verified" })
   async login(@Req() req: Request, @Body() loginDto: LoginDto): Promise<AuthResponseDto> {
-    try {
-      const user = req.user as UserResponseDto;
-      const result = await this.authService.login(user);
-      return result;
-    } catch (error) {
-      throw error;
-    }
+    void loginDto;
+    const user = req.user as UserResponseDto;
+    return this.authService.login(user);
   }
 
   /**

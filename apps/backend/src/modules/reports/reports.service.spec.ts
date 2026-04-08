@@ -9,7 +9,7 @@ import { DoctorPatientService } from "../doctor-patient/doctor-patient.service";
 import { createMockPrismaService } from "../../common/test-helpers/prisma.mock";
 import { createMockConfigService } from "../../common/test-helpers/config.mock";
 import { ReportFormat, ReportType } from "./dto/generate-report.dto";
-import { DiabetesType, UserRole } from "@prisma/client";
+import { DiabetesType } from "@prisma/client";
 
 // Mock PDFKit
 jest.mock("pdfkit", () => {
@@ -64,7 +64,6 @@ describe("ReportsService", () => {
   let service: ReportsService;
   let prismaService: PrismaService;
   let doctorUtilsService: DoctorUtilsService;
-  let encryptionService: EncryptionService;
   let doctorPatientService: DoctorPatientService;
   let configService: ConfigService;
 
@@ -118,7 +117,6 @@ describe("ReportsService", () => {
     service = module.get<ReportsService>(ReportsService);
     prismaService = module.get<PrismaService>(PrismaService);
     doctorUtilsService = module.get<DoctorUtilsService>(DoctorUtilsService);
-    encryptionService = module.get<EncryptionService>(EncryptionService);
     doctorPatientService = module.get<DoctorPatientService>(DoctorPatientService);
     configService = module.get<ConfigService>(ConfigService);
   });
@@ -213,6 +211,20 @@ describe("ReportsService", () => {
       const aiDto = { ...dto, includeAISummary: true };
 
       const result = await service.generateIndividualReport(doctorId, aiDto);
+
+      expect(result).toBeInstanceOf(Buffer);
+    });
+
+    it("should continue without AI summary when generation fails", async () => {
+      (configService.get as jest.Mock).mockReturnValue("test-api-key");
+      jest
+        .spyOn<any, any>(service as any, "generateAISummary")
+        .mockRejectedValue(new Error("gemini unavailable"));
+
+      const result = await service.generateIndividualReport(doctorId, {
+        ...dto,
+        includeAISummary: true,
+      });
 
       expect(result).toBeInstanceOf(Buffer);
     });

@@ -5,6 +5,10 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
+      "@glucosapp/api-client": ["../../packages/api-client/src/index.ts"],
+      "@glucosapp/auth-utils": ["../../packages/auth-utils/src/index.ts"],
+      "@glucosapp/theme": ["../../packages/theme/src/index.ts"],
+      "@glucosapp/types": ["../../packages/types/src/index.ts"],
       "@glucosapp/utils": ["../../packages/utils/src/index.ts"]
     },
     "jsx": "preserve",
@@ -18,5 +22,12 @@
     ]
   },
   "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "jest.setup.ts",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/__tests__/**",
+    "src/test/**"
+  ]
 }

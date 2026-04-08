@@ -262,7 +262,6 @@ describe("DoctorPatientService", () => {
           role: UserRole.PATIENT,
         }),
       ];
-      const activeGlucoseEntries = [{ userId: patientId }];
 
       (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(assignedPatientIds);
       (prismaService.user.findMany as jest.Mock).mockResolvedValue(patients);
@@ -278,6 +277,42 @@ describe("DoctorPatientService", () => {
       const result = await service.getPatients(doctorId, { activeOnly: true });
 
       expect(result.length).toBeGreaterThanOrEqual(0);
+    });
+
+    it("should apply age and weight range filters to the patient query", async () => {
+      const assignedPatientIds = [patientId];
+      const patients = [
+        createMockUser({
+          id: patientId,
+          role: UserRole.PATIENT,
+        }),
+      ];
+
+      (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(assignedPatientIds);
+      (prismaService.user.findMany as jest.Mock).mockResolvedValue(patients);
+      (prismaService.user.findUnique as jest.Mock).mockResolvedValue({
+        minTargetGlucose: 70,
+        maxTargetGlucose: 180,
+      });
+      (prismaService.glucoseEntry.findMany as jest.Mock).mockResolvedValue([]);
+      (prismaService.glucoseReading.findMany as jest.Mock).mockResolvedValue([]);
+      (prismaService.insulinDose.findMany as jest.Mock).mockResolvedValue([]);
+      (prismaService.meal.findMany as jest.Mock).mockResolvedValue([]);
+
+      await service.getPatients(doctorId, { ageRange: "70+", weightRange: "100+" });
+
+      expect(prismaService.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            birthDate: expect.objectContaining({
+              lte: expect.any(Date),
+            }),
+            weight: expect.objectContaining({
+              gte: 100,
+            }),
+          }),
+        }),
+      );
     });
   });
 
@@ -434,6 +469,45 @@ describe("DoctorPatientService", () => {
 
       expect(result.lastGlucoseReading).toBeDefined();
       expect(result.lastGlucoseReading?.value).toBe(120);
+    });
+
+    it("should fall back to glucose readings when glucose entry decryption fails", async () => {
+      const patient = createMockUser({
+        id: patientId,
+        role: UserRole.PATIENT,
+      });
+      const assignedPatientIds = [patientId];
+
+      (doctorUtilsService.getDoctorPatientIds as jest.Mock).mockResolvedValue(assignedPatientIds);
+      (prismaService.user.findUnique as jest.Mock).mockResolvedValue(patient);
+      (prismaService.glucoseEntry.findFirst as jest.Mock).mockResolvedValue({
+        mgdlEncrypted: "broken-value",
+        recordedAt: new Date("2024-01-01T12:00:00Z"),
+      });
+      (prismaService.glucoseReading.findFirst as jest.Mock).mockResolvedValue({
+        glucoseEncrypted: "encrypted-145",
+        recordedAt: new Date("2024-01-02T12:00:00Z"),
+      });
+      (prismaService.glucoseEntry.findMany as jest.Mock).mockResolvedValue([]);
+      (prismaService.glucoseReading.findMany as jest.Mock).mockResolvedValue([]);
+      (prismaService.insulinDose.findMany as jest.Mock).mockResolvedValue([]);
+      (prismaService.meal.findMany as jest.Mock).mockResolvedValue([]);
+      (prismaService.alert.count as jest.Mock).mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+      (encryptionService.decryptGlucoseValue as jest.Mock)
+        .mockImplementationOnce(() => {
+          throw new Error("decrypt failed");
+        })
+        .mockImplementation((encrypted: string) => {
+          const match = encrypted.match(/encrypted-(\d+)/);
+          return match ? parseInt(match[1], 10) : 100;
+        });
+
+      const result = await service.getPatientDetails(doctorId, patientId);
+
+      expect(result.lastGlucoseReading).toMatchObject({
+        value: 145,
+        recordedAt: new Date("2024-01-02T12:00:00Z").toISOString(),
+      });
     });
   });
 

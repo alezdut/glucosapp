@@ -161,11 +161,6 @@ export function getErrorStatus(error: unknown): number | undefined {
  * }
  */
 export function parseApiError(error: unknown, defaultMessage: string = "Request failed"): ApiError {
-  // If already an ApiError with all required fields, return as-is
-  if (isApiError(error) && hasStatus(error)) {
-    return error as ApiError;
-  }
-
   // Extract what we can from the error
   const message = getErrorMessage(error, defaultMessage);
   const status = getErrorStatus(error);
@@ -178,7 +173,12 @@ export function parseApiError(error: unknown, defaultMessage: string = "Request 
 
   // Preserve any additional error details
   if (isObject(error)) {
-    const { message: _, status: __, ...rest } = error as Record<string, unknown>;
+    const rest = { ...(error as Record<string, unknown>) };
+    delete rest.message;
+    delete rest.status;
+    if (typeof rest.code === "string") {
+      apiError.code = rest.code;
+    }
     if (Object.keys(rest).length > 0) {
       apiError.details = rest;
     }
@@ -207,6 +207,13 @@ export function getUserFriendlyMessage(error: unknown, context?: string): string
   const contextPrefix = context ? `Unable to ${context}. ` : "";
 
   if (status === 400) {
+    if (
+      apiError.message &&
+      apiError.message !== "Request failed" &&
+      apiError.message !== "An error occurred"
+    ) {
+      return contextPrefix + apiError.message;
+    }
     return `${contextPrefix}Invalid request. Please check your input.`;
   }
   if (status === 401) {
