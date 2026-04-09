@@ -3,6 +3,8 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { ProtectedRoute } from "../protected-route";
 import { useAuth } from "@/contexts/auth-context";
+import { createMockRouter } from "@/test/navigation";
+import { UserRole } from "@glucosapp/types";
 import { useRouter } from "next/navigation";
 
 jest.mock("@/contexts/auth-context", () => ({
@@ -17,13 +19,12 @@ const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
 
 describe("ProtectedRoute", () => {
-  const push = jest.fn();
+  let router = createMockRouter();
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseRouter.mockReturnValue({
-      push,
-    } as ReturnType<typeof useRouter>);
+    router = createMockRouter();
+    mockUseRouter.mockReturnValue(router);
   });
 
   it("shows a loading indicator while auth state is resolving", () => {
@@ -44,7 +45,7 @@ describe("ProtectedRoute", () => {
     );
 
     expect(screen.queryByText("dashboard")).not.toBeInTheDocument();
-    expect(push).not.toHaveBeenCalled();
+    expect(router.push).not.toHaveBeenCalled();
   });
 
   it("redirects unauthenticated users to login", async () => {
@@ -65,7 +66,7 @@ describe("ProtectedRoute", () => {
     );
 
     await waitFor(() => {
-      expect(push).toHaveBeenCalledWith("/login");
+      expect(router.push).toHaveBeenCalledWith("/login");
     });
     expect(screen.queryByText("dashboard")).not.toBeInTheDocument();
   });
@@ -77,7 +78,7 @@ describe("ProtectedRoute", () => {
         email: "doctor@example.com",
         firstName: "Ada",
         lastName: "Lovelace",
-        role: "DOCTOR",
+        role: UserRole.DOCTOR,
         createdAt: new Date().toISOString(),
         emailVerified: true,
       },
@@ -96,6 +97,6 @@ describe("ProtectedRoute", () => {
     );
 
     expect(screen.getByText("dashboard")).toBeInTheDocument();
-    expect(push).not.toHaveBeenCalled();
+    expect(router.push).not.toHaveBeenCalled();
   });
 });

@@ -3,6 +3,7 @@
   "compilerOptions": {
     "outDir": "dist",
     "baseUrl": ".",
+    "types": ["jest", "node", "@testing-library/jest-dom"],
     "paths": {
       "@/*": ["./src/*"],
       "@glucosapp/api-client": ["../../packages/api-client/src/index.ts"],
@@ -21,13 +22,12 @@
       }
     ]
   },
-  "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": [
-    "node_modules",
+  "include": [
+    "next-env.d.ts",
     "jest.setup.ts",
-    "src/**/*.test.ts",
-    "src/**/*.test.tsx",
-    "src/**/__tests__/**",
-    "src/test/**"
-  ]
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": ["node_modules", ".next"]
 }

@@ -3,6 +3,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import LoginPage from "../page";
 import { useAuth } from "@/contexts/auth-context";
+import { createMockRouter } from "@/test/navigation";
 import { useRouter } from "next/navigation";
 
 jest.mock("@/contexts/auth-context", () => ({
@@ -22,8 +23,8 @@ jest.mock("next/link", () => {
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
 describe("LoginPage", () => {
-  const push = jest.fn();
   const login = jest.fn();
+  let router = createMockRouter();
 
   const submitForm = () => {
     fireEvent.submit(screen.getByRole("button", { name: "Iniciar Sesión" }).closest("form")!);
@@ -31,6 +32,7 @@ describe("LoginPage", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    router = createMockRouter();
     mockUseAuth.mockReturnValue({
       user: null,
       isLoading: false,
@@ -40,9 +42,7 @@ describe("LoginPage", () => {
       logout: jest.fn(),
       refreshUser: jest.fn(),
     });
-    mockUseRouter.mockReturnValue({
-      push,
-    } as ReturnType<typeof useRouter>);
+    mockUseRouter.mockReturnValue(router);
   });
 
   it("validates email before submitting", async () => {
@@ -75,7 +75,7 @@ describe("LoginPage", () => {
 
     await waitFor(() => {
       expect(login).toHaveBeenCalledWith("doctor@example.com", "12345678");
-      expect(push).toHaveBeenCalledWith("/dashboard");
+      expect(router.push).toHaveBeenCalledWith("/dashboard");
     });
   });
 
@@ -95,6 +95,6 @@ describe("LoginPage", () => {
     submitForm();
 
     expect(await screen.findByText("Debes verificar tu correo")).toBeInTheDocument();
-    expect(push).not.toHaveBeenCalled();
+    expect(router.push).not.toHaveBeenCalled();
   });
 });

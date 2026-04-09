@@ -2,10 +2,9 @@
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useAuth } from "@/contexts/auth-context";
+import { createMockRouter } from "@/test/navigation";
 import { usePathname, useRouter } from "next/navigation";
 import { Header } from "../Header";
-
-const mockPush = jest.fn();
 
 jest.mock("@/contexts/auth-context", () => ({
   useAuth: jest.fn(),
@@ -25,9 +24,12 @@ const mockUsePathname = usePathname as jest.MockedFunction<typeof usePathname>;
 const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
 
 describe("Header", () => {
+  let router = createMockRouter();
+
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseRouter.mockReturnValue({ push: mockPush } as never);
+    router = createMockRouter();
+    mockUseRouter.mockReturnValue(router);
     mockUsePathname.mockReturnValue("/dashboard");
     mockUseAuth.mockReturnValue({
       user: { firstName: "Ana", lastName: "Paz", email: "ana@example.com" },
@@ -76,6 +78,6 @@ describe("Header", () => {
     fireEvent.click(screen.getByRole("button", { name: /cerrar sesión/i }));
 
     await waitFor(() => expect(logout).toHaveBeenCalled());
-    expect(mockPush).toHaveBeenCalledWith("/login");
+    expect(router.push).toHaveBeenCalledWith("/login");
   });
 });

@@ -3,10 +3,9 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useAuth } from "@/contexts/auth-context";
 import { acknowledgeAlert } from "@/lib/dashboard-api";
+import { createMockRouter } from "@/test/navigation";
 import { useRouter } from "next/navigation";
 import { AlertCard } from "../AlertCard";
-
-const mockPush = jest.fn();
 
 jest.mock("@/contexts/auth-context", () => ({
   useAuth: jest.fn(),
@@ -25,12 +24,15 @@ const mockAcknowledgeAlert = acknowledgeAlert as jest.MockedFunction<typeof ackn
 const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
 
 describe("AlertCard", () => {
+  let router = createMockRouter();
+
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
     localStorage.clear();
     localStorage.setItem("accessToken", "stored-access");
-    mockUseRouter.mockReturnValue({ push: mockPush } as never);
+    router = createMockRouter();
+    mockUseRouter.mockReturnValue(router);
     mockUseAuth.mockReturnValue({
       user: { id: "doctor-1", email: "doctor@example.com" },
       isLoading: false,
@@ -73,7 +75,7 @@ describe("AlertCard", () => {
     expect(screen.getByText(/ana paz:/i)).toBeInTheDocument();
     expect(screen.getByText(/glucosa muy baja/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /ver detalles/i }));
-    expect(mockPush).toHaveBeenCalledWith("/dashboard/patients/patient-1");
+    expect(router.push).toHaveBeenCalledWith("/dashboard/patients/patient-1");
   });
 
   it("acknowledges an alert and invokes the callback after the fade delay", async () => {

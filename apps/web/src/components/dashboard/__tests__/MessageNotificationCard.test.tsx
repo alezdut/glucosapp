@@ -1,10 +1,9 @@
 "use client";
 
 import { fireEvent, render, screen } from "@testing-library/react";
+import { createMockRouter } from "@/test/navigation";
 import { useRouter } from "next/navigation";
 import { MessageNotificationCard } from "../MessageNotificationCard";
-
-const mockPush = jest.fn();
 
 jest.mock("next/navigation", () => ({
   useRouter: jest.fn(),
@@ -13,9 +12,12 @@ jest.mock("next/navigation", () => ({
 const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
 
 describe("MessageNotificationCard", () => {
+  let router = createMockRouter();
+
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseRouter.mockReturnValue({ push: mockPush } as never);
+    router = createMockRouter();
+    mockUseRouter.mockReturnValue(router);
   });
 
   it("navigates to the conversation and calls onRead", () => {
@@ -35,7 +37,7 @@ describe("MessageNotificationCard", () => {
     );
 
     fireEvent.click(screen.getByText(/ana paz:/i));
-    expect(mockPush).toHaveBeenCalledWith("/dashboard/communication?patientId=patient-1");
+    expect(router.push).toHaveBeenCalledWith("/dashboard/communication?patientId=patient-1");
     expect(onRead).toHaveBeenCalled();
   });
 
@@ -62,6 +64,6 @@ describe("MessageNotificationCard", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /cerrar notificación/i }));
     expect(onDismiss).toHaveBeenCalled();
-    expect(mockPush).not.toHaveBeenCalled();
+    expect(router.push).not.toHaveBeenCalled();
   });
 });
