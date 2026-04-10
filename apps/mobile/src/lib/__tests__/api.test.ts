@@ -1,3 +1,4 @@
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 const mockSecureStoreState = new Map<string, string>();
 
 jest.mock("expo-secure-store", () => ({
@@ -218,5 +219,74 @@ describe("mobile api", () => {
     expect(apiClient.__mockClient.GET).toHaveBeenNthCalledWith(2, "/protected", {
       headers: { Authorization: "Bearer access-2" },
     });
+  });
+
+  it("adds auth headers for PATCH, PUT and DELETE requests", async () => {
+    mockSecureStoreState.set("accessToken", "access-1");
+    apiClient.__mockClient.PATCH.mockResolvedValue({ data: { ok: true } });
+    apiClient.__mockClient.PUT.mockResolvedValue({ data: { ok: true } });
+    apiClient.__mockClient.DELETE.mockResolvedValue({ data: { ok: true } });
+
+    const api = loadApi();
+    const client = api.createApiClient();
+
+    await expect(client.PATCH("/profile", { firstName: "Ana" })).resolves.toEqual({
+      data: { ok: true },
+    });
+    await expect(client.PUT("/profile", { firstName: "Ana" })).resolves.toEqual({
+      data: { ok: true },
+    });
+    await expect(client.DELETE("/profile")).resolves.toEqual({ data: { ok: true } });
+
+    expect(apiClient.__mockClient.PATCH).toHaveBeenCalledWith(
+      "/profile",
+      { firstName: "Ana" },
+      { headers: { Authorization: "Bearer access-1" } },
+    );
+    expect(apiClient.__mockClient.PUT).toHaveBeenCalledWith(
+      "/profile",
+      { firstName: "Ana" },
+      { headers: { Authorization: "Bearer access-1" } },
+    );
+    expect(apiClient.__mockClient.DELETE).toHaveBeenCalledWith("/profile", {
+      headers: { Authorization: "Bearer access-1" },
+    });
+  });
+
+  it("returns assigned doctor and marks messages as read in batch", async () => {
+    apiClient.__mockClient.GET.mockResolvedValueOnce({
+      data: {
+        id: "link-1",
+        doctorId: "doctor-1",
+        patientId: "patient-1",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        doctor: { id: "doctor-1", email: "doctor@example.com" },
+      },
+    });
+    apiClient.__mockClient.POST.mockResolvedValueOnce({
+      data: { count: 2, messageIds: ["m1", "m2"] },
+    })
+      .mockResolvedValueOnce({ data: { ok: true } })
+      .mockResolvedValueOnce({ data: { ok: true } });
+
+    const api = loadApi();
+
+    await expect(api.getAssignedDoctor()).resolves.toEqual({
+      id: "link-1",
+      doctorId: "doctor-1",
+      patientId: "patient-1",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      doctor: { id: "doctor-1", email: "doctor@example.com" },
+    });
+
+    await expect(api.markMessagesAsReadBatch(["m1", "m2"])).resolves.toEqual({
+      count: 2,
+      messageIds: ["m1", "m2"],
+    });
+
+    await expect(
+      api.registerPushToken({ expoPushToken: "expo-token", platform: "ios" }),
+    ).resolves.toBeUndefined();
+    await expect(api.unregisterPushToken("expo-token")).resolves.toBeUndefined();
   });
 });

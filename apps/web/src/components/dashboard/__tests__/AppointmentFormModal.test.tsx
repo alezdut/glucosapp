@@ -12,6 +12,11 @@ const patients = [
 describe("AppointmentFormModal", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers({ now: new Date("2026-04-10T06:00:00Z").getTime() });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it("does not render when closed", () => {

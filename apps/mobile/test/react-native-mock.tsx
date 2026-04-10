@@ -1,3 +1,4 @@
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import React from "react";
 
 type BaseProps = {
@@ -123,6 +124,34 @@ export const Keyboard = {
 
 export const Alert = {
   alert: jest.fn(),
+};
+
+export const Share = {
+  share: jest.fn(),
+};
+
+const deviceEventListeners = new Map<string, Set<(payload: unknown) => void>>();
+
+export const DeviceEventEmitter = {
+  addListener: jest.fn((eventName: string, listener: (payload: unknown) => void) => {
+    const listeners = deviceEventListeners.get(eventName) ?? new Set();
+    listeners.add(listener);
+    deviceEventListeners.set(eventName, listeners);
+
+    return {
+      remove: () => {
+        const current = deviceEventListeners.get(eventName);
+        current?.delete(listener);
+        if (current && current.size === 0) {
+          deviceEventListeners.delete(eventName);
+        }
+      },
+    };
+  }),
+  emit: jest.fn((eventName: string, payload?: unknown) => {
+    const listeners = deviceEventListeners.get(eventName);
+    listeners?.forEach((listener) => listener(payload));
+  }),
 };
 
 export const Dimensions = {
