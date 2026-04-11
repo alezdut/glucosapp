@@ -1,6 +1,6 @@
 module.exports = {
   root: false,
-  extends: ["next", "next/core-web-vitals", "../../packages/config/eslint/index.cjs"],
+  extends: ["next", "next/core-web-vitals", "../../packages/config/eslint/react.cjs"],
   overrides: [
     {
       files: ["*.cjs"],

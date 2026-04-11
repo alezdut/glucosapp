@@ -11,7 +11,7 @@
     "web": "expo start --web --non-interactive",
     "build": "echo 'Expo app is managed; no build step'",
     "lint": "eslint . --ext .ts,.tsx",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "test": "jest --runInBand",
     "test:coverage": "jest --runInBand --coverage",
     "test:watch": "jest --watch"
@@ -61,6 +61,7 @@
     "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
+    "@jest/globals": "^30.3.0",
     "@testing-library/react": "^16.3.2",
     "@types/jest": "^30.0.0",
     "@types/react": "^19.1.17",

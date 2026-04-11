@@ -1,3 +1,4 @@
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import React from "react";
 import { act } from "react";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
@@ -52,6 +53,15 @@ jest.mock("../../components/FoodListItem", () => ({
         eliminar-{item.name}
       </button>
     </div>
+  ),
+}));
+
+jest.mock("../../components/Button", () => ({
+  __esModule: true,
+  default: ({ title, onPress }: { title: string; onPress: () => void }) => (
+    <button type="button" onClick={onPress}>
+      {title}
+    </button>
   ),
 }));
 
@@ -201,5 +211,186 @@ describe("CalculatorScreen", () => {
       screen: "Registrar",
       params: { carbohydrates: 60 },
     });
+  });
+
+  it("shows search alert when backend search returns an error object", async () => {
+    mockGet.mockResolvedValue({ error: { message: "search failed" } });
+
+    renderMobile(<CalculatorScreen />);
+
+    fireEvent.change(screen.getByPlaceholderText("Buscar alimento..."), {
+      target: { value: "fallo" },
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+
+    await waitFor(() => {
+      expect(mockAlert).toHaveBeenCalledWith("Error", "No se pudo buscar alimentos");
+    });
+  });
+
+  it("shows validation alerts for save and calculate when meal has no foods", async () => {
+    renderMobile(<CalculatorScreen />);
+
+    fireEvent.change(screen.getByPlaceholderText("Ej: Desayuno completo"), {
+      target: { value: "Almuerzo" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /guardar plato/i }));
+    fireEvent.click(screen.getByRole("button", { name: /guardar y calcular unidades/i }));
+
+    expect(mockAlert).toHaveBeenCalledWith("Error", "Agrega al menos un alimento");
+  });
+
+  it("saves and resets the meal, then navigates after confirming success", async () => {
+    mockGet.mockResolvedValue({
+      data: [{ name: "Yogur", carbohydratesPer100g: 10 }],
+    });
+    mockPost.mockResolvedValue({ data: { id: "meal-1" } });
+
+    renderMobile(<CalculatorScreen />);
+
+    fireEvent.change(screen.getByPlaceholderText("Buscar alimento..."), {
+      target: { value: "yogur" },
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Yogur")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText("Yogur"));
+    fireEvent.change(screen.getByPlaceholderText("Ej: Desayuno completo"), {
+      target: { value: "Merienda" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /guardar plato/i }));
+
+    await waitFor(() => {
+      expect(mockAlert).toHaveBeenCalledWith(
+        "Éxito",
+        "Plato guardado exitosamente",
+        expect.any(Array),
+      );
+    });
+
+    const successButtons = mockAlert.mock.calls.find(([title]) => title === "Éxito")?.[2] as
+      | Array<{ text: string; onPress?: () => void }>
+      | undefined;
+
+    await act(async () => {
+      await successButtons?.[0]?.onPress?.();
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith("MainTabs", {
+      screen: "Inicio",
+      params: { screen: "Home" },
+    });
+  });
+
+  it("shows validation error when selecting a food with invalid quantity", async () => {
+    mockGet.mockResolvedValue({
+      data: [{ name: "Arroz", carbohydratesPer100g: 28 }],
+    });
+
+    renderMobile(<CalculatorScreen />);
+
+    fireEvent.change(screen.getByDisplayValue("100"), {
+      target: { value: "-1" },
+    });
+
+    fireEvent.change(screen.getByPlaceholderText("Buscar alimento..."), {
+      target: { value: "arroz" },
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Arroz")).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByDisplayValue("100"), {
+      target: { value: "-1" },
+    });
+
+    fireEvent.click(screen.getByText("Arroz"));
+
+    expect(mockAlert).toHaveBeenCalledWith("Error", "Ingresa una cantidad válida");
+  });
+
+  it("edits and deletes a selected food, resetting edit state", async () => {
+    mockGet.mockResolvedValue({
+      data: [{ name: "Pan", brand: "Marca", carbohydratesPer100g: 50 }],
+    });
+
+    renderMobile(<CalculatorScreen />);
+
+    fireEvent.change(screen.getByPlaceholderText("Buscar alimento..."), {
+      target: { value: "pan" },
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Pan")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText("Pan"));
+    fireEvent.click(screen.getByRole("button", { name: "Pan (Marca)" }));
+
+    fireEvent.change(screen.getByDisplayValue("100"), {
+      target: { value: "200" },
+    });
+
+    expect(screen.getByText("100.00 g carbohidratos")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "eliminar-Pan (Marca)" }));
+
+    expect(screen.queryByRole("button", { name: "Pan (Marca)" })).toBeNull();
+    expect(screen.getByDisplayValue("100")).toBeTruthy();
+  });
+
+  it("increments and decrements quantity while editing", async () => {
+    mockGet.mockResolvedValue({
+      data: [{ name: "Avena", carbohydratesPer100g: 60 }],
+    });
+
+    renderMobile(<CalculatorScreen />);
+
+    fireEvent.change(screen.getByPlaceholderText("Buscar alimento..."), {
+      target: { value: "avena" },
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Avena")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText("Avena"));
+    fireEvent.click(screen.getByRole("button", { name: "Avena" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Plus" }));
+    expect(screen.getByDisplayValue("110")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Minus" }));
+    expect(screen.getByDisplayValue("100")).toBeTruthy();
+
+    fireEvent.change(screen.getByDisplayValue("100"), {
+      target: { value: "10" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Minus" }));
+    expect(screen.getByDisplayValue("10")).toBeTruthy();
   });
 });

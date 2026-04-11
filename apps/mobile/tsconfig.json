@@ -1,7 +1,7 @@
 {
   "extends": "../../packages/config/tsconfig/base.json",
   "compilerOptions": {
-    "types": ["node", "react", "react-native"],
+    "types": ["node", "react", "react-native", "jest"],
     "baseUrl": ".",
     "paths": {
       "@glucosapp/api-client": ["../../packages/api-client/src/index.ts"],
@@ -12,12 +12,5 @@
     }
   },
   "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": [
-    "node_modules",
-    "jest.setup.ts",
-    "test/**",
-    "src/**/*.test.ts",
-    "src/**/*.test.tsx",
-    "src/**/__tests__/**"
-  ]
+  "exclude": ["node_modules"]
 }

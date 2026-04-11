@@ -5,11 +5,15 @@
   "description": "Shared config exports for tsconfig, eslint, prettier",
   "exports": {
     "./tsconfig/base.json": "./tsconfig/base.json",
+    "./eslint/base": "./eslint/base.cjs",
+    "./eslint/react": "./eslint/react.cjs",
     "./eslint": "./eslint/index.cjs",
     "./prettier": "./prettier/index.cjs"
   },
   "files": [
     "tsconfig/base.json",
+    "eslint/base.cjs",
+    "eslint/react.cjs",
     "eslint/index.cjs",
     "prettier/index.cjs"
   ],

@@ -3,6 +3,18 @@ module.exports = {
   preset: "ts-jest",
   testEnvironment: "node",
   roots: ["<rootDir>/src"],
+  moduleNameMapper: {
+    "^@glucosapp/types$": "<rootDir>/../types/src/index.ts",
+  },
   testMatch: ["**/*.spec.ts"],
   collectCoverageFrom: ["src/**/*.ts", "!src/**/*.spec.ts", "!src/index.ts"],
+  coverageThreshold: {
+    global: {
+      branches: 70,
+      functions: 82,
+      lines: 82,
+      statements: 82,
+    },
+  },
+  coverageReporters: ["text", "lcov"],
 };

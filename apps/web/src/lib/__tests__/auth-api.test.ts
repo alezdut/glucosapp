@@ -18,7 +18,9 @@ import {
   logout,
   refreshAccessToken,
   register,
+  resendVerification,
   resetPassword,
+  verifyEmail,
 } from "@/lib/auth-api";
 import { createUser } from "@/test/factories";
 
@@ -131,6 +133,22 @@ describe("auth-api", () => {
     });
   });
 
+  it("verifies email addresses and resends verification emails", async () => {
+    mockPost
+      .mockResolvedValueOnce({ data: { message: "Email verificado" } })
+      .mockResolvedValueOnce({ data: { message: "Verificación reenviada" } });
+
+    await expect(verifyEmail("verify-token")).resolves.toEqual({ message: "Email verificado" });
+    await expect(resendVerification("doctor@example.com")).resolves.toEqual({
+      message: "Verificación reenviada",
+    });
+
+    expect(mockPost).toHaveBeenNthCalledWith(1, "/auth/verify-email", { token: "verify-token" });
+    expect(mockPost).toHaveBeenNthCalledWith(2, "/auth/resend-verification", {
+      email: "doctor@example.com",
+    });
+  });
+
   it("logs out with both tokens", async () => {
     mockPost.mockResolvedValue({ data: undefined });
 
@@ -140,5 +158,58 @@ describe("auth-api", () => {
       { refreshToken: "refresh-token" },
       { headers: { Authorization: "Bearer access-token" } },
     );
+  });
+
+  it("throws normalized errors for current user, refresh and recovery endpoints", async () => {
+    mockGet.mockResolvedValueOnce({
+      error: { status: 401, message: "Token expirado", code: "TOKEN_EXPIRED" },
+    });
+    mockPost
+      .mockResolvedValueOnce({
+        error: { status: 401, message: "Refresh inválido", code: "INVALID_REFRESH" },
+      })
+      .mockResolvedValueOnce({
+        error: { status: 400, message: "Verificación inválida", code: "INVALID_TOKEN" },
+      })
+      .mockResolvedValueOnce({
+        error: { status: 404, message: "Usuario no encontrado", code: "USER_NOT_FOUND" },
+      })
+      .mockResolvedValueOnce({
+        error: { status: 400, message: "No se pudo enviar reset", code: "RESET_FAILED" },
+      })
+      .mockResolvedValueOnce({
+        error: { status: 400, message: "Contraseña inválida", code: "INVALID_PASSWORD" },
+      });
+
+    await expect(getCurrentUser("expired-token")).rejects.toMatchObject({
+      message: "Token expirado",
+      status: 401,
+      code: "TOKEN_EXPIRED",
+    });
+    await expect(refreshAccessToken("bad-refresh")).rejects.toMatchObject({
+      message: "Refresh inválido",
+      status: 401,
+      code: "INVALID_REFRESH",
+    });
+    await expect(verifyEmail("bad-token")).rejects.toMatchObject({
+      message: "Verificación inválida",
+      status: 400,
+      code: "INVALID_TOKEN",
+    });
+    await expect(resendVerification("missing@example.com")).rejects.toMatchObject({
+      message: "Usuario no encontrado",
+      status: 404,
+      code: "USER_NOT_FOUND",
+    });
+    await expect(forgotPassword("doctor@example.com")).rejects.toMatchObject({
+      message: "No se pudo enviar reset",
+      status: 400,
+      code: "RESET_FAILED",
+    });
+    await expect(resetPassword("bad-token", "short")).rejects.toMatchObject({
+      message: "Contraseña inválida",
+      status: 400,
+      code: "INVALID_PASSWORD",
+    });
   });
 });

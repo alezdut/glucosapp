@@ -1,4 +1,4 @@
-import type { PropsWithChildren, ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { render } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
@@ -40,23 +40,25 @@ export const createTestQueryClient = () =>
   });
 
 export const createProvidersWrapper = (queryClient = createTestQueryClient()) => {
-  const Wrapper = ({ children }: PropsWithChildren) => (
-    <ThemeProvider theme={testTheme}>
-      <CssBaseline />
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    </ThemeProvider>
-  );
-
   return {
     queryClient,
-    Wrapper,
+    Wrapper: ({ children }: { children: ReactNode }) => (
+      <ThemeProvider theme={testTheme}>
+        <CssBaseline />
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      </ThemeProvider>
+    ),
   };
 };
 
 export const renderWithProviders = (ui: ReactElement, queryClient = createTestQueryClient()) => {
-  const { Wrapper } = createProvidersWrapper(queryClient);
   return {
     queryClient,
-    ...render(ui, { wrapper: Wrapper }),
+    ...render(
+      <ThemeProvider theme={testTheme}>
+        <CssBaseline />
+        <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+      </ThemeProvider>,
+    ),
   };
 };

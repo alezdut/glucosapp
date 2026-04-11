@@ -4,7 +4,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import VerifyEmailPage from "../page";
 import { resendVerification, verifyEmail } from "@/lib/auth-api";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createMockRouter, createMockSearchParams } from "@/test/navigation";
+import { createMockRouter, setMockSearchParams } from "@/test/navigation";
 
 jest.mock("@/lib/auth-api", () => ({
   verifyEmail: jest.fn(),
@@ -28,12 +28,13 @@ const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
 const mockUseSearchParams = useSearchParams as jest.MockedFunction<typeof useSearchParams>;
 
 describe("VerifyEmailPage", () => {
-  const router = createMockRouter();
+  let router = createMockRouter();
 
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
-    mockUseRouter.mockReturnValue(router as ReturnType<typeof useRouter>);
+    router = createMockRouter();
+    mockUseRouter.mockReturnValue(router);
   });
 
   afterEach(() => {
@@ -41,9 +42,7 @@ describe("VerifyEmailPage", () => {
   });
 
   it("shows an error and resend form when the token is missing", async () => {
-    mockUseSearchParams.mockReturnValue(
-      createMockSearchParams({}) as ReturnType<typeof useSearchParams>,
-    );
+    setMockSearchParams(mockUseSearchParams, {});
 
     render(<VerifyEmailPage />);
 
@@ -52,9 +51,7 @@ describe("VerifyEmailPage", () => {
   });
 
   it("verifies the email and redirects to login", async () => {
-    mockUseSearchParams.mockReturnValue(
-      createMockSearchParams({ token: "verify-token" }) as ReturnType<typeof useSearchParams>,
-    );
+    setMockSearchParams(mockUseSearchParams, { token: "verify-token" });
     mockVerifyEmail.mockResolvedValue({ message: "Email verificado" });
 
     render(<VerifyEmailPage />);
@@ -70,9 +67,7 @@ describe("VerifyEmailPage", () => {
   });
 
   it("allows resending verification after a verification error", async () => {
-    mockUseSearchParams.mockReturnValue(
-      createMockSearchParams({ token: "verify-token" }) as ReturnType<typeof useSearchParams>,
-    );
+    setMockSearchParams(mockUseSearchParams, { token: "verify-token" });
     mockVerifyEmail.mockRejectedValue(new Error("Token expirado"));
     mockResendVerification.mockResolvedValue({ message: "Email reenviado" });
 

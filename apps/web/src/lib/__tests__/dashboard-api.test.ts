@@ -16,14 +16,29 @@ jest.mock("@glucosapp/api-client", () => ({
 }));
 
 import {
+  acknowledgeAlert,
   acknowledgeBatchAlerts,
+  assignPatient,
+  getGlucoseEvolution,
+  getInsulinStats,
+  getMealStats,
   getAlerts,
   getCriticalAlerts,
   getDashboardSummary,
+  getPatientDetails,
+  getPatientGlucoseEvolution,
+  getPatientInsulinStats,
+  getPatientLogEntries,
+  getPatientMeals,
+  getPatientProfile,
+  getPatientsWithFilters,
   getRecentAlerts,
   getUnacknowledgedAlerts,
   generateGroupReport,
   generateIndividualReport,
+  removePatient,
+  searchGlobalPatients,
+  updatePatientProfile,
 } from "@/lib/dashboard-api";
 
 const { __mockApiClient } = jest.requireMock("@glucosapp/api-client") as {
@@ -37,6 +52,8 @@ const { __mockApiClient } = jest.requireMock("@glucosapp/api-client") as {
 
 const mockGet = __mockApiClient.GET;
 const mockPost = __mockApiClient.POST;
+const mockPatch = __mockApiClient.PATCH;
+const mockDelete = __mockApiClient.DELETE;
 
 describe("dashboard-api", () => {
   beforeEach(() => {
@@ -95,6 +112,254 @@ describe("dashboard-api", () => {
     await expect(acknowledgeBatchAlerts("token-123", { alertIds: ["alert-1"] })).rejects.toThrow(
       "ack failed",
     );
+  });
+
+  it("returns dashboard metrics and patient collections with bearer auth", async () => {
+    mockGet
+      .mockResolvedValueOnce({
+        data: { activePatients: 8, criticalAlerts: 2, upcomingAppointments: 4 },
+      })
+      .mockResolvedValueOnce({ data: { data: [{ date: "2026-04-01", averageGlucose: 120 }] } })
+      .mockResolvedValueOnce({
+        data: { averageDose: 18, unit: "U", days: 7, description: "weekly" },
+      })
+      .mockResolvedValueOnce({
+        data: { totalMeals: 12, unit: "meals", description: "weekly" },
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            id: "patient-1",
+            email: "patient@example.com",
+            status: "Estable",
+            activityStatus: "Activo",
+            registrationDate: "2026-01-01",
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            id: "patient-2",
+            email: "search@example.com",
+            status: "Riesgo",
+            activityStatus: "Activo",
+            registrationDate: "2026-02-01",
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        data: {
+          id: "patient-1",
+          email: "patient@example.com",
+          status: "Estable",
+          activityStatus: "Activo",
+          registrationDate: "2026-01-01",
+          totalGlucoseReadings: 10,
+          totalInsulinDoses: 12,
+          totalMeals: 14,
+          totalAlerts: 2,
+          unacknowledgedAlerts: 1,
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          data: [{ month: "2026-04", averageGlucose: 124, minGlucose: 70, maxGlucose: 180 }],
+        },
+      })
+      .mockResolvedValueOnce({
+        data: { data: [{ month: "2026-04", averageBasal: 10, averageBolus: 5 }] },
+      })
+      .mockResolvedValueOnce({
+        data: [{ id: "meal-1", recordedAt: "2026-04-01T10:00:00.000Z" }],
+      })
+      .mockResolvedValueOnce({
+        data: {
+          id: "profile-1",
+          email: "patient@example.com",
+          icRatioBreakfast: 10,
+          icRatioLunch: 12,
+          icRatioDinner: 14,
+          insulinSensitivityFactor: 50,
+          diaHours: 4,
+          minTargetGlucose: 80,
+          maxTargetGlucose: 140,
+        },
+      })
+      .mockResolvedValueOnce({
+        data: [{ id: "log-1", recordedAt: "2026-04-01T10:00:00.000Z" }],
+      });
+
+    await expect(getDashboardSummary("token-123", 30)).resolves.toEqual({
+      activePatients: 8,
+      criticalAlerts: 2,
+      upcomingAppointments: 4,
+    });
+    await expect(getGlucoseEvolution("token-123", 7)).resolves.toEqual({
+      data: [{ date: "2026-04-01", averageGlucose: 120 }],
+    });
+    await expect(getInsulinStats("token-123", 7)).resolves.toEqual({
+      averageDose: 18,
+      unit: "U",
+      days: 7,
+      description: "weekly",
+    });
+    await expect(getMealStats("token-123", 7)).resolves.toEqual({
+      totalMeals: 12,
+      unit: "meals",
+      description: "weekly",
+    });
+    await expect(
+      getPatientsWithFilters("token-123", {
+        search: "ana",
+        diabetesType: "TYPE_1",
+        activeOnly: true,
+        registrationDate: "2026-01-01",
+      }),
+    ).resolves.toEqual([
+      expect.objectContaining({ id: "patient-1", email: "patient@example.com" }),
+    ]);
+    await expect(searchGlobalPatients("token-123", "ana paz")).resolves.toEqual([
+      expect.objectContaining({ id: "patient-2", email: "search@example.com" }),
+    ]);
+    await expect(getPatientDetails("token-123", "patient-1")).resolves.toEqual(
+      expect.objectContaining({ id: "patient-1", totalMeals: 14 }),
+    );
+    await expect(getPatientGlucoseEvolution("token-123", "patient-1", 6)).resolves.toEqual({
+      data: [{ month: "2026-04", averageGlucose: 124, minGlucose: 70, maxGlucose: 180 }],
+    });
+    await expect(getPatientInsulinStats("token-123", "patient-1", 6)).resolves.toEqual({
+      data: [{ month: "2026-04", averageBasal: 10, averageBolus: 5 }],
+    });
+    await expect(
+      getPatientMeals("token-123", "patient-1", "2026-04-01", "2026-04-30"),
+    ).resolves.toEqual([{ id: "meal-1", recordedAt: "2026-04-01T10:00:00.000Z" }]);
+    await expect(getPatientProfile("token-123", "patient-1")).resolves.toEqual(
+      expect.objectContaining({ id: "profile-1", maxTargetGlucose: 140 }),
+    );
+    await expect(
+      getPatientLogEntries("token-123", "patient-1", "2026-04-01", "2026-04-30"),
+    ).resolves.toEqual([{ id: "log-1", recordedAt: "2026-04-01T10:00:00.000Z" }]);
+
+    expect(mockGet).toHaveBeenNthCalledWith(
+      1,
+      "/dashboard/summary?days=30",
+      expect.objectContaining({ headers: { Authorization: "Bearer token-123" } }),
+    );
+    expect(mockGet).toHaveBeenNthCalledWith(
+      5,
+      "/doctor-patients?search=ana&diabetesType=TYPE_1&activeOnly=true&registrationDate=2026-01-01",
+      expect.objectContaining({ headers: { Authorization: "Bearer token-123" } }),
+    );
+    expect(mockGet).toHaveBeenNthCalledWith(
+      6,
+      "/doctor-patients/search?q=ana+paz",
+      expect.objectContaining({ headers: { Authorization: "Bearer token-123" } }),
+    );
+    expect(mockGet).toHaveBeenNthCalledWith(
+      10,
+      "/doctor-patients/patient-1/meals?startDate=2026-04-01&endDate=2026-04-30",
+      expect.objectContaining({ headers: { Authorization: "Bearer token-123" } }),
+    );
+  });
+
+  it("posts mutations for alerts and patients and normalizes mutation failures", async () => {
+    mockPost
+      .mockResolvedValueOnce({ data: { id: "alert-1", acknowledged: true } })
+      .mockResolvedValueOnce({ data: {} })
+      .mockResolvedValueOnce({ error: { message: "assign failed" } });
+    mockDelete
+      .mockResolvedValueOnce({ data: {} })
+      .mockResolvedValueOnce({ error: { message: "remove failed" } });
+    mockPatch
+      .mockResolvedValueOnce({
+        data: {
+          id: "profile-1",
+          email: "patient@example.com",
+          icRatioBreakfast: 9,
+          icRatioLunch: 11,
+          icRatioDinner: 13,
+          insulinSensitivityFactor: 60,
+          diaHours: 5,
+          minTargetGlucose: 80,
+          maxTargetGlucose: 140,
+        },
+      })
+      .mockResolvedValueOnce({ error: { message: "profile failed" } })
+      .mockResolvedValueOnce({ data: null });
+
+    await expect(acknowledgeAlert("token-123", "alert-1")).resolves.toEqual({
+      id: "alert-1",
+      acknowledged: true,
+    });
+    await expect(assignPatient("token-123", "patient-1")).resolves.toBeUndefined();
+    await expect(assignPatient("token-123", "patient-2")).rejects.toThrow("assign failed");
+    await expect(removePatient("token-123", "patient-1")).resolves.toBeUndefined();
+    await expect(removePatient("token-123", "patient-2")).rejects.toThrow("remove failed");
+    await expect(
+      updatePatientProfile("token-123", "patient-1", { icRatioBreakfast: 9 }),
+    ).resolves.toEqual(expect.objectContaining({ icRatioBreakfast: 9 }));
+    await expect(
+      updatePatientProfile("token-123", "patient-1", { icRatioBreakfast: 9 }),
+    ).rejects.toThrow("profile failed");
+    await expect(
+      updatePatientProfile("token-123", "patient-1", { icRatioBreakfast: 9 }),
+    ).rejects.toThrow("No data returned from update patient profile endpoint");
+
+    expect(mockPost).toHaveBeenNthCalledWith(
+      1,
+      "/alerts/alert-1/acknowledge",
+      undefined,
+      expect.objectContaining({ headers: { Authorization: "Bearer token-123" } }),
+    );
+    expect(mockPost).toHaveBeenNthCalledWith(
+      2,
+      "/doctor-patients",
+      { patientId: "patient-1" },
+      expect.objectContaining({ headers: { Authorization: "Bearer token-123" } }),
+    );
+    expect(mockDelete).toHaveBeenNthCalledWith(
+      1,
+      "/doctor-patients/patient-1",
+      expect.objectContaining({ headers: { Authorization: "Bearer token-123" } }),
+    );
+    expect(mockPatch).toHaveBeenNthCalledWith(
+      1,
+      "/doctor-patients/patient-1/profile",
+      { icRatioBreakfast: 9 },
+      expect.objectContaining({ headers: { Authorization: "Bearer token-123" } }),
+    );
+  });
+
+  it("surfaces normalized fetch errors and missing-data guards for patient analytics", async () => {
+    mockGet
+      .mockResolvedValueOnce({ error: { message: "glucose failed" } })
+      .mockResolvedValueOnce({ error: { message: "insulin failed" } })
+      .mockResolvedValueOnce({ error: { message: "meal failed" } })
+      .mockResolvedValueOnce({ error: { message: "patients failed" } })
+      .mockResolvedValueOnce({ error: { message: "search failed" } })
+      .mockResolvedValueOnce({ error: { message: "details failed" } })
+      .mockResolvedValueOnce({ data: null })
+      .mockResolvedValueOnce({ data: null })
+      .mockResolvedValueOnce({ error: { message: "meals failed" } })
+      .mockResolvedValueOnce({ error: { message: "profile failed" } })
+      .mockResolvedValueOnce({ error: { message: "logs failed" } });
+
+    await expect(getGlucoseEvolution("token-123")).rejects.toThrow("glucose failed");
+    await expect(getInsulinStats("token-123")).rejects.toThrow("insulin failed");
+    await expect(getMealStats("token-123")).rejects.toThrow("meal failed");
+    await expect(getPatientsWithFilters("token-123")).rejects.toThrow("patients failed");
+    await expect(searchGlobalPatients("token-123", "ana")).rejects.toThrow("search failed");
+    await expect(getPatientDetails("token-123", "patient-1")).rejects.toThrow("details failed");
+    await expect(getPatientGlucoseEvolution("token-123", "patient-1")).rejects.toThrow(
+      "No data returned from patient glucose evolution endpoint",
+    );
+    await expect(getPatientInsulinStats("token-123", "patient-1")).rejects.toThrow(
+      "No data returned from patient insulin stats endpoint",
+    );
+    await expect(getPatientMeals("token-123", "patient-1")).rejects.toThrow("meals failed");
+    await expect(getPatientProfile("token-123", "patient-1")).rejects.toThrow("profile failed");
+    await expect(getPatientLogEntries("token-123", "patient-1")).rejects.toThrow("logs failed");
   });
 
   it("posts report requests and surfaces API errors", async () => {

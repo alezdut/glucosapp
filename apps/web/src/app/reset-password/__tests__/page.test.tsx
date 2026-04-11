@@ -4,7 +4,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import ResetPasswordPage from "../page";
 import { resetPassword } from "@/lib/auth-api";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createMockRouter, createMockSearchParams } from "@/test/navigation";
+import { createMockRouter, setMockSearchParams } from "@/test/navigation";
 
 jest.mock("@/lib/auth-api", () => ({
   resetPassword: jest.fn(),
@@ -26,12 +26,13 @@ const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
 const mockUseSearchParams = useSearchParams as jest.MockedFunction<typeof useSearchParams>;
 
 describe("ResetPasswordPage", () => {
-  const router = createMockRouter();
+  let router = createMockRouter();
 
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
-    mockUseRouter.mockReturnValue(router as ReturnType<typeof useRouter>);
+    router = createMockRouter();
+    mockUseRouter.mockReturnValue(router);
   });
 
   afterEach(() => {
@@ -39,9 +40,7 @@ describe("ResetPasswordPage", () => {
   });
 
   it("shows an error state when the token is missing", async () => {
-    mockUseSearchParams.mockReturnValue(
-      createMockSearchParams({}) as ReturnType<typeof useSearchParams>,
-    );
+    setMockSearchParams(mockUseSearchParams, {});
 
     render(<ResetPasswordPage />);
 
@@ -51,9 +50,7 @@ describe("ResetPasswordPage", () => {
   });
 
   it("validates password confirmation before submitting", async () => {
-    mockUseSearchParams.mockReturnValue(
-      createMockSearchParams({ token: "reset-token" }) as ReturnType<typeof useSearchParams>,
-    );
+    setMockSearchParams(mockUseSearchParams, { token: "reset-token" });
 
     render(<ResetPasswordPage />);
 
@@ -72,9 +69,7 @@ describe("ResetPasswordPage", () => {
   });
 
   it("resets the password and redirects to login", async () => {
-    mockUseSearchParams.mockReturnValue(
-      createMockSearchParams({ token: "reset-token" }) as ReturnType<typeof useSearchParams>,
-    );
+    setMockSearchParams(mockUseSearchParams, { token: "reset-token" });
     mockResetPassword.mockResolvedValue({ message: "Contraseña restablecida" });
 
     render(<ResetPasswordPage />);

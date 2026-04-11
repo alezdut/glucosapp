@@ -3,6 +3,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import RegisterPage from "../page";
 import { useAuth } from "@/contexts/auth-context";
+import { createMockRouter } from "@/test/navigation";
 import { useRouter } from "next/navigation";
 
 jest.mock("@/contexts/auth-context", () => ({
@@ -23,8 +24,8 @@ const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
 
 describe("RegisterPage", () => {
-  const push = jest.fn();
   const register = jest.fn();
+  let router = createMockRouter();
 
   const submit = () => {
     fireEvent.submit(screen.getByRole("button", { name: "Registrarse" }).closest("form")!);
@@ -33,6 +34,7 @@ describe("RegisterPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    router = createMockRouter();
     mockUseAuth.mockReturnValue({
       user: null,
       isLoading: false,
@@ -42,7 +44,7 @@ describe("RegisterPage", () => {
       logout: jest.fn(),
       refreshUser: jest.fn(),
     });
-    mockUseRouter.mockReturnValue({ push } as ReturnType<typeof useRouter>);
+    mockUseRouter.mockReturnValue(router);
   });
 
   afterEach(() => {
@@ -99,6 +101,6 @@ describe("RegisterPage", () => {
       jest.advanceTimersByTime(3000);
     });
 
-    expect(push).toHaveBeenCalledWith("/login");
+    expect(router.push).toHaveBeenCalledWith("/login");
   });
 });

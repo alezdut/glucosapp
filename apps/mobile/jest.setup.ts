@@ -1,3 +1,4 @@
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import mockReact from "react";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -10,6 +11,11 @@ jest.mock("expo-web-browser", () => ({
 jest.mock("expo-linking", () => ({
   addEventListener: jest.fn(() => ({ remove: jest.fn() })),
   getInitialURL: jest.fn().mockResolvedValue(null),
+}));
+
+jest.mock("./src/lib/expo-auth", () => ({
+  Linking: jest.requireMock("expo-linking"),
+  WebBrowser: jest.requireMock("expo-web-browser"),
 }));
 
 jest.mock("expo-notifications", () => ({

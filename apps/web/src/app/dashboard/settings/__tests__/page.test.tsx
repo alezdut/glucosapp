@@ -118,6 +118,16 @@ describe("SettingsPage", () => {
     jest.useFakeTimers();
     localStorage.clear();
 
+    Object.defineProperty(window.URL, "createObjectURL", {
+      configurable: true,
+      value: jest.fn(() => "blob:mock"),
+    });
+    Object.defineProperty(window.URL, "revokeObjectURL", {
+      configurable: true,
+      value: jest.fn(),
+    });
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+
     mockUseAuth.mockReturnValue({
       user: null,
       isLoading: false,
@@ -168,6 +178,7 @@ describe("SettingsPage", () => {
 
   afterEach(() => {
     jest.useRealTimers();
+    jest.restoreAllMocks();
   });
 
   it("initializes the alert UI from the fetched settings", () => {
@@ -260,6 +271,63 @@ describe("SettingsPage", () => {
     });
   });
 
+  it("shows loading state while alert settings are being fetched", () => {
+    mockUseAlertSettings.mockReturnValue({
+      data: null,
+      isLoading: true,
+      isError: false,
+      error: null,
+    } as ReturnType<typeof useAlertSettings>);
+
+    render(<SettingsPage />);
+
+    expect(screen.getByText("Cargando configuración...")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Guardar Configuración" })).not.toBeInTheDocument();
+  });
+
+  it("shows an API error when alert settings fail to load", () => {
+    mockUseAlertSettings.mockReturnValue({
+      data: {
+        alertsEnabled: true,
+        hypoglycemiaEnabled: true,
+        hypoglycemiaThreshold: 70,
+        severeHypoglycemiaEnabled: true,
+        severeHypoglycemiaThreshold: 54,
+        hyperglycemiaEnabled: true,
+        hyperglycemiaThreshold: 250,
+        persistentHyperglycemiaEnabled: true,
+        persistentHyperglycemiaThreshold: 250,
+        persistentHyperglycemiaWindowHours: 4,
+        persistentHyperglycemiaMinReadings: 2,
+        notificationChannels: { dashboard: true, email: true, push: true },
+        dailySummaryEnabled: false,
+        dailySummaryTime: "08:00",
+        quietHoursEnabled: false,
+        quietHoursStart: "22:00",
+        quietHoursEnd: "07:00",
+        criticalAlertsIgnoreQuietHours: false,
+        notificationFrequency: NotificationFrequency.IMMEDIATE,
+      },
+      isLoading: false,
+      isError: true,
+      error: new Error("Error de red"),
+    } as ReturnType<typeof useAlertSettings>);
+
+    render(<SettingsPage />);
+
+    expect(screen.getByText(/Error al cargar la configuración/i)).toBeInTheDocument();
+  });
+
+  it("shows mutation error feedback when saving alert settings fails", async () => {
+    mutateAsync.mockRejectedValue(new Error("No se pudo guardar"));
+
+    render(<SettingsPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Guardar Configuración" }));
+
+    expect(await screen.findByText("No se pudo guardar")).toBeInTheDocument();
+  });
+
   it("requires a selected patient before generating an individual report", async () => {
     render(<SettingsPage />);
 
@@ -283,5 +351,100 @@ describe("SettingsPage", () => {
       screen.getByText("Por favor selecciona al menos un tipo de reporte"),
     ).toBeInTheDocument();
     expect(mockGenerateGroupReport).not.toHaveBeenCalled();
+  });
+
+  it("searches patients and generates individual PDF and CSV reports", async () => {
+    localStorage.setItem("accessToken", "stored-token");
+    mockUsePatients.mockImplementation((filters) => {
+      if (filters?.search) {
+        return {
+          data: [
+            {
+              id: "patient-9",
+              firstName: "Ada",
+              lastName: "Lovelace",
+              email: "ada@example.com",
+            },
+          ],
+          isLoading: false,
+        } as ReturnType<typeof usePatients>;
+      }
+
+      return {
+        data: [],
+        isLoading: false,
+      } as ReturnType<typeof usePatients>;
+    });
+    mockGenerateIndividualReport.mockResolvedValue(new Blob(["report"]));
+
+    render(<SettingsPage />);
+
+    const patientInput = screen.getByRole("combobox", {
+      name: /seleccionar paciente/i,
+    });
+
+    fireEvent.focus(patientInput);
+    fireEvent.change(patientInput, {
+      target: { value: "Ada" },
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+
+    await waitFor(() => {
+      expect(mockUsePatients).toHaveBeenLastCalledWith({ search: "Ada" });
+    });
+
+    fireEvent.click(await screen.findByText("Ada Lovelace"));
+
+    expect(await screen.findByDisplayValue("Ada Lovelace")).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByLabelText("Lecturas del Sensor")[0]);
+    fireEvent.click(screen.getAllByLabelText("Insulina")[0]);
+    fireEvent.click(screen.getAllByLabelText("Resumen por IA")[0]);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Generar PDF" })[0]);
+
+    await waitFor(() => {
+      expect(mockGenerateIndividualReport).toHaveBeenCalledWith(
+        "stored-token",
+        "patient-9",
+        expect.objectContaining({
+          format: "pdf",
+          includeAISummary: true,
+          reportTypes: expect.arrayContaining([
+            "glucosa",
+            "lecturas_sensor",
+            "insulina",
+            "comidas",
+          ]),
+        }),
+      );
+    });
+  });
+
+  it("adds group filters and generates grouped PDF and CSV reports", async () => {
+    localStorage.setItem("accessToken", "stored-token");
+    mockGenerateGroupReport.mockResolvedValue(new Blob(["group-report"]));
+
+    render(<SettingsPage />);
+
+    fireEvent.click(screen.getAllByLabelText("Insulina")[1]);
+    fireEvent.click(screen.getAllByLabelText("Resumen por IA")[1]);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Generar PDF" })[1]);
+
+    await waitFor(() => {
+      expect(mockGenerateGroupReport).toHaveBeenCalledWith(
+        "stored-token",
+        expect.objectContaining({
+          format: "pdf",
+          includeAISummary: true,
+          filters: undefined,
+          reportTypes: expect.arrayContaining(["glucosa", "insulina", "comidas"]),
+        }),
+      );
+    });
   });
 });

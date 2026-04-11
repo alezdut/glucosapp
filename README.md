@@ -66,13 +66,22 @@ pnpm build
 
 ## Flujo de calidad
 
-- `pre-commit`: ejecuta `prettier` y `eslint` sobre archivos staged.
+- `pre-commit`: ejecuta `lint-staged`.
+- `lint-staged`: corre `prettier --write` sobre archivos staged compatibles y luego `eslint --max-warnings=0` por workspace afectado.
 - `pre-push`: ejecuta `pnpm typecheck` para evitar pushes con tipos rotos.
 - CI ejecuta la misma base de validaciones del repositorio:
+  - `pnpm install --frozen-lockfile`
+  - `pnpm -C apps/backend prisma:generate`
   - `pnpm lint`
   - `pnpm typecheck`
   - `pnpm test`
   - `pnpm build`
+
+## Política de cobertura
+
+- `apps/backend`, `apps/web` y `apps/mobile` comparten el mismo mínimo global de cobertura: `branches 70`, `functions 82`, `lines 82`, `statements 82`.
+- Los `packages/*` con tests deben declarar `coverageThreshold` explícito en su runner correspondiente.
+- Las exclusiones de cobertura deben limitarse a archivos estructurales, de configuración o de barrel export; no se usan para ocultar deuda funcional.
 
 Si tocás auth, cálculo clínico, alertas, reportes o sincronización entre clientes y backend, sumá o ajustá tests en la misma rama.
 

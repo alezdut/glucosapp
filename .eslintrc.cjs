@@ -1,4 +1,4 @@
 module.exports = {
   root: true,
-  extends: ["./packages/config/eslint/index.cjs"],
+  extends: ["./packages/config/eslint/base.cjs"],
 };
