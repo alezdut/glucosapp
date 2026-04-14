@@ -62,6 +62,9 @@ importers:
 
   apps/backend:
     dependencies:
+      '@glucosapp/env':
+        specifier: workspace:*
+        version: link:../../packages/env
       '@glucosapp/mdi-insulin-algorithm':
         specifier: workspace:*
         version: link:../../packages/mdi-insulin-algorithm
@@ -222,6 +225,9 @@ importers:
       '@glucosapp/auth-utils':
         specifier: workspace:*
         version: link:../../packages/auth-utils
+      '@glucosapp/env':
+        specifier: workspace:*
+        version: link:../../packages/env
       '@glucosapp/theme':
         specifier: workspace:*
         version: link:../../packages/theme
@@ -382,6 +388,9 @@ importers:
       '@glucosapp/auth-utils':
         specifier: workspace:*
         version: link:../../packages/auth-utils
+      '@glucosapp/env':
+        specifier: workspace:*
+        version: link:../../packages/env
       '@glucosapp/theme':
         specifier: workspace:*
         version: link:../../packages/theme

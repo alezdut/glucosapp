@@ -57,6 +57,7 @@ describe("ScanScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     alertSpy.mockImplementation(jest.fn());
+    process.env.EXPO_PUBLIC_IMAGE_ANALYSIS_BASE_URL = "http://scanner.example.com";
     mockCameraPermission = { granted: true };
     mockMediaPermission = { granted: true };
 
@@ -77,6 +78,10 @@ describe("ScanScreen", () => {
       name: "Apple",
       brand: "Genérica",
     } as never);
+  });
+
+  afterEach(() => {
+    delete process.env.EXPO_PUBLIC_IMAGE_ANALYSIS_BASE_URL;
   });
 
   it("requests camera access when permission is denied", () => {
@@ -109,7 +114,7 @@ describe("ScanScreen", () => {
       expect(mockTakePictureAsync).toHaveBeenCalledWith({ quality: 0.8, base64: false });
       expect(mockAnalyzeImage).toHaveBeenCalledWith(
         "file:///cropped.jpg",
-        "http://192.168.1.37:8000",
+        "http://scanner.example.com",
       );
     });
 

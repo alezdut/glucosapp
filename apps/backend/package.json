@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@glucosapp/mdi-insulin-algorithm": "workspace:*",
+    "@glucosapp/env": "workspace:*",
     "@glucosapp/types": "workspace:*",
     "@glucosapp/utils": "workspace:*",
     "@google/generative-ai": "^0.24.1",

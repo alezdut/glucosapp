@@ -2,8 +2,9 @@ import { makeApiClient, type ApiClientError } from "@glucosapp/api-client";
 import { isTokenExpiringSoon } from "@glucosapp/auth-utils";
 import { throwApiError } from "@glucosapp/utils";
 import * as SecureStore from "expo-secure-store";
+import { getMobileApiBaseUrl } from "./env";
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:3000";
+const API_BASE_URL = getMobileApiBaseUrl();
 
 // Token storage keys
 const ACCESS_TOKEN_KEY = "accessToken";

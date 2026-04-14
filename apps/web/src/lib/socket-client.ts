@@ -1,6 +1,7 @@
 import { io, Socket } from "socket.io-client";
+import { getWebApiBaseUrl } from "./env";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
+const apiBaseUrl = getWebApiBaseUrl();
 const socketUrl = apiBaseUrl.replace(/\/v1$/, ""); // Remove /v1 if present
 
 let socket: Socket | null = null;
