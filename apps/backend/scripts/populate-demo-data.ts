@@ -16,6 +16,7 @@ import { EncryptionService } from "../src/common/services/encryption.service";
 import { ConfigModule } from "@nestjs/config";
 import { Module } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
+import { loadBackendRuntimeEnv } from "../src/config/runtime-env";
 
 import { DEMO_PATIENTS, PatientProfile } from "./demo-data/patient-profiles";
 import { generateDailyMeals } from "./demo-data/meal-generator";
@@ -50,8 +51,7 @@ class DemoDataPopulator {
   private startTime: number;
 
   private getAvatarUrl(avatarPath: string): string {
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3001";
-    return new URL(avatarPath, frontendUrl).toString();
+    return new URL(avatarPath, loadBackendRuntimeEnv().FRONTEND_URL).toString();
   }
 
   private async syncDemoUserProfile(

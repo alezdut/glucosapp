@@ -31,6 +31,7 @@ module.exports = {
   testEnvironment: "node",
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
+    "^@glucosapp/env$": "<rootDir>/../../../packages/env/src/index.ts",
     "^@glucosapp/types$": "<rootDir>/../../../packages/types/src/index.ts",
     "^@glucosapp/(.*)$": "<rootDir>/../../../packages/$1/src",
     "^@glucosapp/mdi-insulin-algorithm$":
