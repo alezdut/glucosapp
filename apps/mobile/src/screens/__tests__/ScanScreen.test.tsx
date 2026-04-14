@@ -53,10 +53,12 @@ const mockSaveToLibraryAsync = MediaLibrary.saveToLibraryAsync as jest.MockedFun
 
 describe("ScanScreen", () => {
   const alertSpy = jest.spyOn(Alert, "alert");
+  let previousImageAnalysisBaseUrl: string | undefined;
 
   beforeEach(() => {
     jest.clearAllMocks();
     alertSpy.mockImplementation(jest.fn());
+    previousImageAnalysisBaseUrl = process.env.EXPO_PUBLIC_IMAGE_ANALYSIS_BASE_URL;
     process.env.EXPO_PUBLIC_IMAGE_ANALYSIS_BASE_URL = "http://scanner.example.com";
     mockCameraPermission = { granted: true };
     mockMediaPermission = { granted: true };
@@ -81,7 +83,11 @@ describe("ScanScreen", () => {
   });
 
   afterEach(() => {
-    delete process.env.EXPO_PUBLIC_IMAGE_ANALYSIS_BASE_URL;
+    if (previousImageAnalysisBaseUrl === undefined) {
+      delete process.env.EXPO_PUBLIC_IMAGE_ANALYSIS_BASE_URL;
+    } else {
+      process.env.EXPO_PUBLIC_IMAGE_ANALYSIS_BASE_URL = previousImageAnalysisBaseUrl;
+    }
   });
 
   it("requests camera access when permission is denied", () => {

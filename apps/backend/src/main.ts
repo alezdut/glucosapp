@@ -10,9 +10,14 @@ async function bootstrap() {
   assertBackendRuntimeEnv(runtimeEnv);
   const app = await NestFactory.create(AppModule);
   const logger = new Logger("Bootstrap");
-  const isProduction = runtimeEnv.NODE_ENV === "production";
+  const allowedOrigins = runtimeEnv.ALLOWED_ORIGINS;
+
+  if (allowedOrigins.length === 0) {
+    throw new Error("ALLOWED_ORIGINS must contain at least one allowed origin.");
+  }
+
   app.enableCors({
-    origin: runtimeEnv.ALLOWED_ORIGINS.length > 0 ? runtimeEnv.ALLOWED_ORIGINS : !isProduction,
+    origin: allowedOrigins,
     credentials: true,
   });
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: "1" });

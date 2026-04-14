@@ -48,11 +48,15 @@ export function assertBackendRuntimeEnv(env: BackendRuntimeEnv): void {
 }
 
 function parseNodeEnv(value: string | undefined): NodeEnv {
+  if (value === undefined) {
+    return "development";
+  }
+
   if (value === "development" || value === "test" || value === "production") {
     return value;
   }
 
-  return "development";
+  throw new Error(`Invalid NODE_ENV: ${value}. Expected development, test, or production.`);
 }
 
 function parsePort(value: string | undefined): number {
