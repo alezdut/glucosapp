@@ -8,6 +8,7 @@ module.exports = {
   moduleNameMapper: {
     "^@glucosapp/api-client$": "<rootDir>/../../packages/api-client/src/index.ts",
     "^@glucosapp/auth-utils$": "<rootDir>/../../packages/auth-utils/src/index.ts",
+    "^@glucosapp/env$": "<rootDir>/../../packages/env/src/index.ts",
     "^@glucosapp/theme$": "<rootDir>/../../packages/theme/src/index.ts",
     "^@glucosapp/types$": "<rootDir>/../../packages/types/src/index.ts",
     "^@glucosapp/utils$": "<rootDir>/../../packages/utils/src/index.ts",
