@@ -1,8 +1,7 @@
 import { io, Socket } from "socket.io-client";
-import { getMobileApiBaseUrl } from "./env";
+import { getMobileApiOrigin } from "./env";
 
-const apiBaseUrl = getMobileApiBaseUrl();
-const socketUrl = apiBaseUrl.replace(/\/v1$/, ""); // Remove /v1 if present
+const socketUrl = getMobileApiOrigin();
 
 let socket: Socket | null = null;
 

@@ -185,7 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Use custom scheme for better iOS compatibility
       const redirectUrl = "glucosapp://auth/callback";
-      const authUrl = `${API_BASE_URL}/v1/auth/google/mobile?redirect_uri=${encodeURIComponent(redirectUrl)}`;
+      const authUrl = `${API_BASE_URL}/auth/google/mobile?redirect_uri=${encodeURIComponent(redirectUrl)}`;
 
       const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
 

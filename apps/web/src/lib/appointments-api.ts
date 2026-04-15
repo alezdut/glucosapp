@@ -11,7 +11,7 @@ import { throwApiError } from "@glucosapp/utils";
 import { getWebApiBaseUrl } from "./env";
 
 const apiBaseUrl = getWebApiBaseUrl();
-const { client } = makeApiClient(`${apiBaseUrl}/v1`);
+const { client } = makeApiClient(apiBaseUrl);
 
 export interface AppointmentsFilters {
   includePast?: boolean;

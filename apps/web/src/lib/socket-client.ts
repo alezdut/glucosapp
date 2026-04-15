@@ -1,8 +1,7 @@
 import { io, Socket } from "socket.io-client";
-import { getWebApiBaseUrl } from "./env";
+import { getWebApiOrigin } from "./env";
 
-const apiBaseUrl = getWebApiBaseUrl();
-const socketUrl = apiBaseUrl.replace(/\/v1$/, ""); // Remove /v1 if present
+const socketUrl = getWebApiOrigin();
 
 let socket: Socket | null = null;
 

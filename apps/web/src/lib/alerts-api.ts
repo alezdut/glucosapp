@@ -3,7 +3,7 @@ import type { AlertSettings, UpdateAlertSettingsPayload } from "@glucosapp/types
 import { getWebApiBaseUrl } from "./env";
 
 const apiBaseUrl = getWebApiBaseUrl();
-const { client } = makeApiClient(`${apiBaseUrl}/v1`);
+const { client } = makeApiClient(apiBaseUrl);
 
 /**
  * Get alert settings for doctor's patients (doctors only)
