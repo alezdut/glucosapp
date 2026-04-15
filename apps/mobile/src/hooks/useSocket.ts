@@ -4,11 +4,25 @@ import { getSocket, disconnectSocket } from "../lib/socket-client";
 import { useAuth } from "../contexts/AuthContext";
 import { getAccessToken } from "../lib/api";
 
+export type SocketConnectionState =
+  | "connected"
+  | "connecting"
+  | "degraded"
+  | "offline"
+  | "auth_error";
+
 interface UseSocketReturn {
   socket: Socket | null;
   isConnected: boolean;
   error: Error | null;
+  connectionState: SocketConnectionState;
 }
+
+const isAuthError = (message: string): boolean =>
+  /expired|jwt|token|unauthorized|forbidden|invalid/i.test(message);
+
+const isOfflineError = (message: string): boolean =>
+  /network|offline|timeout|closed|unavailable/i.test(message);
 
 /**
  * Hook to manage Socket.io connection
@@ -20,21 +34,29 @@ export const useSocket = (): UseSocketReturn => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [connectionState, setConnectionState] = useState<SocketConnectionState>("connecting");
   const socketRef = useRef<Socket | null>(null);
 
   // Stable handler functions using useCallback
   const handleConnect = useCallback(() => {
     setIsConnected(true);
     setError(null);
+    setConnectionState("connected");
   }, []);
 
   const handleDisconnect = useCallback(() => {
     setIsConnected(false);
+    setConnectionState("offline");
   }, []);
 
   const handleError = useCallback((err: Error) => {
     setError(err);
     setIsConnected(false);
+    if (isAuthError(err.message)) {
+      setConnectionState("auth_error");
+      return;
+    }
+    setConnectionState(isOfflineError(err.message) ? "offline" : "degraded");
   }, []);
 
   useEffect(() => {
@@ -45,6 +67,7 @@ export const useSocket = (): UseSocketReturn => {
         socketRef.current = null;
         setSocket(null);
         setIsConnected(false);
+        setConnectionState("offline");
       }
       return;
     }
@@ -55,6 +78,7 @@ export const useSocket = (): UseSocketReturn => {
         const token = await getAccessToken();
         if (!token) {
           setError(new Error("No access token available"));
+          setConnectionState("auth_error");
           return;
         }
 
@@ -62,6 +86,7 @@ export const useSocket = (): UseSocketReturn => {
         const socketInstance = getSocket(token);
         if (!socketInstance) {
           setError(new Error("Failed to create socket connection"));
+          setConnectionState("degraded");
           return;
         }
 
@@ -75,6 +100,8 @@ export const useSocket = (): UseSocketReturn => {
           setIsConnected(socketInstance.connected);
         }
 
+        setConnectionState(socketInstance.connected ? "connected" : "connecting");
+
         // Remove old listeners before adding new ones (using stable handlers)
         socketInstance.off("connect", handleConnect);
         socketInstance.off("disconnect", handleDisconnect);
@@ -86,6 +113,7 @@ export const useSocket = (): UseSocketReturn => {
         socketInstance.on("connect_error", handleError);
       } catch (err) {
         setError(err instanceof Error ? err : new Error("Failed to get access token"));
+        setConnectionState("auth_error");
       }
     };
 
@@ -105,5 +133,5 @@ export const useSocket = (): UseSocketReturn => {
   // The socket singleton will be managed by socket-client.ts
   // Only disconnect on explicit logout or token change
 
-  return { socket, isConnected, error };
+  return { socket, isConnected, error, connectionState };
 };

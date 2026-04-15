@@ -5,11 +5,25 @@ import { Socket } from "socket.io-client";
 import { getSocket, disconnectSocket } from "@/lib/socket-client";
 import { useAuth } from "@/contexts/auth-context";
 
+export type SocketConnectionState =
+  | "connected"
+  | "connecting"
+  | "degraded"
+  | "offline"
+  | "auth_error";
+
 interface UseSocketReturn {
   socket: Socket | null;
   isConnected: boolean;
   error: Error | null;
+  connectionState: SocketConnectionState;
 }
+
+const isAuthError = (message: string): boolean =>
+  /expired|jwt|token|unauthorized|forbidden|invalid/i.test(message);
+
+const isOfflineError = (message: string): boolean =>
+  /network|offline|timeout|closed|unavailable/i.test(message);
 
 /**
  * Hook to manage Socket.io connection
@@ -20,6 +34,7 @@ export const useSocket = (): UseSocketReturn => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [connectionState, setConnectionState] = useState<SocketConnectionState>("connecting");
   const socketRef = useRef<Socket | null>(null);
   const tokenRef = useRef<string | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -32,6 +47,7 @@ export const useSocket = (): UseSocketReturn => {
         socketRef.current = null;
         setSocket(null);
         setIsConnected(false);
+        setConnectionState("offline");
       }
       tokenRef.current = null;
       return;
@@ -43,6 +59,7 @@ export const useSocket = (): UseSocketReturn => {
     if (!token) {
       setError(new Error("No access token available"));
       setIsConnected(false);
+      setConnectionState("auth_error");
       tokenRef.current = null;
       return;
     }
@@ -57,6 +74,7 @@ export const useSocket = (): UseSocketReturn => {
     if (!socketInstance) {
       setError(new Error("Failed to create socket connection"));
       setIsConnected(false);
+      setConnectionState("degraded");
       return;
     }
 
@@ -69,14 +87,18 @@ export const useSocket = (): UseSocketReturn => {
       setIsConnected(socketInstance.connected);
     }
 
+    setConnectionState(socketInstance.connected ? "connected" : "connecting");
+
     // Set up event listeners (only once per socket instance)
     const handleConnect = () => {
       setIsConnected(true);
       setError(null);
+      setConnectionState("connected");
     };
 
     const handleDisconnect = (reason: string) => {
       setIsConnected(false);
+      setConnectionState(reason === "io server disconnect" ? "auth_error" : "offline");
 
       // If disconnected due to authentication error, try to reconnect with fresh token
       if (reason === "io server disconnect") {
@@ -102,12 +124,16 @@ export const useSocket = (): UseSocketReturn => {
     };
 
     const handleError = (err: Error) => {
-      console.error("Socket connection error:", err.message);
       setError(err);
       setIsConnected(false);
+      if (isAuthError(err.message)) {
+        setConnectionState("auth_error");
+      } else {
+        setConnectionState(isOfflineError(err.message) ? "offline" : "degraded");
+      }
 
       // If token expired, try to reconnect with fresh token
-      if (err.message.includes("expired") || err.message.includes("jwt")) {
+      if (isAuthError(err.message)) {
         const freshToken =
           typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
         if (freshToken && freshToken !== token) {
@@ -214,5 +240,5 @@ export const useSocket = (): UseSocketReturn => {
   // The socket singleton will be managed by socket-client.ts
   // Only disconnect on explicit logout or token change
 
-  return { socket, isConnected, error };
+  return { socket, isConnected, error, connectionState };
 };

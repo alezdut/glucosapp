@@ -17,6 +17,7 @@ import { renderMobile } from "../../../test/render-mobile";
 import type { Message, Conversation } from "../../lib/messages-api";
 import { useAuth } from "../../contexts/AuthContext";
 import { useSocket } from "../useSocket";
+import { useMessageOutbox } from "../useMessageOutbox";
 import * as api from "../../lib/api";
 
 jest.mock("../../contexts/AuthContext", () => ({
@@ -27,6 +28,10 @@ jest.mock("../useSocket", () => ({
   useSocket: jest.fn(),
 }));
 
+jest.mock("../useMessageOutbox", () => ({
+  useMessageOutbox: jest.fn(),
+}));
+
 jest.mock("../../lib/api", () => ({
   getAssignedDoctor: jest.fn(),
   markMessagesAsReadBatch: jest.fn(),
@@ -34,6 +39,7 @@ jest.mock("../../lib/api", () => ({
 
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockUseSocket = useSocket as jest.MockedFunction<typeof useSocket>;
+const mockUseMessageOutbox = useMessageOutbox as jest.MockedFunction<typeof useMessageOutbox>;
 const mockGetAssignedDoctor = api.getAssignedDoctor as jest.MockedFunction<
   typeof api.getAssignedDoctor
 >;
@@ -88,7 +94,7 @@ const buildMessage = (overrides: Partial<Message> = {}): Message => ({
 });
 
 function ConversationProbe() {
-  const conversation = useConversationWithDoctor();
+  const conversation = useConversationWithDoctor("doctor-1");
   const batchRead = useMarkAsReadBatch();
 
   return (
@@ -168,7 +174,16 @@ function AssignedDoctorProbe() {
 describe("useMessages", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseAuth.mockReturnValue({ user: { id: "patient-1" } } as never);
+    mockUseAuth.mockReturnValue({
+      user: { id: "patient-1", email: "patient@example.com" },
+    } as never);
+    mockUseMessageOutbox.mockReturnValue({
+      entries: [],
+      queueMessage: jest.fn(),
+      retryMessage: jest.fn(),
+      reconcileMessages: jest.fn(),
+      flush: jest.fn(),
+    } as never);
   });
 
   it("joins conversation room and reacts to message/new/read and batch-read events", async () => {
@@ -180,12 +195,17 @@ describe("useMessages", () => {
       }
     });
 
-    mockUseSocket.mockReturnValue({ socket, isConnected: true, error: null } as never);
+    mockUseSocket.mockReturnValue({
+      socket,
+      isConnected: true,
+      error: null,
+      connectionState: "connected",
+    } as never);
     mockMarkMessagesAsReadBatch.mockResolvedValue({ count: 1, messageIds: ["msg-1"] } as never);
 
     renderMobile(<ConversationProbe />);
 
-    expect(screen.getByTestId("conversation-loading").textContent).toBe("true");
+    expect(screen.getByTestId("conversation-loading").textContent).toBe("false");
 
     await act(async () => {
       trigger("conversation:messages", [buildMessage({ id: "msg-1", read: false })]);
@@ -223,7 +243,12 @@ describe("useMessages", () => {
       }
     });
 
-    mockUseSocket.mockReturnValue({ socket, isConnected: true, error: null } as never);
+    mockUseSocket.mockReturnValue({
+      socket,
+      isConnected: true,
+      error: null,
+      connectionState: "connected",
+    } as never);
 
     renderMobile(<UnreadProbe />);
 
@@ -270,17 +295,13 @@ describe("useMessages", () => {
     });
   });
 
-  it("sends and marks messages as read through socket callbacks", async () => {
+  it("queues messages and marks them as read through socket callbacks", async () => {
     const { socket } = createSocketHarness();
+    const queueMessage = jest
+      .fn()
+      .mockResolvedValue(buildMessage({ id: "local-1", clientMessageId: "client-1" }));
 
     socket.emit.mockImplementation((event, payload, callback) => {
-      if (event === "message:send") {
-        const sendPayload = payload as { content: string };
-        callback?.({
-          success: true,
-          message: buildMessage({ id: "sent-1", content: sendPayload.content }),
-        });
-      }
       if (event === "message:read") {
         const readPayload = payload as { messageId: string };
         callback?.({
@@ -290,15 +311,29 @@ describe("useMessages", () => {
       }
     });
 
-    mockUseSocket.mockReturnValue({ socket, isConnected: true, error: null } as never);
+    mockUseMessageOutbox.mockReturnValue({
+      entries: [],
+      queueMessage,
+      retryMessage: jest.fn(),
+      reconcileMessages: jest.fn(),
+      flush: jest.fn(),
+    } as never);
+    mockUseSocket.mockReturnValue({
+      socket,
+      isConnected: true,
+      error: null,
+      connectionState: "connected",
+    } as never);
 
     renderMobile(<SendReadProbe />);
 
     fireEvent.click(screen.getByRole("button", { name: "send" }));
 
     await waitFor(() => {
-      expect(screen.getByTestId("mutation-status").textContent).toBe("sent:sent-1");
+      expect(screen.getByTestId("mutation-status").textContent).toBe("sent:local-1");
     });
+
+    expect(queueMessage).toHaveBeenCalledWith({ receiverId: "doctor-1", content: "mensaje" });
 
     fireEvent.click(screen.getByRole("button", { name: "read" }));
 
@@ -307,17 +342,30 @@ describe("useMessages", () => {
     });
   });
 
-  it("returns mutation errors when socket is disconnected", async () => {
-    mockUseSocket.mockReturnValue({ socket: null, isConnected: false, error: null });
+  it("returns queued optimistic messages when socket is disconnected", async () => {
+    const queueMessage = jest
+      .fn()
+      .mockResolvedValue(buildMessage({ id: "local-offline", deliveryStatus: "queued" }));
+    mockUseMessageOutbox.mockReturnValue({
+      entries: [],
+      queueMessage,
+      retryMessage: jest.fn(),
+      reconcileMessages: jest.fn(),
+      flush: jest.fn(),
+    } as never);
+    mockUseSocket.mockReturnValue({
+      socket: null,
+      isConnected: false,
+      error: null,
+      connectionState: "offline",
+    });
 
     renderMobile(<SendReadProbe />);
 
     fireEvent.click(screen.getByRole("button", { name: "send" }));
 
     await waitFor(() => {
-      expect(screen.getByTestId("mutation-status").textContent).toBe(
-        "send-error:Socket not connected",
-      );
+      expect(screen.getByTestId("mutation-status").textContent).toBe("sent:local-offline");
     });
   });
 
@@ -334,7 +382,12 @@ describe("useMessages", () => {
       }
     });
 
-    mockUseSocket.mockReturnValue({ socket, isConnected: true, error: null } as never);
+    mockUseSocket.mockReturnValue({
+      socket,
+      isConnected: true,
+      error: null,
+      connectionState: "connected",
+    } as never);
     mockGetAssignedDoctor.mockResolvedValue({ id: "doctor-1" } as never);
 
     renderMobile(

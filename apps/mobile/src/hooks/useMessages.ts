@@ -1,28 +1,89 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { DeviceEventEmitter } from "react-native";
+import { mergeMessages, upsertMessage } from "@glucosapp/utils";
 import { useSocket } from "./useSocket";
+import { useMessageOutbox } from "./useMessageOutbox";
 import { useAuth } from "../contexts/AuthContext";
 import { getAssignedDoctor, markMessagesAsReadBatch } from "../lib/api";
 import type { Message, Conversation } from "../lib/messages-api";
 
 const BATCH_MESSAGES_READ_EVENT = "messages:batch-read";
+const SOCKET_ACK_TIMEOUT_MS = 5000;
+
+const emitWithAck = <TResponse>(
+  socket: {
+    timeout?: (timeoutMs: number) => {
+      emit: (
+        event: string,
+        payload: Record<string, unknown>,
+        callback: (error: Error | null, response?: TResponse) => void,
+      ) => void;
+    };
+    emit: (
+      event: string,
+      payload: Record<string, unknown>,
+      callback: (response?: TResponse) => void,
+    ) => void;
+  },
+  event: string,
+  payload: Record<string, unknown>,
+): Promise<TResponse> => {
+  return new Promise((resolve, reject) => {
+    if (typeof socket.timeout === "function") {
+      socket.timeout(SOCKET_ACK_TIMEOUT_MS).emit(event, payload, (error, response) => {
+        if (error) {
+          reject(new Error(`${event} timed out`));
+          return;
+        }
+
+        if (!response) {
+          reject(new Error(`Missing ${event} response`));
+          return;
+        }
+
+        resolve(response);
+      });
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      reject(new Error(`${event} timed out`));
+    }, SOCKET_ACK_TIMEOUT_MS);
+
+    socket.emit(event, payload, (response) => {
+      clearTimeout(timeoutId);
+      if (!response) {
+        reject(new Error(`Missing ${event} response`));
+        return;
+      }
+      resolve(response);
+    });
+  });
+};
 
 /**
  * Hook to get conversation with doctor (for patients)
  */
-export const useConversationWithDoctor = () => {
+export const useConversationWithDoctor = (doctorId?: string) => {
   const { user } = useAuth();
   const userId = user?.id ?? null;
-  const { socket, isConnected } = useSocket();
-  const [messages, setMessages] = useState<Message[]>([]);
+  const { socket, isConnected, connectionState } = useSocket();
+  const [remoteMessages, setRemoteMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const hasJoinedRef = useRef(false);
+  const { entries, reconcileMessages, flush } = useMessageOutbox(doctorId);
+  const outboxMessages = entries.map((entry) => entry.message);
 
   // Join conversation room when enabled
   useEffect(() => {
+    if (!doctorId) {
+      setIsLoading(false);
+      return;
+    }
+
     if (!socket || !isConnected || !userId) {
-      setIsLoading(true);
+      setIsLoading(connectionState === "connecting");
       return;
     }
 
@@ -34,36 +95,46 @@ export const useConversationWithDoctor = () => {
     hasJoinedRef.current = true;
 
     // Join conversation room (patients chat with their doctor)
-    socket.emit(
+    void emitWithAck<{ success: boolean; room?: string; error?: string }>(
+      socket,
       "conversation:join",
       {},
-      (response: { success: boolean; room?: string; error?: string }) => {
+    )
+      .then((response) => {
         if (!response.success) {
           console.error("Failed to join conversation:", response.error);
           setIsLoading(false);
         }
-      },
-    );
+      })
+      .catch(() => {
+        setIsLoading(false);
+      });
 
     // Listen for conversation messages
     const handleConversationMessages = (conversationMessages: Message[]) => {
-      setMessages(conversationMessages);
+      const nextMessages = conversationMessages.map((message) => ({
+        ...message,
+        deliveryStatus: "sent" as const,
+        isOptimistic: false,
+      }));
+      setRemoteMessages(nextMessages);
+      void reconcileMessages(nextMessages);
       setIsLoading(false);
     };
 
     // Listen for new messages
     const handleNewMessage = (newMessage: Message) => {
-      setMessages((prev) => {
-        // Avoid duplicates
-        if (prev.some((msg) => msg.id === newMessage.id)) {
-          return prev;
-        }
-        return [...prev, newMessage];
-      });
+      const normalizedMessage = {
+        ...newMessage,
+        deliveryStatus: "sent" as const,
+        isOptimistic: false,
+      };
+      setRemoteMessages((prev) => upsertMessage(prev, normalizedMessage));
+      void reconcileMessages([normalizedMessage]);
     };
 
     const handleMessageRead = (data: { messageId: string; read: boolean }) => {
-      setMessages((prev) =>
+      setRemoteMessages((prev) =>
         prev.map((message) =>
           message.id === data.messageId ? { ...message, read: data.read } : message,
         ),
@@ -76,7 +147,7 @@ export const useConversationWithDoctor = () => {
       }
 
       const messageIdsSet = new Set(messageIds);
-      setMessages((prev) =>
+      setRemoteMessages((prev) =>
         prev.map((message) =>
           messageIdsSet.has(message.id) ? { ...message, read: true } : message,
         ),
@@ -100,11 +171,29 @@ export const useConversationWithDoctor = () => {
       // The room will be cleaned up when socket disconnects
       hasJoinedRef.current = false;
     };
-  }, [socket, isConnected, userId]);
+  }, [socket, isConnected, userId, doctorId, connectionState, reconcileMessages]);
+
+  useEffect(() => {
+    if (!doctorId) {
+      return;
+    }
+
+    void reconcileMessages(remoteMessages);
+  }, [doctorId, reconcileMessages, remoteMessages]);
+
+  useEffect(() => {
+    if (!doctorId) {
+      return;
+    }
+
+    void flush();
+  }, [doctorId, flush]);
+
+  const messages = mergeMessages(remoteMessages, outboxMessages);
 
   return {
     data: messages,
-    isLoading: !isConnected || isLoading,
+    isLoading: isLoading && messages.length === 0 && connectionState === "connecting",
     isError: false,
     error: null,
   };
@@ -124,15 +213,15 @@ export const useConversations = () => {
     if (!socket || !isConnected || !userId) return;
 
     // Request conversations list
-    socket.emit(
+    void emitWithAck<{ success: boolean; conversations?: Conversation[]; error?: string }>(
+      socket,
       "conversation:list",
       {},
-      (response: { success: boolean; conversations?: Conversation[]; error?: string }) => {
-        if (response.success && response.conversations) {
-          setConversations(response.conversations);
-        }
-      },
-    );
+    ).then((response) => {
+      if (response.success && response.conversations) {
+        setConversations(response.conversations);
+      }
+    });
 
     // Listen for conversation updates
     const handleConversationUpdated = (updatedConversations: Conversation[]) => {
@@ -158,8 +247,7 @@ export const useConversations = () => {
  * Hook to send a message
  */
 export const useSendMessage = () => {
-  const queryClient = useQueryClient();
-  const { socket, isConnected } = useSocket();
+  const { queueMessage } = useMessageOutbox();
 
   return useMutation({
     mutationFn: async ({
@@ -169,28 +257,10 @@ export const useSendMessage = () => {
       receiverId: string;
       content: string;
     }): Promise<Message> => {
-      if (!socket || !isConnected) {
-        throw new Error("Socket not connected");
-      }
-
-      return new Promise((resolve, reject) => {
-        socket.emit(
-          "message:send",
-          { receiverId, content },
-          (response: { success: boolean; message?: Message; error?: string }) => {
-            if (response.success && response.message) {
-              resolve(response.message);
-            } else {
-              reject(new Error(response.error || "Failed to send message"));
-            }
-          },
-        );
+      return queueMessage({
+        receiverId,
+        content,
       });
-    },
-    onSuccess: () => {
-      // Invalidate queries to update UI
-      queryClient.invalidateQueries({ queryKey: ["messages", "conversation"] });
-      queryClient.invalidateQueries({ queryKey: ["messages", "conversations"] });
     },
   });
 };
@@ -208,19 +278,17 @@ export const useMarkAsRead = () => {
         throw new Error("Socket not connected");
       }
 
-      return new Promise((resolve, reject) => {
-        socket.emit(
-          "message:read",
-          { messageId },
-          (response: { success: boolean; message?: Message; error?: string }) => {
-            if (response.success && response.message) {
-              resolve(response.message);
-            } else {
-              reject(new Error(response.error || "Failed to mark message as read"));
-            }
-          },
-        );
-      });
+      const response = await emitWithAck<{ success: boolean; message?: Message; error?: string }>(
+        socket,
+        "message:read",
+        { messageId },
+      );
+
+      if (response.success && response.message) {
+        return response.message;
+      }
+
+      throw new Error(response.error || "Failed to mark message as read");
     },
     onSuccess: () => {
       // Invalidate queries to update read status

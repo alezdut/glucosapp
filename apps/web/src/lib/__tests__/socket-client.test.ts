@@ -104,6 +104,6 @@ describe("web socket-client", () => {
 
     expect(socket.io.opts.reconnection).toBe(false);
     expect(socket.disconnect).toHaveBeenCalled();
-    expect(consoleErrorSpy).toHaveBeenCalledWith("Socket connection error:", "jwt expired");
+    expect(consoleErrorSpy).toHaveBeenCalledWith("Socket authentication error:", "jwt expired");
   });
 });
