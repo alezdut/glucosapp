@@ -198,10 +198,20 @@ export const useConversation = (patientId?: string) => {
       setIsLoading(false);
     };
 
+    const handleMessageRead = (data: { messageId: string; read: boolean }) => {
+      setRemoteMessages((prev) =>
+        prev.map((message) =>
+          message.id === data.messageId ? { ...message, read: data.read } : message,
+        ),
+      );
+    };
+
     socket.on("conversation:messages", handleConversationMessages);
+    socket.on("message:read", handleMessageRead);
 
     return () => {
       socket.off("conversation:messages", handleConversationMessages);
+      socket.off("message:read", handleMessageRead);
       if (socket.connected) {
         socket.emit("conversation:leave", { patientId });
       }
@@ -289,10 +299,40 @@ export const useConversations = () => {
       setConversations(updatedConversations);
     };
 
+    const handleMessageRead = (data: { messageId: string; read: boolean }) => {
+      setConversations((current) =>
+        current.map((conversation) => {
+          const updatedMessages = conversation.messages.map((message) =>
+            message.id === data.messageId ? { ...message, read: data.read } : message,
+          );
+
+          const unreadCount = updatedMessages.reduce(
+            (count, message) => count + (message.read || message.receiverId !== user.id ? 0 : 1),
+            0,
+          );
+
+          if (
+            updatedMessages === conversation.messages &&
+            unreadCount === conversation.unreadCount
+          ) {
+            return conversation;
+          }
+
+          return {
+            ...conversation,
+            messages: updatedMessages,
+            unreadCount,
+          };
+        }),
+      );
+    };
+
     socket.on("conversation:updated", handleConversationUpdated);
+    socket.on("message:read", handleMessageRead);
 
     return () => {
       socket.off("conversation:updated", handleConversationUpdated);
+      socket.off("message:read", handleMessageRead);
     };
   }, [socket, isConnected, user]);
 

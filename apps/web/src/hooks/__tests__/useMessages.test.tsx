@@ -96,8 +96,45 @@ const createSocket = () => {
         callback?.({
           success: true,
           conversations: [
-            { patientId: "patient-1", unreadCount: 2 },
-            { patientId: "patient-2", unreadCount: 1 },
+            {
+              patientId: "patient-1",
+              unreadCount: 2,
+              messages: [
+                {
+                  id: "msg-1",
+                  senderId: "patient-1",
+                  receiverId: "doctor-1",
+                  read: false,
+                  createdAt: "2026-04-15T10:00:00.000Z",
+                  sender: { email: "patient-1@example.com" },
+                  receiver: { email: "doctor@example.com" },
+                },
+                {
+                  id: "msg-2",
+                  senderId: "patient-1",
+                  receiverId: "doctor-1",
+                  read: false,
+                  createdAt: "2026-04-15T10:01:00.000Z",
+                  sender: { email: "patient-1@example.com" },
+                  receiver: { email: "doctor@example.com" },
+                },
+              ],
+            },
+            {
+              patientId: "patient-2",
+              unreadCount: 1,
+              messages: [
+                {
+                  id: "msg-3",
+                  senderId: "patient-2",
+                  receiverId: "doctor-1",
+                  read: false,
+                  createdAt: "2026-04-15T10:02:00.000Z",
+                  sender: { email: "patient-2@example.com" },
+                  receiver: { email: "doctor@example.com" },
+                },
+              ],
+            },
           ],
         });
       }
@@ -252,12 +289,18 @@ describe("useMessages hooks", () => {
     expect(unreadResult.current.data).toBe(3);
 
     act(() => {
-      trigger("conversation:updated", [{ patientId: "patient-3", unreadCount: 5 }]);
+      trigger("message:read", { messageId: "msg-1", read: true });
     });
 
-    await waitFor(() =>
-      expect(result.current.data).toEqual([{ patientId: "patient-3", unreadCount: 5 }]),
-    );
+    await waitFor(() => {
+      expect(result.current.data[0]).toEqual(
+        expect.objectContaining({
+          unreadCount: 1,
+          messages: expect.arrayContaining([expect.objectContaining({ id: "msg-1", read: true })]),
+        }),
+      );
+      expect(unreadResult.current.data).toBe(2);
+    });
   });
 
   it("queues messages and marks them as read through mutations", async () => {

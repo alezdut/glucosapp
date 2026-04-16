@@ -14,6 +14,7 @@ import type { Message } from "@/lib/messages-api";
 
 export const NotificationDropdown = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [dismissedPatientIds, setDismissedPatientIds] = useState<string[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -68,9 +69,10 @@ export const NotificationDropdown = () => {
 
           // Check if patient already has notifications from newMessageNotifications
           const hasNewNotification = newMessageNotifications.some((n) => n.patientId === patientId);
+          const isDismissed = dismissedPatientIds.includes(patientId);
 
-          // Only include if not already in newMessageNotifications
-          if (!hasNewNotification) {
+          // Only include if not already in newMessageNotifications and not manually dismissed
+          if (!hasNewNotification && !isDismissed) {
             const existing = patientMessagesMap.get(patientId);
             if (existing) {
               existing.messages.push(...unread);
@@ -106,7 +108,7 @@ export const NotificationDropdown = () => {
           new Date(a.latestMessage.createdAt).getTime(),
       )
       .slice(0, 10);
-  }, [user, conversations, newMessageNotifications, activePatientId]);
+  }, [user, conversations, newMessageNotifications, activePatientId, dismissedPatientIds]);
 
   // Combine new notifications with existing unread messages, grouped by patient
   const allMessageNotifications = useMemo(() => {
@@ -189,6 +191,7 @@ export const NotificationDropdown = () => {
   };
 
   const handleMessageRead = (patientId: string) => {
+    setDismissedPatientIds((prev) => (prev.includes(patientId) ? prev : [...prev, patientId]));
     clearMessageNotification(patientId);
     // UI will update automatically via socket/state listeners (useConversations/useConversation)
   };

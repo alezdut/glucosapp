@@ -177,6 +177,51 @@ describe("NotificationDropdown", () => {
     );
   });
 
+  it("dismisses a message notification even when it comes from conversation unread state", () => {
+    const clearNotification = jest.fn();
+    mockUseNewMessageNotifications.mockReturnValue({
+      notifications: [],
+      clearNotification,
+    } as never);
+    mockUseConversations.mockReturnValue({
+      data: [
+        {
+          participant: {
+            id: "patient-3",
+            email: "patient-3@example.com",
+            firstName: "Leo",
+            lastName: "Norte",
+          },
+          unreadCount: 2,
+          messages: [
+            {
+              id: "m-10",
+              read: false,
+              receiverId: "doctor-1",
+              createdAt: "2026-04-08T12:00:00.000Z",
+            },
+            {
+              id: "m-11",
+              read: false,
+              receiverId: "doctor-1",
+              createdAt: "2026-04-08T12:01:00.000Z",
+            },
+          ],
+        },
+      ],
+    } as never);
+
+    render(<NotificationDropdown />);
+
+    fireEvent.click(screen.getByRole("button", { name: /notificaciones/i }));
+    expect(screen.getByText("Leo Norte")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /dismiss message/i }));
+
+    expect(screen.queryByText("Leo Norte")).not.toBeInTheDocument();
+    expect(clearNotification).toHaveBeenCalledWith("patient-3");
+  });
+
   it("closes when clicking outside and logs dismiss-all failures", async () => {
     const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
     const mutateAsync = jest.fn().mockRejectedValue(new Error("dismiss failed"));

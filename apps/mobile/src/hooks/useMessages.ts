@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { DeviceEventEmitter } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { mergeMessages, upsertMessage } from "@glucosapp/utils";
 import { useSocket } from "./useSocket";
 import { useMessageOutbox } from "./useMessageOutbox";
@@ -10,6 +11,19 @@ import type { Message, Conversation } from "../lib/messages-api";
 
 const BATCH_MESSAGES_READ_EVENT = "messages:batch-read";
 const SOCKET_ACK_TIMEOUT_MS = 5000;
+const MESSAGE_CACHE_LIMIT = 20;
+
+const getConversationCacheKey = (userId: string, doctorId: string) =>
+  `@glucosapp/messages-cache:${userId}:${doctorId}`;
+
+const getConversationCacheSignature = (messages: Message[]): string =>
+  messages
+    .map((message) =>
+      [message.id, message.read ? "1" : "0", message.deliveryStatus ?? "", message.createdAt].join(
+        "|",
+      ),
+    )
+    .join(";");
 
 const emitWithAck = <TResponse>(
   socket: {
@@ -71,9 +85,57 @@ export const useConversationWithDoctor = (doctorId?: string) => {
   const { socket, isConnected, connectionState } = useSocket();
   const [remoteMessages, setRemoteMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasLoadedConversationSnapshot, setHasLoadedConversationSnapshot] = useState(false);
   const hasJoinedRef = useRef(false);
+  const lastPersistedConversationSignatureRef = useRef<string | null>(null);
   const { entries, reconcileMessages, flush } = useMessageOutbox(doctorId);
   const outboxMessages = entries.map((entry) => entry.message);
+
+  useEffect(() => {
+    if (!doctorId || !userId) {
+      setHasLoadedConversationSnapshot(true);
+      lastPersistedConversationSignatureRef.current = null;
+      return;
+    }
+
+    let isCancelled = false;
+    setHasLoadedConversationSnapshot(false);
+
+    void AsyncStorage.getItem(getConversationCacheKey(userId, doctorId))
+      .then((cached) => {
+        if (isCancelled || !cached) {
+          return;
+        }
+
+        const parsed = JSON.parse(cached) as Message[];
+        if (!Array.isArray(parsed) || parsed.length === 0) {
+          return;
+        }
+
+        const normalizedCachedMessages = parsed.map((message) => ({
+          ...message,
+          deliveryStatus: "sent" as const,
+          isOptimistic: false,
+        }));
+
+        lastPersistedConversationSignatureRef.current =
+          getConversationCacheSignature(normalizedCachedMessages);
+
+        setRemoteMessages((prev) => (prev.length > 0 ? prev : normalizedCachedMessages));
+      })
+      .catch(() => {
+        // Ignore cache read errors and continue with live socket sync.
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setHasLoadedConversationSnapshot(true);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [doctorId, userId]);
 
   // Join conversation room when enabled
   useEffect(() => {
@@ -189,13 +251,37 @@ export const useConversationWithDoctor = (doctorId?: string) => {
     void flush();
   }, [doctorId, flush]);
 
+  useEffect(() => {
+    if (!doctorId || !userId || remoteMessages.length === 0) {
+      return;
+    }
+
+    const recentMessages = remoteMessages.slice(-MESSAGE_CACHE_LIMIT);
+    const nextSignature = getConversationCacheSignature(recentMessages);
+
+    if (lastPersistedConversationSignatureRef.current === nextSignature) {
+      return;
+    }
+
+    lastPersistedConversationSignatureRef.current = nextSignature;
+    void AsyncStorage.setItem(
+      getConversationCacheKey(userId, doctorId),
+      JSON.stringify(recentMessages),
+    ).catch(() => {
+      // Ignore cache write errors to avoid impacting chat UX.
+    });
+  }, [doctorId, userId, remoteMessages]);
+
   const messages = mergeMessages(remoteMessages, outboxMessages);
+  const isUncertainState =
+    !isConnected && hasLoadedConversationSnapshot && messages.length === 0 && !!doctorId;
 
   return {
     data: messages,
     isLoading: isLoading && messages.length === 0 && connectionState === "connecting",
-    isError: false,
-    error: null,
+    isError: isUncertainState,
+    error: isUncertainState ? new Error("No se pudo confirmar el estado de la conversación") : null,
+    isConnectionUncertain: isUncertainState,
   };
 };
 

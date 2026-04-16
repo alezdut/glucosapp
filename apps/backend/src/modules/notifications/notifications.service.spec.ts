@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { PrismaService } from "../../prisma/prisma.service";
 import { createMockPrismaService } from "../../common/test-helpers/prisma.mock";
@@ -121,5 +122,40 @@ describe("NotificationsService", () => {
         data: { isActive: false },
       }),
     );
+  });
+
+  it("logs a warning when Expo returns a non-fatal push error ticket", async () => {
+    const warnSpy = jest.spyOn(Logger.prototype, "warn").mockImplementation(() => undefined);
+
+    (prismaService.alertSettings.findUnique as jest.Mock).mockResolvedValue({
+      notificationChannels: { dashboard: true, email: false, push: true },
+    });
+    (prismaService.pushDevice.findMany as jest.Mock).mockResolvedValue([
+      { expoPushToken: "ExponentPushToken[abc123]" },
+    ]);
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [
+          {
+            status: "error",
+            details: { error: "MessageRateExceeded" },
+          },
+        ],
+      }),
+    });
+
+    await service.sendToUser("patient-1", {
+      type: "message",
+      entityId: "msg-2",
+      title: "Doctor",
+      body: "Hola",
+      route: "Communication",
+    });
+
+    expect(warnSpy).toHaveBeenCalledWith("Expo push returned 1 error ticket(s) for user patient-1");
+    expect(prismaService.pushDevice.updateMany).not.toHaveBeenCalled();
+
+    warnSpy.mockRestore();
   });
 });

@@ -117,7 +117,11 @@ export default function CommunicationScreen() {
 
   const { data: assignedDoctor } = useAssignedDoctor();
   const doctorId = assignedDoctor?.doctor?.id;
-  const { data: messages = [], isLoading } = useConversationWithDoctor(doctorId);
+  const {
+    data: messages = [],
+    isLoading,
+    isConnectionUncertain,
+  } = useConversationWithDoctor(doctorId);
   const sendMessageMutation = useSendMessage();
   const { retryMessage } = useMessageOutbox(doctorId);
   const { connectionState } = useSocket();
@@ -274,8 +278,14 @@ export default function CommunicationScreen() {
         ) : null}
         {messages.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No hay mensajes aún</Text>
-            <Text style={styles.emptySubtext}>Comienza una conversación enviando un mensaje</Text>
+            <Text style={styles.emptyText}>
+              {isConnectionUncertain ? "No pudimos confirmar tus mensajes" : "No hay mensajes aún"}
+            </Text>
+            <Text style={styles.emptySubtext}>
+              {isConnectionUncertain
+                ? "Reintentando en segundo plano. Verifica tu conexión o vuelve a intentar en unos segundos."
+                : "Comienza una conversación enviando un mensaje"}
+            </Text>
           </View>
         ) : (
           <FlatList

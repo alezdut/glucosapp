@@ -1,13 +1,9 @@
 import { io, Socket } from "socket.io-client";
-import { isTemporaryMessageError } from "@glucosapp/utils";
 import { getMobileApiOrigin } from "./env";
 
 const socketUrl = getMobileApiOrigin();
 
 let socket: Socket | null = null;
-
-const isAuthError = (message: string): boolean =>
-  /expired|jwt|token|unauthorized|forbidden|invalid/i.test(message);
 
 /**
  * Get or create Socket.io connection
@@ -52,19 +48,7 @@ export const getSocket = (token: string | null): Socket | null => {
     });
 
     socket.on("connect_error", (error) => {
-      if (isAuthError(error.message)) {
-        console.error("Socket authentication error:", error.message);
-        return;
-      }
-
-      if (isTemporaryMessageError(error)) {
-        if (typeof __DEV__ !== "undefined" && __DEV__) {
-          console.warn("Socket connection degraded:", error.message);
-        }
-        return;
-      }
-
-      console.error("Socket connection error:", error.message);
+      void error;
     });
   }
 

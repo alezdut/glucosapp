@@ -4,7 +4,7 @@ import { act, screen, waitFor } from "@testing-library/react";
 import { useSocket } from "../useSocket";
 import { renderMobile } from "../../../test/render-mobile";
 import { useAuth } from "../../contexts/AuthContext";
-import { getAccessToken } from "../../lib/api";
+import { getAccessToken, refreshAccessToken } from "../../lib/api";
 import { disconnectSocket, getSocket } from "../../lib/socket-client";
 
 jest.mock("../../contexts/AuthContext", () => ({
@@ -13,6 +13,7 @@ jest.mock("../../contexts/AuthContext", () => ({
 
 jest.mock("../../lib/api", () => ({
   getAccessToken: jest.fn(),
+  refreshAccessToken: jest.fn(),
 }));
 
 jest.mock("../../lib/socket-client", () => ({
@@ -22,6 +23,7 @@ jest.mock("../../lib/socket-client", () => ({
 
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockGetAccessToken = getAccessToken as jest.MockedFunction<typeof getAccessToken>;
+const mockRefreshAccessToken = refreshAccessToken as jest.MockedFunction<typeof refreshAccessToken>;
 const mockGetSocket = getSocket as jest.MockedFunction<typeof getSocket>;
 const mockDisconnectSocket = disconnectSocket as jest.MockedFunction<typeof disconnectSocket>;
 
@@ -175,5 +177,62 @@ describe("useSocket", () => {
 
     expect(screen.getByTestId("socket-connected").textContent).toBe("false");
     expect(screen.getByTestId("socket-error").textContent).toBe("socket failed");
+  });
+
+  it("refreshes token and reconnects when socket auth fails", async () => {
+    const firstSocket = createSocketHarness(false);
+    const secondSocket = createSocketHarness(false);
+
+    mockGetAccessToken.mockResolvedValueOnce("expired-token").mockResolvedValueOnce("fresh-token");
+    mockRefreshAccessToken.mockResolvedValue({
+      accessToken: "fresh-token",
+      refreshToken: "fresh-refresh-token",
+    });
+    mockGetSocket.mockReturnValueOnce(firstSocket.socket).mockReturnValueOnce(secondSocket.socket);
+
+    renderMobile(<SocketProbe />);
+
+    await waitFor(() => {
+      expect(mockGetSocket).toHaveBeenCalledWith("expired-token");
+    });
+
+    await act(async () => {
+      firstSocket.trigger("connect_error", new Error("Invalid token"));
+    });
+
+    await waitFor(() => {
+      expect(mockRefreshAccessToken).toHaveBeenCalled();
+      expect(mockGetSocket).toHaveBeenCalledWith("fresh-token");
+    });
+  });
+
+  it("retries auth refresh with backoff when the first refresh fails", async () => {
+    jest.useFakeTimers();
+    const setTimeoutSpy = jest.spyOn(global, "setTimeout");
+
+    const initialSocket = createSocketHarness(false);
+
+    mockGetAccessToken.mockResolvedValueOnce("expired-token").mockResolvedValueOnce("fresh-token");
+    mockRefreshAccessToken.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      accessToken: "fresh-token",
+      refreshToken: "fresh-refresh-token",
+    });
+    mockGetSocket.mockReturnValueOnce(initialSocket.socket);
+
+    renderMobile(<SocketProbe />);
+
+    await waitFor(() => {
+      expect(mockGetSocket).toHaveBeenCalledWith("expired-token");
+    });
+
+    await act(async () => {
+      initialSocket.trigger("connect_error", new Error("Invalid token"));
+    });
+
+    await waitFor(() => expect(mockRefreshAccessToken).toHaveBeenCalledTimes(1));
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 1000);
+
+    setTimeoutSpy.mockRestore();
+    jest.useRealTimers();
   });
 });
