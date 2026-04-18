@@ -13,6 +13,7 @@ import { UseGuards, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { MessagesService } from "./messages.service";
+import { MessagesRealtimeService } from "./messages-realtime.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuthService } from "../auth/services/auth.service";
 import { WsJwtGuard } from "./guards/ws-jwt.guard";
@@ -27,6 +28,7 @@ import { JwtPayload } from "../auth/strategies/jwt.strategy";
 import { UserRole } from "@prisma/client";
 import { RealtimeNotificationsService } from "../notifications/realtime-notifications.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { loadBackendRuntimeEnv } from "../../config/runtime-env";
 
 /**
  * Helper function to generate room name for a conversation
@@ -42,10 +44,7 @@ function getConversationRoom(doctorId: string, patientId: string): string {
  */
 @WebSocketGateway({
   cors: {
-    origin: process.env.CORS_ORIGIN?.split(",") || [
-      "http://localhost:3001",
-      "http://localhost:8082",
-    ],
+    origin: loadBackendRuntimeEnv().ALLOWED_ORIGINS,
     credentials: true,
   },
   namespace: "/messages",
@@ -58,6 +57,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   constructor(
     private readonly messagesService: MessagesService,
+    private readonly messagesRealtime: MessagesRealtimeService,
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
@@ -182,66 +182,18 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       }
 
       // Create message using service
-      const message = await this.messagesService.sendMessage(user.id, {
+      const result = await this.messagesService.sendMessage(user.id, {
         receiverId: dto.receiverId,
         content: dto.content,
+        clientMessageId: dto.clientMessageId,
+        createdAtClient: dto.createdAtClient,
       });
 
-      // Determine conversation room
-      const userRole = user.role as UserRole;
-      let room: string;
-
-      if (userRole === UserRole.DOCTOR) {
-        room = getConversationRoom(user.id, dto.receiverId);
-      } else {
-        room = getConversationRoom(dto.receiverId, user.id);
+      if (result.created) {
+        await this.messagesRealtime.emitMessageCreated(result.message);
       }
 
-      // Emit new message to room (for users currently viewing the conversation)
-      this.server.to(room).emit("message:new", message);
-
-      // Emit to both users' dedicated rooms so every active device/tab stays in sync
-      this.realtimeNotifications.emitToUser(user.id, "message:new", message);
-      this.realtimeNotifications.emitToUser(dto.receiverId, "message:new", message);
-      const senderName =
-        `${message.sender.firstName || ""} ${message.sender.lastName || ""}`.trim() ||
-        message.sender.email;
-      await this.notificationsService.sendToUser(
-        dto.receiverId,
-        this.notificationsService.createMessagePayload({
-          messageId: message.id,
-          senderName,
-          body: message.content,
-          doctorId: userRole === UserRole.DOCTOR ? user.id : dto.receiverId,
-        }),
-      );
-
-      // Emit conversation list update to sender
-      if (userRole === UserRole.DOCTOR) {
-        const conversations = await this.messagesService.getConversations(user.id);
-        this.realtimeNotifications.emitToUser(user.id, "conversation:updated", conversations);
-      }
-
-      // Also emit conversation list update to receiver (if receiver is a doctor)
-      // This ensures doctors see updated conversation list when patients send messages
-      try {
-        const receiverUser = await this.authService.getUserById(dto.receiverId);
-        if (receiverUser && receiverUser.role === UserRole.DOCTOR) {
-          const receiverConversations = await this.messagesService.getConversations(dto.receiverId);
-          this.realtimeNotifications.emitToUser(
-            dto.receiverId,
-            "conversation:updated",
-            receiverConversations,
-          );
-        }
-      } catch (error) {
-        // If we can't update receiver's conversations, that's okay
-        this.logger.warn(
-          `Could not update receiver conversations: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
-
-      return { success: true, message };
+      return { success: true, message: result.message };
     } catch (error) {
       this.logger.error(
         `Error sending message: ${error instanceof Error ? error.message : String(error)}`,

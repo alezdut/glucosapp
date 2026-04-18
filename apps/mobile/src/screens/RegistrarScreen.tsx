@@ -339,10 +339,19 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
 
   // Update calculated dose when real-time correction calculation completes (fasting mode)
   useEffect(() => {
+    const canApplyCorrectionResult =
+      isFasting && targetGlucose !== undefined && isTargetGlucoseEdited;
+
+    if (isFasting && !canApplyCorrectionResult) {
+      setCalculatedDose(null);
+      setAppliedInsulin(undefined);
+      return;
+    }
+
     if (
       realTimeCorrectionResult &&
       !wasManuallyEdited &&
-      isFasting &&
+      canApplyCorrectionResult &&
       typeof realTimeCorrectionResult === "object" &&
       realTimeCorrectionResult !== null &&
       "dose" in realTimeCorrectionResult &&
@@ -354,7 +363,14 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
         setAppliedInsulin(realTimeCorrectionResult.dose);
       }
     }
-  }, [realTimeCorrectionResult, wasManuallyEdited, isEditingInsulin, isFasting]);
+  }, [
+    realTimeCorrectionResult,
+    wasManuallyEdited,
+    isEditingInsulin,
+    isFasting,
+    targetGlucose,
+    isTargetGlucoseEdited,
+  ]);
 
   const breakdown = calculatedDose?.breakdown;
   const prandialInsulin = breakdown?.prandial || 0;
@@ -381,6 +397,11 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
       if (!hasPrefilledCarbsRef.current) {
         resetFormFields();
       }
+
+      // Also reset on blur so stale fasting correction data never persists
+      return () => {
+        resetFormFields();
+      };
     }, []),
   );
 
@@ -423,6 +444,7 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
       setIsTargetGlucoseEdited(false);
       // Clear calculated dose when target glucose is cleared
       setAppliedInsulin(undefined);
+      setCalculatedDose(null);
       setWasManuallyEdited(false);
     } else {
       const newValue = isNaN(value) ? undefined : value;
@@ -483,8 +505,9 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
         ? targetGlucose !== undefined && isTargetGlucoseEdited
         : true;
 
-      const insulinToSend = shouldIncludeInsulin ? appliedInsulin || 0 : 0;
+      const insulinToSend = shouldIncludeInsulin ? (appliedInsulin ?? calculatedInsulin ?? 0) : 0;
       const calculatedInsulinToSend = shouldIncludeInsulin ? calculatedInsulin || 0 : 0;
+      const isCorrectionEntry = isFasting && shouldIncludeInsulin && insulinToSend > 0;
 
       const response = await client.POST("/log-entries", {
         glucoseMgdl: Math.round(glucoseLevel),
@@ -493,7 +516,7 @@ export default function RegistrarScreen({ navigation, route }: RegistrarScreenPr
         wasManuallyEdited: wasManuallyEdited && shouldIncludeInsulin,
         insulinType: InsulinType.BOLUS,
         carbohydrates: isFasting ? undefined : carbsNum > 0 ? carbsNum : undefined,
-        mealType: isFasting ? MealCategory.CORRECTION : mealType,
+        mealType: isFasting ? (isCorrectionEntry ? MealCategory.CORRECTION : undefined) : mealType,
         recordedAt: recordedAt.toISOString(),
         // Calculation breakdown for transparency - only include if insulin is being sent
         carbInsulin: shouldIncludeInsulin && prandialInsulin > 0 ? prandialInsulin : undefined,

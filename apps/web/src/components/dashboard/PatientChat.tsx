@@ -4,7 +4,10 @@ import { useState, useEffect, useRef } from "react";
 import { Send, Loader2, MessageSquare } from "lucide-react";
 import { useConversation, useSendMessage, useMarkAsRead } from "@/hooks/useMessages";
 import { useAuth } from "@/contexts/auth-context";
+import { useSocket } from "@/hooks/useSocket";
 import { formatTimeAgo } from "@glucosapp/utils";
+import { flushMessageOutbox, retryMessageOutboxEntry } from "@/lib/message-outbox";
+import { sendMessage as sendMessageApi } from "@/lib/messages-api";
 import type { Message } from "@/lib/messages-api";
 import { usePatientDetails } from "@/hooks/usePatients";
 
@@ -20,6 +23,7 @@ export const PatientChat = ({ patientId }: PatientChatProps) => {
   const hasInitialScrolledRef = useRef(false);
   const previousMessagesLengthRef = useRef(0);
   const [isListReady, setIsListReady] = useState(false);
+  const { connectionState } = useSocket();
 
   // Web app is doctor-only, always treat as doctor interface
   const shouldCallHook = !!patientId;
@@ -209,6 +213,14 @@ export const PatientChat = ({ patientId }: PatientChatProps) => {
         </h2>
       </div>
 
+      {connectionState !== "connected" ? (
+        <div className="mx-4 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          {connectionState === "auth_error"
+            ? "La sesión necesita reautenticación para sincronizar mensajes."
+            : "Sin conexión estable. Los mensajes pendientes se enviarán automáticamente."}
+        </div>
+      ) : null}
+
       {/* Messages container */}
       <div
         ref={messagesContainerRef}
@@ -243,10 +255,41 @@ export const PatientChat = ({ patientId }: PatientChatProps) => {
                     <span className={`text-xs ${isOwnMessage ? "text-blue-100" : "text-gray-500"}`}>
                       {formatTimeAgo(message.createdAt)}
                     </span>
+                    {isOwnMessage && message.deliveryStatus && message.deliveryStatus !== "sent" ? (
+                      <span
+                        className={`text-xs ${isOwnMessage ? "text-blue-100" : "text-gray-500"}`}
+                      >
+                        {message.deliveryStatus === "failed"
+                          ? "No se pudo enviar"
+                          : message.deliveryStatus === "queued"
+                            ? "En cola"
+                            : "Enviando..."}
+                      </span>
+                    ) : null}
                     {isOwnMessage && message.read && (
                       <span className="text-xs text-blue-100">✓ Leído</span>
                     )}
                   </div>
+                  {isOwnMessage &&
+                  message.deliveryStatus === "failed" &&
+                  message.clientMessageId ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void retryMessageOutboxEntry(message.clientMessageId!).then(() => {
+                          const accessToken = localStorage.getItem("accessToken");
+                          if (accessToken) {
+                            void flushMessageOutbox((payload) =>
+                              sendMessageApi(accessToken, payload),
+                            );
+                          }
+                        });
+                      }}
+                      className="mt-2 text-xs underline underline-offset-2"
+                    >
+                      Reintentar
+                    </button>
+                  ) : null}
                 </div>
               </div>
             );

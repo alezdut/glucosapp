@@ -1,8 +1,9 @@
 import { makeApiClient } from "@glucosapp/api-client";
 import type { AlertSettings, UpdateAlertSettingsPayload } from "@glucosapp/types";
+import { getWebApiBaseUrl } from "./env";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
-const { client } = makeApiClient(`${apiBaseUrl}/v1`);
+const apiBaseUrl = getWebApiBaseUrl();
+const { client } = makeApiClient(apiBaseUrl);
 
 /**
  * Get alert settings for doctor's patients (doctors only)

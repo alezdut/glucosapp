@@ -1,10 +1,13 @@
 import { makeApiClient } from "@glucosapp/api-client";
 import type { DiabetesType, GlucoseUnit, Language, Theme, UserProfile } from "@glucosapp/types";
+import { getWebApiBaseUrl } from "./env";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
-const { client } = makeApiClient(`${apiBaseUrl}/v1`);
+const apiBaseUrl = getWebApiBaseUrl();
+const { client } = makeApiClient(apiBaseUrl);
 
 export type UpdateProfilePayload = {
+  firstName?: string;
+  lastName?: string;
   birthDate?: string; // ISO date string
   weight?: number;
   diabetesType?: DiabetesType;

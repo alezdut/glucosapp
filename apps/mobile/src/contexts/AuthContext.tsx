@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import type { UserProfile } from "@glucosapp/types";
 import {
   createApiClient,
   storeTokens,
@@ -6,6 +7,7 @@ import {
   getRefreshToken,
   clearTokens,
 } from "../lib/api";
+import { getMobileApiBaseUrl } from "../lib/env";
 import { unregisterCurrentPushDevice } from "../lib/push-notifications";
 import { Linking, WebBrowser } from "../lib/expo-auth";
 
@@ -37,7 +39,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:3000";
+const API_BASE_URL = getMobileApiBaseUrl();
 
 /**
  * AuthProvider component that manages authentication state
@@ -183,7 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Use custom scheme for better iOS compatibility
       const redirectUrl = "glucosapp://auth/callback";
-      const authUrl = `${API_BASE_URL}/v1/auth/google/mobile?redirect_uri=${encodeURIComponent(redirectUrl)}`;
+      const authUrl = `${API_BASE_URL}/auth/google/mobile?redirect_uri=${encodeURIComponent(redirectUrl)}`;
 
       const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
 
@@ -262,17 +264,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateUserProfile = async (firstName: string, lastName: string) => {
     try {
       setIsLoading(true);
+      const client = createApiClient();
+      const response = await client.PATCH<UserProfile>("/profile", {
+        firstName,
+        lastName,
+      });
 
-      // TODO: Implement update profile endpoint in backend
-      // For now, we'll just update locally
-
-      if (user) {
-        setUser({
-          ...user,
-          firstName,
-          lastName,
-        });
+      if (response.error || !response.data) {
+        throw response.error ?? new Error("Failed to update profile");
       }
+
+      setUser((currentUser) =>
+        currentUser
+          ? {
+              ...currentUser,
+              firstName: response.data?.firstName,
+              lastName: response.data?.lastName,
+            }
+          : currentUser,
+      );
+      setNeedsOnboarding(!(response.data.firstName && response.data.lastName));
     } catch (error) {
       console.error("Profile update failed:", error);
       throw error;

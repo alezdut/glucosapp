@@ -1,10 +1,77 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { createClientMessageId, mergeMessages, upsertMessage } from "@glucosapp/utils";
 import { useAuth } from "@/contexts/auth-context";
 import { useSocket } from "./useSocket";
-import type { Message, Conversation } from "@/lib/messages-api";
+import {
+  enqueueMessageOutboxEntry,
+  flushMessageOutbox,
+  reconcileMessageOutbox,
+  subscribeToMessageOutbox,
+} from "@/lib/message-outbox";
+import { sendMessage as sendMessageApi, type Message, type Conversation } from "@/lib/messages-api";
+
+const SOCKET_ACK_TIMEOUT_MS = 5000;
+
+const emitWithAck = <TResponse>(
+  socket: {
+    timeout?: (timeoutMs: number) => {
+      emit: (
+        event: string,
+        payload: Record<string, unknown>,
+        callback: (error: Error | null, response?: TResponse) => void,
+      ) => void;
+    };
+    emit: (
+      event: string,
+      payload: Record<string, unknown>,
+      callback: (response?: TResponse) => void,
+    ) => void;
+  },
+  event: string,
+  payload: Record<string, unknown>,
+): Promise<TResponse> => {
+  return new Promise((resolve, reject) => {
+    if (typeof socket.timeout === "function") {
+      socket.timeout(SOCKET_ACK_TIMEOUT_MS).emit(event, payload, (error, response) => {
+        if (error) {
+          reject(new Error(`${event} timed out`));
+          return;
+        }
+
+        if (!response) {
+          reject(new Error(`Missing ${event} response`));
+          return;
+        }
+
+        resolve(response);
+      });
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      reject(new Error(`${event} timed out`));
+    }, SOCKET_ACK_TIMEOUT_MS);
+
+    socket.emit(event, payload, (response) => {
+      clearTimeout(timeoutId);
+      if (!response) {
+        reject(new Error(`Missing ${event} response`));
+        return;
+      }
+      resolve(response);
+    });
+  });
+};
+
+const getToken = () => {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("accessToken");
+  }
+  return null;
+};
 
 /**
  * Hook to get conversation
@@ -13,8 +80,9 @@ import type { Message, Conversation } from "@/lib/messages-api";
  */
 export const useConversation = (patientId?: string) => {
   const { user } = useAuth();
-  const { socket, isConnected } = useSocket();
-  const [messages, setMessages] = useState<Message[]>([]);
+  const { socket, isConnected, connectionState } = useSocket();
+  const [remoteMessages, setRemoteMessages] = useState<Message[]>([]);
+  const [queuedMessages, setQueuedMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const joinedPatientIdRef = useRef<string | undefined>(undefined);
   const currentPatientIdRef = useRef<string | undefined>(patientId);
@@ -48,13 +116,13 @@ export const useConversation = (patientId?: string) => {
         (newMessage.receiverId === user.id && newMessage.senderId === currentPatient);
 
       if (isRelevant) {
-        setMessages((prev) => {
-          // Avoid duplicates
-          if (prev.some((msg) => msg.id === newMessage.id)) {
-            return prev;
-          }
-          return [...prev, newMessage];
-        });
+        const normalizedMessage = {
+          ...newMessage,
+          deliveryStatus: "sent" as const,
+          isOptimistic: false,
+        };
+        setRemoteMessages((prev) => upsertMessage(prev, normalizedMessage));
+        void reconcileMessageOutbox([normalizedMessage]);
       }
     };
 
@@ -89,7 +157,7 @@ export const useConversation = (patientId?: string) => {
       joinedPatientIdRef.current !== undefined &&
       joinedPatientIdRef.current !== currentPatientId
     ) {
-      setMessages([]);
+      setRemoteMessages([]);
       setIsLoading(true);
     }
 
@@ -101,36 +169,91 @@ export const useConversation = (patientId?: string) => {
     joinedPatientIdRef.current = currentPatientId;
 
     // Join conversation room
-    socket.emit(
+    void emitWithAck<{ success: boolean; room?: string; error?: string }>(
+      socket,
       "conversation:join",
-      { patientId },
-      (response: { success: boolean; room?: string; error?: string }) => {
+      {
+        patientId,
+      },
+    )
+      .then((response) => {
         if (!response.success) {
           console.error("Failed to join conversation:", response.error);
           setIsLoading(false);
         }
-      },
-    );
+      })
+      .catch(() => {
+        setIsLoading(false);
+      });
 
     // Listen for conversation messages (initial load)
     const handleConversationMessages = (conversationMessages: Message[]) => {
-      setMessages(conversationMessages);
+      const nextMessages = conversationMessages.map((message) => ({
+        ...message,
+        deliveryStatus: "sent" as const,
+        isOptimistic: false,
+      }));
+      setRemoteMessages(nextMessages);
+      void reconcileMessageOutbox(nextMessages);
       setIsLoading(false);
     };
 
+    const handleMessageRead = (data: { messageId: string; read: boolean }) => {
+      setRemoteMessages((prev) =>
+        prev.map((message) =>
+          message.id === data.messageId ? { ...message, read: data.read } : message,
+        ),
+      );
+    };
+
     socket.on("conversation:messages", handleConversationMessages);
+    socket.on("message:read", handleMessageRead);
 
     return () => {
       socket.off("conversation:messages", handleConversationMessages);
+      socket.off("message:read", handleMessageRead);
       if (socket.connected) {
         socket.emit("conversation:leave", { patientId });
       }
     };
   }, [shouldEnable, socket, isConnected, patientId, user]);
 
+  useEffect(() => {
+    const unsubscribe = subscribeToMessageOutbox((entries) => {
+      setQueuedMessages(
+        entries
+          .filter((entry) =>
+            patientId
+              ? entry.message.receiverId === patientId || entry.message.senderId === patientId
+              : false,
+          )
+          .map((entry) => entry.message),
+      );
+    });
+
+    return unsubscribe;
+  }, [patientId]);
+
+  const flush = useCallback(async () => {
+    const accessToken = getToken();
+    if (!accessToken) {
+      return;
+    }
+
+    await flushMessageOutbox((payload) => sendMessageApi(accessToken, payload));
+  }, []);
+
+  useEffect(() => {
+    if (connectionState === "connected" || connectionState === "degraded") {
+      void flush();
+    }
+  }, [connectionState, flush]);
+
+  const messages = mergeMessages(remoteMessages, queuedMessages);
+
   return {
     data: messages,
-    isLoading: !isConnected || isLoading,
+    isLoading: isLoading && messages.length === 0 && connectionState === "connecting",
     isError: false,
     error: null,
   };
@@ -159,27 +282,57 @@ export const useConversations = () => {
     hasRequestedRef.current = true;
 
     // Request conversations list
-    socket.emit(
+    void emitWithAck<{ success: boolean; conversations?: Conversation[]; error?: string }>(
+      socket,
       "conversation:list",
       {},
-      (response: { success: boolean; conversations?: Conversation[]; error?: string }) => {
-        if (response.success && response.conversations) {
-          setConversations(response.conversations);
-        } else if (response.error) {
-          console.error("Error getting conversations:", response.error);
-        }
-      },
-    );
+    ).then((response) => {
+      if (response.success && response.conversations) {
+        setConversations(response.conversations);
+      } else if (response.error) {
+        console.error("Error getting conversations:", response.error);
+      }
+    });
 
     // Listen for conversation updates
     const handleConversationUpdated = (updatedConversations: Conversation[]) => {
       setConversations(updatedConversations);
     };
 
+    const handleMessageRead = (data: { messageId: string; read: boolean }) => {
+      setConversations((current) =>
+        current.map((conversation) => {
+          const updatedMessages = conversation.messages.map((message) =>
+            message.id === data.messageId ? { ...message, read: data.read } : message,
+          );
+
+          const unreadCount = updatedMessages.reduce(
+            (count, message) => count + (message.read || message.receiverId !== user.id ? 0 : 1),
+            0,
+          );
+
+          if (
+            updatedMessages === conversation.messages &&
+            unreadCount === conversation.unreadCount
+          ) {
+            return conversation;
+          }
+
+          return {
+            ...conversation,
+            messages: updatedMessages,
+            unreadCount,
+          };
+        }),
+      );
+    };
+
     socket.on("conversation:updated", handleConversationUpdated);
+    socket.on("message:read", handleMessageRead);
 
     return () => {
       socket.off("conversation:updated", handleConversationUpdated);
+      socket.off("message:read", handleMessageRead);
     };
   }, [socket, isConnected, user]);
 
@@ -202,7 +355,8 @@ export const useConversations = () => {
  * Hook to send a message
  */
 export const useSendMessage = () => {
-  const { socket, isConnected } = useSocket();
+  const { user } = useAuth();
+  const { connectionState } = useSocket();
 
   return useMutation({
     mutationFn: async ({
@@ -212,26 +366,53 @@ export const useSendMessage = () => {
       receiverId: string;
       content: string;
     }): Promise<Message> => {
-      if (!socket || !isConnected) {
-        throw new Error("Socket not connected");
+      if (!user) {
+        throw new Error("Not authenticated");
       }
 
-      return new Promise((resolve, reject) => {
-        socket.emit(
-          "message:send",
-          { receiverId, content },
-          (response: { success: boolean; message?: Message; error?: string }) => {
-            if (response.success && response.message) {
-              resolve(response.message);
-            } else {
-              reject(new Error(response.error || "Failed to send message"));
-            }
-          },
-        );
+      const clientMessageId = createClientMessageId();
+      const createdAtClient = new Date().toISOString();
+      const localMessage: Message = {
+        id: `local:${clientMessageId}`,
+        senderId: user.id,
+        receiverId,
+        clientMessageId,
+        content,
+        read: false,
+        createdAt: createdAtClient,
+        createdAtClient,
+        sender: {
+          id: user.id,
+          email: user.email ?? "",
+          firstName: user.firstName ?? undefined,
+          lastName: user.lastName ?? undefined,
+          avatarUrl: user.avatarUrl ?? undefined,
+        },
+        receiver: {
+          id: receiverId,
+          email: "",
+        },
+        deliveryStatus: connectionState === "connected" ? "sending" : "queued",
+        isOptimistic: true,
+      };
+
+      await enqueueMessageOutboxEntry({
+        clientMessageId,
+        receiverId,
+        content,
+        createdAtClient,
+        status: connectionState === "connected" ? "sending" : "queued",
+        attemptCount: 0,
+        message: localMessage,
       });
+
+      const accessToken = getToken();
+      if (accessToken) {
+        void flushMessageOutbox((payload) => sendMessageApi(accessToken, payload));
+      }
+
+      return localMessage;
     },
-    // UI updates automatically via socket listeners (useConversation/useConversations)
-    // No need to invalidate queries as these hooks use useState, not React Query
   });
 };
 
@@ -247,19 +428,17 @@ export const useMarkAsRead = () => {
         throw new Error("Socket not connected");
       }
 
-      return new Promise((resolve, reject) => {
-        socket.emit(
-          "message:read",
-          { messageId },
-          (response: { success: boolean; message?: Message; error?: string }) => {
-            if (response.success && response.message) {
-              resolve(response.message);
-            } else {
-              reject(new Error(response.error || "Failed to mark message as read"));
-            }
-          },
-        );
-      });
+      const response = await emitWithAck<{ success: boolean; message?: Message; error?: string }>(
+        socket,
+        "message:read",
+        { messageId },
+      );
+
+      if (response.success && response.message) {
+        return response.message;
+      }
+
+      throw new Error(response.error || "Failed to mark message as read");
     },
     // UI updates automatically via socket listeners (useConversation/useConversations)
     // No need to invalidate queries as these hooks use useState, not React Query

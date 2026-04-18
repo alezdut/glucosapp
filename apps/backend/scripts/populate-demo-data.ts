@@ -16,11 +16,12 @@ import { EncryptionService } from "../src/common/services/encryption.service";
 import { ConfigModule } from "@nestjs/config";
 import { Module } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
+import { loadBackendRuntimeEnv } from "../src/config/runtime-env";
 
 import { DEMO_PATIENTS, PatientProfile } from "./demo-data/patient-profiles";
 import { generateDailyMeals } from "./demo-data/meal-generator";
-import { generateDailyReadings, verifyReadingStatistics } from "./demo-data/glucose-generator";
-import { generateInsulinDosesForMeals, generateBasalDoses } from "./demo-data/insulin-generator";
+import { generateDailyReadings, validateGeneratedReadings } from "./demo-data/glucose-generator";
+import { generateInsulinDosesForMeals } from "./demo-data/insulin-generator";
 import { addDays, generateDateRange, generateBirthDate } from "./demo-data/utils";
 
 // Bootstrap module for standalone script
@@ -50,8 +51,7 @@ class DemoDataPopulator {
   private startTime: number;
 
   private getAvatarUrl(avatarPath: string): string {
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3001";
-    return new URL(avatarPath, frontendUrl).toString();
+    return new URL(avatarPath, loadBackendRuntimeEnv().FRONTEND_URL).toString();
   }
 
   private async syncDemoUserProfile(
@@ -261,6 +261,11 @@ class DemoDataPopulator {
     let logEntriesCreated = 0;
     let sensorReadingsCreated = 0;
     let alertsCreated = 0;
+    const validationSampleReadings: Array<{
+      glucose: number;
+      timestamp: Date;
+      source: PatientProfile["readingSource"];
+    }> = [];
 
     await this.prisma.$transaction(
       async (tx) => {
@@ -341,6 +346,9 @@ class DemoDataPopulator {
 
           // Generate glucose readings for the day (used for both LogEntry and GlucoseReading)
           const dailyReadings = generateDailyReadings(date, profile, dailyMeals);
+          if (validationSampleReadings.length < profile.readingsPerDay * 14) {
+            validationSampleReadings.push(...dailyReadings);
+          }
 
           // Generate insulin doses based on meals and glucose
           const mealInsulinDoses = generateInsulinDosesForMeals(dailyMeals, dailyReadings, profile);
@@ -474,6 +482,20 @@ class DemoDataPopulator {
         timeout: 300000, // 5 minutes
       },
     );
+
+    if (validationSampleReadings.length > 0) {
+      const validation = validateGeneratedReadings(validationSampleReadings, profile);
+      if (!validation.passed) {
+        console.warn(
+          `  ! Validation warning for ${profile.firstName} ${profile.lastName}: ` +
+            `TIR ${validation.actual.inRangePercentage}% (target ${profile.targetInRangePercentage}%), ` +
+            `hypo ${validation.actual.hypoPercentage}% (target ${profile.hypoglycemiaPercentage}%), ` +
+            `severe hypo ${validation.actual.severeHypoPercentage}% ` +
+            `(target ${profile.severeHypoglycemiaPercentage}%), ` +
+            `hyper ${validation.actual.hyperPercentage}% (target ${profile.hyperglycemiaPercentage}%)`,
+        );
+      }
+    }
 
     return { logEntriesCreated, sensorReadingsCreated, alertsCreated };
   }

@@ -1,7 +1,7 @@
 import { io, Socket } from "socket.io-client";
+import { getMobileApiOrigin } from "./env";
 
-const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:3000";
-const socketUrl = apiBaseUrl.replace(/\/v1$/, ""); // Remove /v1 if present
+const socketUrl = getMobileApiOrigin();
 
 let socket: Socket | null = null;
 
@@ -48,7 +48,7 @@ export const getSocket = (token: string | null): Socket | null => {
     });
 
     socket.on("connect_error", (error) => {
-      console.error("Socket connection error:", error.message);
+      void error;
     });
   }
 

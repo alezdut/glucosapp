@@ -1,8 +1,9 @@
 import { makeApiClient } from "@glucosapp/api-client";
-
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
-const { client } = makeApiClient(`${apiBaseUrl}/v1`);
 import type { LogEntry } from "@glucosapp/types";
+import { getWebApiBaseUrl } from "./env";
+
+const apiBaseUrl = getWebApiBaseUrl();
+const { client } = makeApiClient(apiBaseUrl);
 
 export interface DashboardSummary {
   activePatients: number;
@@ -596,7 +597,7 @@ export async function generateIndividualReport(
   patientId: string,
   options: GenerateReportOptions,
 ): Promise<Blob> {
-  const response = await fetch(`${apiBaseUrl}/v1/reports/individual`, {
+  const response = await fetch(`${apiBaseUrl}/reports/individual`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -623,7 +624,7 @@ export async function generateGroupReport(
   accessToken: string,
   options: GenerateGroupReportOptions,
 ): Promise<Blob> {
-  const response = await fetch(`${apiBaseUrl}/v1/reports/group`, {
+  const response = await fetch(`${apiBaseUrl}/reports/group`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,

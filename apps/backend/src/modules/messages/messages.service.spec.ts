@@ -11,7 +11,6 @@ import { CreateMessageDto } from "./dto/create-message.dto";
 describe("MessagesService", () => {
   let service: MessagesService;
   let prismaService: PrismaService;
-  let doctorUtilsService: DoctorUtilsService;
 
   const doctorId = "doctor-123";
   const patientId = "patient-123";
@@ -43,10 +42,12 @@ describe("MessagesService", () => {
     id: "message-123",
     senderId: patientId,
     receiverId: doctorId,
+    clientMessageId: "client-message-123",
     content: "Test message",
     read: false,
     readAt: null,
     createdAt: new Date("2024-01-01T12:00:00.000Z"),
+    createdAtClient: new Date("2024-01-01T11:59:55.000Z"),
     sender: {
       id: patientId,
       email: mockPatient.email,
@@ -85,7 +86,6 @@ describe("MessagesService", () => {
 
     service = module.get<MessagesService>(MessagesService);
     prismaService = module.get<PrismaService>(PrismaService);
-    doctorUtilsService = module.get<DoctorUtilsService>(DoctorUtilsService);
   });
 
   it("should be defined", () => {
@@ -96,32 +96,39 @@ describe("MessagesService", () => {
     const createDto: CreateMessageDto = {
       receiverId: doctorId,
       content: "Test message",
+      clientMessageId: "client-message-123",
+      createdAtClient: "2024-01-01T11:59:55.000Z",
     };
 
     it("should send a message from patient to doctor successfully", async () => {
       (prismaService.user.findUnique as jest.Mock)
-        .mockResolvedValueOnce(mockPatient) // sender
-        .mockResolvedValueOnce(mockDoctor); // receiver
+        .mockResolvedValueOnce(mockDoctor) // receiver
+        .mockResolvedValueOnce({ role: UserRole.PATIENT }); // sender role
       (prismaService.doctorPatient.findFirst as jest.Mock).mockResolvedValue(
         mockDoctorPatientRelation,
       );
+      (prismaService.message.findUnique as jest.Mock).mockResolvedValue(null);
       (prismaService.message.create as jest.Mock).mockResolvedValue(mockMessage);
 
       const result = await service.sendMessage(patientId, createDto);
 
-      expect(result).toMatchObject({
+      expect(result.message).toMatchObject({
         id: mockMessage.id,
         senderId: patientId,
         receiverId: doctorId,
+        clientMessageId: "client-message-123",
         content: "Test message",
         read: false,
       });
+      expect(result.created).toBe(true);
       expect(prismaService.message.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: {
             senderId: patientId,
             receiverId: doctorId,
+            clientMessageId: "client-message-123",
             content: "Test message",
+            createdAtClient: new Date("2024-01-01T11:59:55.000Z"),
           },
         }),
       );
@@ -131,18 +138,22 @@ describe("MessagesService", () => {
       const createDtoDoctor: CreateMessageDto = {
         receiverId: patientId,
         content: "Doctor's response",
+        clientMessageId: "doctor-client-message-1",
+        createdAtClient: "2024-01-01T12:05:00.000Z",
       };
 
       (prismaService.user.findUnique as jest.Mock)
-        .mockResolvedValueOnce(mockDoctor) // sender
-        .mockResolvedValueOnce(mockPatient); // receiver
+        .mockResolvedValueOnce(mockPatient) // receiver
+        .mockResolvedValueOnce({ role: UserRole.DOCTOR }); // sender role
       (prismaService.doctorPatient.findFirst as jest.Mock).mockResolvedValue(
         mockDoctorPatientRelation,
       );
+      (prismaService.message.findUnique as jest.Mock).mockResolvedValue(null);
       (prismaService.message.create as jest.Mock).mockResolvedValue({
         ...mockMessage,
         senderId: doctorId,
         receiverId: patientId,
+        clientMessageId: "doctor-client-message-1",
         content: "Doctor's response",
         sender: {
           id: doctorId,
@@ -162,15 +173,14 @@ describe("MessagesService", () => {
 
       const result = await service.sendMessage(doctorId, createDtoDoctor);
 
-      expect(result.senderId).toBe(doctorId);
-      expect(result.receiverId).toBe(patientId);
-      expect(result.content).toBe("Doctor's response");
+      expect(result.message.senderId).toBe(doctorId);
+      expect(result.message.receiverId).toBe(patientId);
+      expect(result.message.content).toBe("Doctor's response");
+      expect(result.created).toBe(true);
     });
 
     it("should throw NotFoundException if receiver does not exist", async () => {
-      (prismaService.user.findUnique as jest.Mock)
-        .mockResolvedValueOnce(mockPatient) // sender
-        .mockResolvedValueOnce(null); // receiver not found
+      (prismaService.user.findUnique as jest.Mock).mockResolvedValueOnce(null);
 
       await expect(service.sendMessage(patientId, createDto)).rejects.toThrow(NotFoundException);
       expect(prismaService.message.create).not.toHaveBeenCalled();
@@ -178,8 +188,8 @@ describe("MessagesService", () => {
 
     it("should throw ForbiddenException if no doctor-patient relationship exists", async () => {
       (prismaService.user.findUnique as jest.Mock)
-        .mockResolvedValueOnce(mockPatient)
-        .mockResolvedValueOnce(mockDoctor);
+        .mockResolvedValueOnce(mockDoctor)
+        .mockResolvedValueOnce({ role: UserRole.PATIENT });
       (prismaService.doctorPatient.findFirst as jest.Mock).mockResolvedValue(null);
 
       await expect(service.sendMessage(patientId, createDto)).rejects.toThrow(ForbiddenException);
@@ -194,11 +204,13 @@ describe("MessagesService", () => {
       const createDtoInvalid: CreateMessageDto = {
         receiverId: otherPatient.id,
         content: "Test message",
+        clientMessageId: "invalid-1",
+        createdAtClient: "2024-01-01T12:00:00.000Z",
       };
 
       (prismaService.user.findUnique as jest.Mock)
-        .mockResolvedValueOnce(mockPatient)
-        .mockResolvedValueOnce(otherPatient);
+        .mockResolvedValueOnce(otherPatient)
+        .mockResolvedValueOnce({ role: UserRole.PATIENT });
       (prismaService.doctorPatient.findFirst as jest.Mock).mockResolvedValue(null);
 
       await expect(service.sendMessage(patientId, createDtoInvalid)).rejects.toThrow(
@@ -214,11 +226,13 @@ describe("MessagesService", () => {
       const createDtoInvalid: CreateMessageDto = {
         receiverId: otherDoctor.id,
         content: "Test message",
+        clientMessageId: "invalid-2",
+        createdAtClient: "2024-01-01T12:00:00.000Z",
       };
 
       (prismaService.user.findUnique as jest.Mock)
-        .mockResolvedValueOnce(mockDoctor)
-        .mockResolvedValueOnce(otherDoctor);
+        .mockResolvedValueOnce(otherDoctor)
+        .mockResolvedValueOnce({ role: UserRole.DOCTOR });
       (prismaService.doctorPatient.findFirst as jest.Mock).mockResolvedValue(null);
 
       await expect(service.sendMessage(doctorId, createDtoInvalid)).rejects.toThrow(
@@ -230,14 +244,17 @@ describe("MessagesService", () => {
       const createDtoWithSpaces: CreateMessageDto = {
         receiverId: doctorId,
         content: "  Test message with spaces  ",
+        clientMessageId: "trim-test",
+        createdAtClient: "2024-01-01T12:00:00.000Z",
       };
 
       (prismaService.user.findUnique as jest.Mock)
-        .mockResolvedValueOnce(mockPatient)
-        .mockResolvedValueOnce(mockDoctor);
+        .mockResolvedValueOnce(mockDoctor)
+        .mockResolvedValueOnce({ role: UserRole.PATIENT });
       (prismaService.doctorPatient.findFirst as jest.Mock).mockResolvedValue(
         mockDoctorPatientRelation,
       );
+      (prismaService.message.findUnique as jest.Mock).mockResolvedValue(null);
       (prismaService.message.create as jest.Mock).mockResolvedValue({
         ...mockMessage,
         content: "Test message with spaces",
@@ -248,10 +265,32 @@ describe("MessagesService", () => {
       expect(prismaService.message.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
+            clientMessageId: "trim-test",
             content: "Test message with spaces",
           }),
         }),
       );
+    });
+
+    it("should return the same message for idempotent retries", async () => {
+      (prismaService.user.findUnique as jest.Mock)
+        .mockResolvedValueOnce(mockDoctor)
+        .mockResolvedValueOnce({ role: UserRole.PATIENT });
+      (prismaService.doctorPatient.findFirst as jest.Mock).mockResolvedValue(
+        mockDoctorPatientRelation,
+      );
+      (prismaService.message.findUnique as jest.Mock).mockResolvedValue(mockMessage);
+
+      const result = await service.sendMessage(patientId, createDto);
+
+      expect(result).toEqual({
+        message: expect.objectContaining({
+          id: mockMessage.id,
+          clientMessageId: mockMessage.clientMessageId,
+        }),
+        created: false,
+      });
+      expect(prismaService.message.create).not.toHaveBeenCalled();
     });
   });
 

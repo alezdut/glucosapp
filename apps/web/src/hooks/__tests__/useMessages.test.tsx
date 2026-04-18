@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { useAuth } from "@/contexts/auth-context";
 import { useSocket } from "../useSocket";
+import * as messageOutbox from "@/lib/message-outbox";
+import * as messagesApi from "@/lib/messages-api";
 import {
   useConversation,
   useConversations,
@@ -22,10 +24,35 @@ jest.mock("../useSocket", () => ({
   useSocket: jest.fn(),
 }));
 
+jest.mock("@/lib/message-outbox", () => ({
+  enqueueMessageOutboxEntry: jest.fn(),
+  flushMessageOutbox: jest.fn(),
+  reconcileMessageOutbox: jest.fn(),
+  retryMessageOutboxEntry: jest.fn(),
+  subscribeToMessageOutbox: jest.fn(() => jest.fn()),
+}));
+
+jest.mock("@/lib/messages-api", () => ({
+  sendMessage: jest.fn(),
+}));
+
 type Listener = (...args: unknown[]) => void;
 
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockUseSocket = useSocket as jest.MockedFunction<typeof useSocket>;
+const mockEnqueueMessageOutboxEntry =
+  messageOutbox.enqueueMessageOutboxEntry as jest.MockedFunction<
+    typeof messageOutbox.enqueueMessageOutboxEntry
+  >;
+const mockFlushMessageOutbox = messageOutbox.flushMessageOutbox as jest.MockedFunction<
+  typeof messageOutbox.flushMessageOutbox
+>;
+const mockSubscribeToMessageOutbox = messageOutbox.subscribeToMessageOutbox as jest.MockedFunction<
+  typeof messageOutbox.subscribeToMessageOutbox
+>;
+const mockSendMessageApi = messagesApi.sendMessage as jest.MockedFunction<
+  typeof messagesApi.sendMessage
+>;
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
@@ -69,8 +96,45 @@ const createSocket = () => {
         callback?.({
           success: true,
           conversations: [
-            { patientId: "patient-1", unreadCount: 2 },
-            { patientId: "patient-2", unreadCount: 1 },
+            {
+              patientId: "patient-1",
+              unreadCount: 2,
+              messages: [
+                {
+                  id: "msg-1",
+                  senderId: "patient-1",
+                  receiverId: "doctor-1",
+                  read: false,
+                  createdAt: "2026-04-15T10:00:00.000Z",
+                  sender: { email: "patient-1@example.com" },
+                  receiver: { email: "doctor@example.com" },
+                },
+                {
+                  id: "msg-2",
+                  senderId: "patient-1",
+                  receiverId: "doctor-1",
+                  read: false,
+                  createdAt: "2026-04-15T10:01:00.000Z",
+                  sender: { email: "patient-1@example.com" },
+                  receiver: { email: "doctor@example.com" },
+                },
+              ],
+            },
+            {
+              patientId: "patient-2",
+              unreadCount: 1,
+              messages: [
+                {
+                  id: "msg-3",
+                  senderId: "patient-2",
+                  receiverId: "doctor-1",
+                  read: false,
+                  createdAt: "2026-04-15T10:02:00.000Z",
+                  sender: { email: "patient-2@example.com" },
+                  receiver: { email: "doctor@example.com" },
+                },
+              ],
+            },
           ],
         });
       }
@@ -111,6 +175,7 @@ const createSocket = () => {
 describe("useMessages hooks", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorage.setItem("accessToken", "token-123");
     mockUseAuth.mockReturnValue({
       user: { id: "doctor-1", role: "DOCTOR" },
       isLoading: false,
@@ -120,6 +185,21 @@ describe("useMessages hooks", () => {
       logout: jest.fn(),
       refreshUser: jest.fn(),
     } as never);
+    mockSubscribeToMessageOutbox.mockImplementation((listener) => {
+      listener([]);
+      return jest.fn();
+    });
+    mockFlushMessageOutbox.mockResolvedValue(undefined);
+    mockSendMessageApi.mockResolvedValue({
+      id: "message-sent",
+      senderId: "doctor-1",
+      receiverId: "patient-1",
+      content: "Hola",
+      read: false,
+      createdAt: "2026-04-15T00:00:00.000Z",
+      sender: { id: "doctor-1", email: "doctor@example.com" },
+      receiver: { id: "patient-1", email: "patient@example.com" },
+    } as never);
   });
 
   it("loads and updates a conversation through socket events", async () => {
@@ -128,6 +208,7 @@ describe("useMessages hooks", () => {
       socket,
       isConnected: true,
       error: null,
+      connectionState: "connected",
     } as never);
 
     const { result, unmount } = renderHook(() => useConversation("patient-1"), {
@@ -170,8 +251,18 @@ describe("useMessages hooks", () => {
     });
 
     expect(result.current.data).toEqual([
-      { id: "msg-1", senderId: "patient-1", receiverId: "doctor-1", content: "Hola" },
-      { id: "msg-2", senderId: "patient-1", receiverId: "doctor-1", content: "Seguimiento" },
+      expect.objectContaining({
+        id: "msg-1",
+        senderId: "patient-1",
+        receiverId: "doctor-1",
+        content: "Hola",
+      }),
+      expect.objectContaining({
+        id: "msg-2",
+        senderId: "patient-1",
+        receiverId: "doctor-1",
+        content: "Seguimiento",
+      }),
     ]);
 
     unmount();
@@ -184,6 +275,7 @@ describe("useMessages hooks", () => {
       socket,
       isConnected: true,
       error: null,
+      connectionState: "connected",
     } as never);
 
     const { result } = renderHook(() => useConversations(), {
@@ -197,20 +289,27 @@ describe("useMessages hooks", () => {
     expect(unreadResult.current.data).toBe(3);
 
     act(() => {
-      trigger("conversation:updated", [{ patientId: "patient-3", unreadCount: 5 }]);
+      trigger("message:read", { messageId: "msg-1", read: true });
     });
 
-    await waitFor(() =>
-      expect(result.current.data).toEqual([{ patientId: "patient-3", unreadCount: 5 }]),
-    );
+    await waitFor(() => {
+      expect(result.current.data[0]).toEqual(
+        expect.objectContaining({
+          unreadCount: 1,
+          messages: expect.arrayContaining([expect.objectContaining({ id: "msg-1", read: true })]),
+        }),
+      );
+      expect(unreadResult.current.data).toBe(2);
+    });
   });
 
-  it("sends and marks messages as read through mutations", async () => {
+  it("queues messages and marks them as read through mutations", async () => {
     const { socket } = createSocket();
     mockUseSocket.mockReturnValue({
       socket,
       isConnected: true,
       error: null,
+      connectionState: "connected",
     } as never);
 
     const { result: sendResult } = renderHook(() => useSendMessage(), {
@@ -223,20 +322,20 @@ describe("useMessages hooks", () => {
     await act(async () => {
       await expect(
         sendResult.current.mutateAsync({ receiverId: "patient-1", content: "Hola" }),
-      ).resolves.toEqual(
-        expect.objectContaining({ id: "message-sent", receiverId: "patient-1", content: "Hola" }),
-      );
+      ).resolves.toEqual(expect.objectContaining({ receiverId: "patient-1", content: "Hola" }));
 
       await expect(readResult.current.mutateAsync("msg-9")).resolves.toEqual(
         expect.objectContaining({ id: "msg-9" }),
       );
     });
 
-    expect(socket.emit).toHaveBeenCalledWith(
-      "message:send",
-      { receiverId: "patient-1", content: "Hola" },
-      expect.any(Function),
+    expect(mockEnqueueMessageOutboxEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        receiverId: "patient-1",
+        content: "Hola",
+      }),
     );
+    expect(mockFlushMessageOutbox).toHaveBeenCalled();
     expect(socket.emit).toHaveBeenCalledWith(
       "message:read",
       { messageId: "msg-9" },
@@ -250,6 +349,7 @@ describe("useMessages hooks", () => {
       socket,
       isConnected: true,
       error: null,
+      connectionState: "connected",
     } as never);
 
     const { result, rerender } = renderHook(
@@ -326,11 +426,12 @@ describe("useMessages hooks", () => {
     expect(result.current.notifications).toEqual([]);
   });
 
-  it("rejects mutations when socket is not connected", async () => {
+  it("still queues messages when socket is not connected", async () => {
     mockUseSocket.mockReturnValue({
       socket: null,
       isConnected: false,
       error: new Error("down"),
+      connectionState: "offline",
     } as never);
 
     const { result: sendResult } = renderHook(() => useSendMessage(), {
@@ -343,7 +444,7 @@ describe("useMessages hooks", () => {
     await act(async () => {
       await expect(
         sendResult.current.mutateAsync({ receiverId: "patient-1", content: "Hola" }),
-      ).rejects.toThrow("Socket not connected");
+      ).resolves.toEqual(expect.objectContaining({ receiverId: "patient-1", content: "Hola" }));
       await expect(readResult.current.mutateAsync("msg-1")).rejects.toThrow("Socket not connected");
     });
   });

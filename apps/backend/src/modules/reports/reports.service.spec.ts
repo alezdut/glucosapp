@@ -206,6 +206,52 @@ describe("ReportsService", () => {
       expect(result).toContain("Tipo,Fecha,Valor");
     });
 
+    it("should include meals recorded directly on log entries when mealTemplateId is null", async () => {
+      const csvDto = {
+        ...dto,
+        format: ReportFormat.CSV,
+        reportTypes: [ReportType.MEALS],
+      };
+
+      (prismaService.logEntry.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "log-1",
+          recordedAt: new Date("2024-01-15T12:00:00.000Z"),
+          mealType: "LUNCH",
+          carbohydrates: 48,
+          mealTemplate: null,
+        },
+        {
+          id: "log-2",
+          recordedAt: new Date("2024-01-15T20:00:00.000Z"),
+          mealType: "DINNER",
+          carbohydrates: 36,
+          mealTemplate: {
+            id: "meal-1",
+            name: "Cena ejemplo",
+            carbohydrates: 40,
+            foodItems: [],
+          },
+        },
+      ]);
+
+      const result = await service.generateIndividualReport(doctorId, csvDto);
+
+      expect(typeof result).toBe("string");
+      const csv = result as string;
+
+      expect(csv).toContain("Comida,2024-01-15T12:00:00.000Z,48,g,Registro LUNCH");
+      expect(csv).toContain("Comida,2024-01-15T20:00:00.000Z,36,g,Cena ejemplo");
+      expect(prismaService.logEntry.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            userId: patientId,
+            OR: [{ mealTemplateId: { not: null } }, { carbohydrates: { gt: 0 } }],
+          }),
+        }),
+      );
+    });
+
     it("should include AI summary when requested and API key is configured", async () => {
       (configService.get as jest.Mock).mockReturnValue("test-api-key");
       const aiDto = { ...dto, includeAISummary: true };
@@ -1109,9 +1155,9 @@ describe("ReportsService", () => {
         foodItems: [],
       };
 
-      // Patient 1: 2 meals (50+60=110g carbs)
-      // Patient 2: 3 meals (40+50+30=120g carbs)
-      // Total: 5 meals, 230g carbs
+      // Patient 1: 2 meals (manual 45 + template 60 = 105g carbs)
+      // Patient 2: 3 meals (manual 40 + template 50 + manual 30 = 120g carbs)
+      // Total: 5 meals, 225g carbs
       (prismaService.logEntry.findMany as jest.Mock).mockImplementation((args: any) => {
         if (args.where.userId?.in) {
           // Batch query - return all meals for all patients
@@ -1120,31 +1166,41 @@ describe("ReportsService", () => {
               id: "l1",
               recordedAt: new Date("2024-01-10"),
               userId: "p1",
-              mealTemplate: { ...mockMealTemplate, carbohydrates: 50 },
+              mealType: "BREAKFAST",
+              carbohydrates: 45,
+              mealTemplate: null,
             },
             {
               id: "l2",
               recordedAt: new Date("2024-01-11"),
               userId: "p1",
+              mealType: "LUNCH",
+              carbohydrates: 60,
               mealTemplate: { ...mockMealTemplate, carbohydrates: 60 },
             },
             {
               id: "l3",
               recordedAt: new Date("2024-01-10"),
               userId: "p2",
-              mealTemplate: { ...mockMealTemplate, carbohydrates: 40 },
+              mealType: "BREAKFAST",
+              carbohydrates: 40,
+              mealTemplate: null,
             },
             {
               id: "l4",
               recordedAt: new Date("2024-01-11"),
               userId: "p2",
+              mealType: "LUNCH",
+              carbohydrates: 50,
               mealTemplate: { ...mockMealTemplate, carbohydrates: 50 },
             },
             {
               id: "l5",
               recordedAt: new Date("2024-01-12"),
               userId: "p2",
-              mealTemplate: { ...mockMealTemplate, carbohydrates: 30 },
+              mealType: "DINNER",
+              carbohydrates: 30,
+              mealTemplate: null,
             },
           ]);
         }
@@ -1158,15 +1214,24 @@ describe("ReportsService", () => {
 
       // Verify exact calculations
       // Total meals: 5
-      // Total carbs: 230g
-      // Average per meal: 230/5 = 46g
-      // Average daily: 230/31 = 7.42g rounded to 7.4
-      // Average daily per patient: 7.42/2 = 3.71g rounded to 3.7
+      // Total carbs: 225g
+      // Average per meal: 225/5 = 45g
+      // Average daily: 225/31 = 7.25g rounded to 7.3
+      // Average daily per patient: 7.25/2 = 3.63g rounded to 3.6
       expect(csv).toContain("Comidas,Total de comidas,5,comidas");
-      expect(csv).toContain("Comidas,Total de carbohidratos,230.0,g");
-      expect(csv).toContain("Comidas,Promedio por comida,46.0,g");
+      expect(csv).toContain("Comidas,Total de carbohidratos,225.0,g");
+      expect(csv).toContain("Comidas,Promedio por comida,45.0,g");
+      expect(csv).toContain("Comidas,Promedio diario total,7.3,g/día");
+      expect(csv).toContain("Comidas,Promedio diario por paciente,3.6,g/día/paciente");
       // Verify batch query was used (single call instead of per-patient calls)
-      expect(prismaService.logEntry.findMany).toHaveBeenCalled();
+      expect(prismaService.logEntry.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            userId: { in: ["p1", "p2"] },
+            OR: [{ mealTemplateId: { not: null } }, { carbohydrates: { gt: 0 } }],
+          }),
+        }),
+      );
     });
   });
 

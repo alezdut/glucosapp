@@ -1,9 +1,10 @@
 import { makeApiClient } from "@glucosapp/api-client";
 import { AuthResponse, User } from "@glucosapp/types";
 import { throwApiError } from "@glucosapp/utils";
+import { getWebApiBaseUrl } from "./env";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
-const { client } = makeApiClient(`${apiBaseUrl}/v1`);
+const apiBaseUrl = getWebApiBaseUrl();
+const { client } = makeApiClient(apiBaseUrl);
 
 export interface RegisterData {
   email: string;

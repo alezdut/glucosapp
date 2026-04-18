@@ -4,6 +4,8 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import CommunicationScreen from "../CommunicationScreen";
 import { renderMobile } from "../../../test/render-mobile";
 import * as messagesHooks from "../../hooks/useMessages";
+import * as messageOutboxHooks from "../../hooks/useMessageOutbox";
+import * as socketHooks from "../../hooks/useSocket";
 import * as authContext from "../../contexts/AuthContext";
 import * as utils from "@glucosapp/utils";
 
@@ -57,6 +59,14 @@ jest.mock("../../hooks/useMessages", () => ({
   useAssignedDoctor: jest.fn(),
 }));
 
+jest.mock("../../hooks/useMessageOutbox", () => ({
+  useMessageOutbox: jest.fn(),
+}));
+
+jest.mock("../../hooks/useSocket", () => ({
+  useSocket: jest.fn(),
+}));
+
 jest.mock("../../components/ScreenHeader", () => ({
   __esModule: true,
   default: ({ title, onBack }: { title: string; onBack?: () => void }) => (
@@ -87,6 +97,10 @@ const mockUseMarkAsReadBatch = messagesHooks.useMarkAsReadBatch as jest.MockedFu
 const mockUseAssignedDoctor = messagesHooks.useAssignedDoctor as jest.MockedFunction<
   typeof messagesHooks.useAssignedDoctor
 >;
+const mockUseMessageOutbox = messageOutboxHooks.useMessageOutbox as jest.MockedFunction<
+  typeof messageOutboxHooks.useMessageOutbox
+>;
+const mockUseSocket = socketHooks.useSocket as jest.MockedFunction<typeof socketHooks.useSocket>;
 
 describe("CommunicationScreen", () => {
   const sendMessageMutateAsync = jest.fn();
@@ -118,6 +132,12 @@ describe("CommunicationScreen", () => {
           lastName: "Fernández",
         },
       },
+    } as never);
+    mockUseMessageOutbox.mockReturnValue({
+      retryMessage: jest.fn(),
+    } as never);
+    mockUseSocket.mockReturnValue({
+      connectionState: "connected",
     } as never);
     sendMessageMutateAsync.mockResolvedValue(undefined);
   });
