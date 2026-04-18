@@ -27,7 +27,11 @@ export class DashboardService {
   /**
    * Get alert settings for a patient (used internally to filter alerts)
    */
-  private async getAlertSettings(patientId: string) {
+  private async getAlertSettings(patientId?: string) {
+    if (!patientId) {
+      return null;
+    }
+
     return this.prisma.alertSettings.findUnique({
       where: { userId: patientId },
     });
@@ -81,7 +85,7 @@ export class DashboardService {
 
     // Get alert settings to determine which alert types are enabled
     const firstPatientId = patientIds[0];
-    const settings = await this.getAlertSettings(firstPatientId);
+    const settings = firstPatientId ? await this.getAlertSettings(firstPatientId) : null;
 
     // Build list of enabled alert types based on settings
     const enabledAlertTypes: AlertType[] = [];
