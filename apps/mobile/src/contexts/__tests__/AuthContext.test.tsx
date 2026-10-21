@@ -67,6 +67,13 @@ describe("AuthProvider", () => {
           <button onClick={() => auth.updateUserProfile("Ana", "Paz")}>update</button>
           <button onClick={() => auth.signOut()}>sign-out</button>
           <button onClick={() => auth.signInWithGoogle()}>sign-in</button>
+          <button
+            onClick={() =>
+              auth.signInWithPassword(" demo@example.com ", "Demo123!").catch(() => {})
+            }
+          >
+            password-sign-in
+          </button>
         </>
       );
     };
@@ -101,6 +108,44 @@ describe("AuthProvider", () => {
         createdAt: "2026-01-01T00:00:00.000Z",
       },
     });
+  });
+
+  it("stores a successful password session and rejects failed credentials without storing tokens", async () => {
+    mockGetAccessToken.mockResolvedValue(null);
+    const { AuthProvider, Consumer } = loadAuthModule();
+    render(
+      <AuthProvider>
+        <Consumer />
+      </AuthProvider>,
+    );
+    POST.mockResolvedValueOnce({ error: { message: "Unauthorized" } });
+    await act(async () => {
+      screen.getByText("password-sign-in").click();
+    });
+    expect(mockStoreTokens).not.toHaveBeenCalled();
+    expect(screen.getByText("no-user")).toBeTruthy();
+    POST.mockResolvedValueOnce({
+      data: {
+        accessToken: "password-access",
+        refreshToken: "password-refresh",
+        user: {
+          id: "patient-1",
+          email: "demo@example.com",
+          firstName: "Ana",
+          lastName: "Demo",
+          role: "PATIENT",
+        },
+      },
+    });
+    await act(async () => {
+      screen.getByText("password-sign-in").click();
+    });
+    expect(POST).toHaveBeenLastCalledWith("/auth/login", {
+      body: { email: "demo@example.com", password: "Demo123!" },
+    });
+    expect(mockStoreTokens).toHaveBeenCalledWith("password-access", "password-refresh");
+    expect(screen.getByText("demo@example.com")).toBeTruthy();
+    expect(screen.getByText("ready")).toBeTruthy();
   });
 
   it("loads the current user, persists onboarding updates and refreshes state", async () => {

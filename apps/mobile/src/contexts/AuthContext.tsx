@@ -31,6 +31,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   needsOnboarding: boolean;
   signInWithGoogle: () => Promise<void>;
+  signInWithPassword: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateUserProfile: (firstName: string, lastName: string) => Promise<void>;
   completeOnboarding: () => void;
@@ -176,6 +177,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const signInWithPassword = async (email: string, password: string) => {
+    setIsLoading(true);
+    try {
+      const response = await createApiClient().POST<{
+        accessToken: string;
+        refreshToken: string;
+        user: User;
+      }>("/auth/login", { body: { email: email.trim(), password } });
+      if (
+        response.error ||
+        !response.data?.accessToken ||
+        !response.data.refreshToken ||
+        !response.data.user
+      ) {
+        throw new Error("No se pudo iniciar sesión. Revisá tu email y contraseña.");
+      }
+      await storeTokens(response.data.accessToken, response.data.refreshToken);
+      setUser(response.data.user);
+      setNeedsOnboarding(!(response.data.user.firstName && response.data.user.lastName));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   /**
    * Sign in with Google
    */
@@ -305,6 +330,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: !!user,
     needsOnboarding,
     signInWithGoogle,
+    signInWithPassword,
     signOut,
     updateUserProfile,
     completeOnboarding,

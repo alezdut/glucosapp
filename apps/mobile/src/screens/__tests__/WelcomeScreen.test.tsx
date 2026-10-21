@@ -24,6 +24,7 @@ describe("WelcomeScreen", () => {
       isAuthenticated: false,
       needsOnboarding: false,
       signInWithGoogle,
+      signInWithPassword: jest.fn(),
       signOut: jest.fn(),
       updateUserProfile: jest.fn(),
       completeOnboarding: jest.fn(),
@@ -39,6 +40,29 @@ describe("WelcomeScreen", () => {
     });
   });
 
+  it("submits password credentials and displays a useful error on rejection", async () => {
+    const signInWithPassword = jest.fn().mockRejectedValue(new Error("invalid credentials"));
+    mockUseAuth.mockReturnValue({
+      isLoading: false,
+      signInWithPassword,
+      signInWithGoogle: jest.fn(),
+    } as never);
+    renderMobile(<WelcomeScreen />);
+    expect(screen.getByRole("button", { name: /^iniciar sesión$/i })).toHaveProperty(
+      "disabled",
+      true,
+    );
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "demo-patient-1@glucosapp.demo" },
+    });
+    fireEvent.change(screen.getByLabelText("Contraseña"), { target: { value: "Demo123!" } });
+    fireEvent.click(screen.getByRole("button", { name: /^iniciar sesión$/i }));
+    await waitFor(() =>
+      expect(signInWithPassword).toHaveBeenCalledWith("demo-patient-1@glucosapp.demo", "Demo123!"),
+    );
+    expect(await screen.findByText(/revisá tus credenciales/i)).toBeTruthy();
+  });
+
   it("shows a loading state and disables the CTA while auth is resolving", () => {
     mockUseAuth.mockReturnValue({
       user: null,
@@ -46,6 +70,7 @@ describe("WelcomeScreen", () => {
       isAuthenticated: false,
       needsOnboarding: false,
       signInWithGoogle: jest.fn(),
+      signInWithPassword: jest.fn(),
       signOut: jest.fn(),
       updateUserProfile: jest.fn(),
       completeOnboarding: jest.fn(),
@@ -55,7 +80,10 @@ describe("WelcomeScreen", () => {
     renderMobile(<WelcomeScreen />);
 
     expect(screen.getByTestId("activity-indicator")).toBeTruthy();
-    expect(screen.getByRole("button")).toHaveProperty("disabled", true);
+    expect(screen.getByRole("button", { name: /continuar con google/i })).toHaveProperty(
+      "disabled",
+      true,
+    );
   });
 
   it("keeps rendering if Google sign-in rejects", async () => {
@@ -68,6 +96,7 @@ describe("WelcomeScreen", () => {
       isAuthenticated: false,
       needsOnboarding: false,
       signInWithGoogle,
+      signInWithPassword: jest.fn(),
       signOut: jest.fn(),
       updateUserProfile: jest.fn(),
       completeOnboarding: jest.fn(),

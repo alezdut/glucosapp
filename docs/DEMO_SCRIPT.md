@@ -12,3 +12,7 @@ Todos los nombres, perfiles, lecturas y credenciales son sintéticos. No use la 
 8. Explique que el algoritmo MDI es experimental y no está validado clínicamente. No cambie parámetros ni muestre dosis como recomendaciones para una persona real.
 
 Las capturas de documentación se obtienen de estas cuentas. No necesita sensores, credenciales Google, correo ni servicios pagos para este recorrido. Consulte las dependencias opcionales y limitaciones en SETUP.
+
+## Verificación de esta release
+
+La instalación, migraciones, carga repetida, autenticación, permisos, reportes y chat se verificaron mediante smoke tests y CI. Se revisaron manualmente el dashboard, la ficha del paciente y los enlaces de licencia de la web. La app iOS compiló para simulador; el recorrido completo en dispositivo nativo queda pendiente.
