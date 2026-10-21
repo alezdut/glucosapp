@@ -27,6 +27,7 @@ import { JwtPayload } from "../auth/strategies/jwt.strategy";
 import { UserRole } from "@prisma/client";
 import { RealtimeNotificationsService } from "../notifications/realtime-notifications.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { loadBackendRuntimeEnv } from "../../config/runtime-env";
 
 /**
  * Helper function to generate room name for a conversation
@@ -42,10 +43,7 @@ function getConversationRoom(doctorId: string, patientId: string): string {
  */
 @WebSocketGateway({
   cors: {
-    origin: process.env.CORS_ORIGIN?.split(",") || [
-      "http://localhost:3001",
-      "http://localhost:8082",
-    ],
+    origin: loadBackendRuntimeEnv().ALLOWED_ORIGINS,
     credentials: true,
   },
   namespace: "/messages",

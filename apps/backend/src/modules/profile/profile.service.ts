@@ -20,6 +20,7 @@ export class ProfileService {
       select: {
         id: true,
         email: true,
+        role: true,
         firstName: true,
         lastName: true,
         avatarUrl: true,
@@ -74,6 +75,8 @@ export class ProfileService {
     const user = await this.prisma.user.update({
       where: { id: userId },
       data: {
+        firstName: data.firstName,
+        lastName: data.lastName,
         birthDate: data.birthDate ? new Date(data.birthDate) : undefined,
         weight: data.weight,
         diabetesType: data.diabetesType,
@@ -98,6 +101,7 @@ export class ProfileService {
       select: {
         id: true,
         email: true,
+        role: true,
         firstName: true,
         lastName: true,
         avatarUrl: true,

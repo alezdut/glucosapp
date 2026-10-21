@@ -49,6 +49,7 @@ const mockOpenAuthSessionAsync = WebBrowser.openAuthSessionAsync as jest.MockedF
 describe("AuthProvider", () => {
   const GET = jest.fn();
   const POST = jest.fn();
+  const PATCH = jest.fn();
 
   const loadAuthModule = () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -75,9 +76,20 @@ describe("AuthProvider", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockCreateApiClient.mockReturnValue({ GET, POST } as never);
+    mockCreateApiClient.mockReturnValue({ GET, POST, PATCH } as never);
     mockGetAccessToken.mockResolvedValue("access-token");
     mockGetRefreshToken.mockResolvedValue("refresh-token");
+    PATCH.mockResolvedValue({
+      data: {
+        id: "patient-1",
+        email: "patient@example.com",
+        role: "PATIENT",
+        firstName: "Ana",
+        lastName: "Paz",
+        emailVerified: true,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+    });
     GET.mockResolvedValue({
       data: {
         id: "patient-1",
@@ -91,7 +103,7 @@ describe("AuthProvider", () => {
     });
   });
 
-  it("loads the current user, refreshes it and updates onboarding state locally", async () => {
+  it("loads the current user, persists onboarding updates and refreshes state", async () => {
     const { AuthProvider, Consumer } = loadAuthModule();
 
     render(
@@ -107,14 +119,17 @@ describe("AuthProvider", () => {
       screen.getByText("update").click();
     });
 
-    expect(screen.getByText("needs-onboarding")).toBeTruthy();
-
-    await act(async () => {
-      screen.getByText("complete").click();
-      screen.getByText("refresh").click();
+    await waitFor(() => {
+      expect(PATCH).toHaveBeenCalledWith("/profile", {
+        firstName: "Ana",
+        lastName: "Paz",
+      });
+      expect(screen.getByText("ready")).toBeTruthy();
     });
 
-    expect(screen.getByText("ready")).toBeTruthy();
+    await act(async () => {
+      screen.getByText("refresh").click();
+    });
 
     expect(GET).toHaveBeenCalledWith("/auth/me", {});
   });

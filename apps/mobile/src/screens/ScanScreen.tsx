@@ -13,6 +13,7 @@ import * as ImageManipulator from "expo-image-manipulator";
 import * as MediaLibrary from "expo-media-library";
 import { analyzeImage, AnalyzeResponse } from "@glucosapp/api-client";
 import { theme } from "../theme";
+import { getMobileImageAnalysisBaseUrl } from "../lib/env";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 const overlaySize = Math.min(screenWidth * 0.7, screenHeight * 0.4);
@@ -116,9 +117,7 @@ export default function ScanScreen() {
         }
       }
 
-      // TODO: Replace with actual image analysis service URL
-      // For physical devices, use your computer's LAN IP address instead of localhost
-      const baseUrl = "http://192.168.1.37:8000"; // Replace with your actual LAN IP
+      const baseUrl = getMobileImageAnalysisBaseUrl();
       const result = await analyzeImage(croppedImage.uri, baseUrl);
       console.log(result);
       setAnalysisResult(result);

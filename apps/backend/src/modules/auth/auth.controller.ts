@@ -25,6 +25,7 @@ import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { GoogleAuthGuard } from "./guards/google-auth.guard";
 import { GoogleMobileAuthGuard } from "./guards/google-mobile-auth.guard";
 import type { Request, Response } from "express";
+import { loadBackendRuntimeEnv } from "../../config/runtime-env";
 
 /**
  * Controller handling authentication endpoints
@@ -190,9 +191,8 @@ export class AuthController {
   async googleAuthCallback(@Req() req: Request, @Res() res: Response): Promise<void> {
     const user = req.user as UserResponseDto;
     const authResponse = await this.authService.login(user);
-
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3001";
-    const isProduction = process.env.NODE_ENV === "production";
+    const runtimeEnv = loadBackendRuntimeEnv();
+    const isProduction = runtimeEnv.NODE_ENV === "production";
 
     // Set secure HTTP-only cookies for tokens
     res.cookie("accessToken", authResponse.accessToken, {
@@ -212,7 +212,7 @@ export class AuthController {
     });
 
     // Redirect without tokens in URL
-    res.redirect(`${frontendUrl}/auth/callback`);
+    res.redirect(`${runtimeEnv.FRONTEND_URL}/auth/callback`);
   }
 
   /**

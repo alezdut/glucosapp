@@ -83,6 +83,13 @@ pnpm build
 - Los `packages/*` con tests deben declarar `coverageThreshold` explícito en su runner correspondiente.
 - Las exclusiones de cobertura deben limitarse a archivos estructurales, de configuración o de barrel export; no se usan para ocultar deuda funcional.
 
+## Convenciones de entorno
+
+- Backend usa `ALLOWED_ORIGINS` como única fuente de verdad para CORS y WebSocket.
+- Web usa `NEXT_PUBLIC_API_BASE_URL`.
+- Mobile usa `EXPO_PUBLIC_API_BASE_URL` y `EXPO_PUBLIC_IMAGE_ANALYSIS_BASE_URL`.
+- Los defaults locales viven en `@glucosapp/env`; producción debe definir los valores críticos del backend explícitamente.
+
 Si tocás auth, cálculo clínico, alertas, reportes o sincronización entre clientes y backend, sumá o ajustá tests en la misma rama.
 
 ## Evidencia técnica para tesis

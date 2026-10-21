@@ -1,11 +1,36 @@
+import { Transform } from "class-transformer";
 import { ApiProperty } from "@nestjs/swagger";
-import { IsNumber, IsEnum, IsOptional, IsInt, Min, Max, IsDateString } from "class-validator";
+import {
+  IsNumber,
+  IsEnum,
+  IsOptional,
+  IsInt,
+  Min,
+  Max,
+  IsDateString,
+  IsString,
+  MinLength,
+} from "class-validator";
 import { DiabetesType, GlucoseUnit, Theme, Language } from "@glucosapp/types";
 
 /**
  * DTO for updating user profile
  */
 export class UpdateProfileDto {
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @MinLength(1)
+  firstName?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @MinLength(1)
+  lastName?: string;
+
   @ApiProperty({ required: false, type: String, format: "date-time" })
   @IsOptional()
   @IsDateString()

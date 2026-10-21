@@ -8,8 +8,9 @@ import {
   type PatientAppointment,
 } from "@glucosapp/types";
 import { throwApiError } from "@glucosapp/utils";
+import { getWebApiBaseUrl } from "./env";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
+const apiBaseUrl = getWebApiBaseUrl();
 const { client } = makeApiClient(`${apiBaseUrl}/v1`);
 
 export interface AppointmentsFilters {

@@ -31,6 +31,12 @@ cp apps/web/.env.example apps/web/.env.local
 cp apps/mobile/.env.example apps/mobile/.env
 ```
 
+Variables relevantes:
+
+- Backend: `DATABASE_URL`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `ENCRYPTION_KEY`, `ALLOWED_ORIGINS`, `FRONTEND_URL`
+- Web: `NEXT_PUBLIC_API_BASE_URL`
+- Mobile: `EXPO_PUBLIC_API_BASE_URL`, `EXPO_PUBLIC_IMAGE_ANALYSIS_BASE_URL`
+
 ## Base de datos
 
 Levantar PostgreSQL:

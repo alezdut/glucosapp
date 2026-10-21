@@ -2,10 +2,6 @@
   "name": "glucosapp",
   "private": true,
   "packageManager": "pnpm@9.12.2",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "scripts": {
     "prepare": "husky install",
     "dev": "sh -c 'docker compose up -d db >/dev/null 2>&1 || echo \"[dev] No se pudo iniciar db con docker compose; continúo con backend/web.\"; turbo run dev --filter=backend... --filter=web...'",
@@ -21,6 +17,7 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "test": "node ./scripts/run-tests-with-summary.mjs",
+    "test:integration": "turbo run test:integration",
     "test:coverage": "turbo run test:coverage",
     "typecheck": "turbo run typecheck"
   },

@@ -1,8 +1,9 @@
 import { makeApiClient } from "@glucosapp/api-client";
-
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
-const { client } = makeApiClient(`${apiBaseUrl}/v1`);
 import type { LogEntry } from "@glucosapp/types";
+import { getWebApiBaseUrl } from "./env";
+
+const apiBaseUrl = getWebApiBaseUrl();
+const { client } = makeApiClient(`${apiBaseUrl}/v1`);
 
 export interface DashboardSummary {
   activePatients: number;

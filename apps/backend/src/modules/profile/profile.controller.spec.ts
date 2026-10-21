@@ -79,11 +79,15 @@ describe("ProfileController", () => {
   describe("updateProfile", () => {
     it("should update profile", async () => {
       const updateDto: UpdateProfileDto = {
+        firstName: "Ana",
+        lastName: "Paz",
         weight: 75,
         targetGlucose: 110,
       };
       const expectedResult = {
         id: mockUser.id,
+        firstName: "Ana",
+        lastName: "Paz",
         weight: 75,
         targetGlucose: 110,
       } as any;
