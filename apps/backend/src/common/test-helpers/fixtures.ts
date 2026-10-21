@@ -5,6 +5,26 @@ import { UserResponseDto } from "../../modules/auth/dto/auth-response.dto";
  * Test fixtures for creating mock data
  */
 
+export interface MessageMockUser {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  avatarUrl: string | null;
+}
+
+export interface MessageMock {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  content: string;
+  read: boolean;
+  readAt: Date | null;
+  createdAt: Date;
+  sender: MessageMockUser;
+  receiver: MessageMockUser;
+}
+
 export const createMockUser = (overrides?: Partial<any>): any => {
   return {
     id: "user-123",
@@ -31,6 +51,7 @@ export const createMockUserResponse = (overrides?: Partial<UserResponseDto>): Us
     firstName: "Test",
     lastName: "User",
     emailVerified: true,
+    role: UserRole.PATIENT,
     createdAt: "2024-01-01T00:00:00.000Z",
     ...overrides,
   };
@@ -67,6 +88,33 @@ export const createMockAccount = (overrides?: Partial<any>): any => {
     userId: "user-123",
     createdAt: new Date("2024-01-01"),
     user: createMockUser(),
+    ...overrides,
+  };
+};
+
+export const createMockMessage = (overrides?: Partial<MessageMock>): MessageMock => {
+  return {
+    id: "message-123",
+    senderId: "user-123",
+    receiverId: "user-456",
+    content: "Test message",
+    read: false,
+    readAt: null,
+    createdAt: new Date("2024-01-01T12:00:00.000Z"),
+    sender: {
+      id: "user-123",
+      email: "sender@example.com",
+      firstName: "Sender",
+      lastName: "User",
+      avatarUrl: null,
+    },
+    receiver: {
+      id: "user-456",
+      email: "receiver@example.com",
+      firstName: "Receiver",
+      lastName: "User",
+      avatarUrl: null,
+    },
     ...overrides,
   };
 };

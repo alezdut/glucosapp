@@ -9,28 +9,57 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CI: true
+      DEMO_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/glucosapp_demo
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: glucosapp_demo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d glucosapp_demo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.2
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Enable corepack
-        run: |
-          corepack enable
-          corepack prepare pnpm@9.12.2 --activate
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
       - name: Install
-        run: pnpm install --frozen-lockfile=false
+        run: pnpm install --frozen-lockfile
       - name: Generate Prisma Client
         run: cd apps/backend && pnpm prisma:generate
-      - name: Build
-        run: pnpm build
-      - name: Test
-        run: pnpm test
-        env:
-          CI: true
+      - name: Build shared packages
+        run: pnpm --filter './packages/**' build
       - name: Lint
-        run: pnpm lint || true
+        run: pnpm lint
       - name: Typecheck
         run: pnpm typecheck
+      - name: Test
+        run: pnpm test
+      - name: Coverage
+        run: pnpm test:coverage
+      - name: Release and environment regression tests
+        run: pnpm test:release
+      - name: Profile integration tests
+        run: pnpm -C apps/backend test:integration
+      - name: Build
+        run: pnpm build
+      - name: Fresh migrations and repeatable demo smoke test
+        run: pnpm demo:smoke

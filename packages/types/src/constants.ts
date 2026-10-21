@@ -6,7 +6,7 @@
  * Critical safety range for glucose levels (mg/dL)
  * These are absolute limits that indicate severe risk
  */
-export const CRITICAL_MIN_GLUCOSE = 30; // Below this is severe hypoglycemia
+export const CRITICAL_MIN_GLUCOSE = 40; // Below this is severe hypoglycemia (medical standard)
 export const CRITICAL_MAX_GLUCOSE = 350; // Above this is severe hyperglycemia
 
 /**
@@ -36,9 +36,15 @@ export const DEFAULT_IC_RATIO_DINNER = 10; // Lower ratio at dinner (more sensit
 export const CARB_GLUCOSE_IMPACT = 3;
 
 /**
- * Validation ranges
+ * Validation ranges for glucose readings
  */
-export const MIN_GLUCOSE_READING = 20; // mg/dL
-export const MAX_GLUCOSE_READING = 600; // mg/dL
+export const MIN_GLUCOSE_READING = 20; // mg/dL - absolute minimum
+export const MAX_GLUCOSE_READING = 600; // mg/dL - absolute maximum
+export const MIN_TARGET_GLUCOSE = 70; // mg/dL - minimum for target range
+export const MAX_TARGET_GLUCOSE = 200; // mg/dL - maximum for target range
+
+/**
+ * Validation ranges for insulin
+ */
 export const MIN_INSULIN_DOSE = 0.5; // units
 export const MAX_INSULIN_DOSE = 100; // units

@@ -1,0 +1,10 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="256" height="256" rx="48" fill="#EEF9F1"/>
+  <circle cx="128" cy="98" r="54" fill="#D9A67F"/>
+  <path d="M58 228C58 184 90 160 128 160C166 160 198 184 198 228V256H58V228Z" fill="#2F9E44"/>
+  <path d="M72 92C72 54 96 36 128 36C160 36 184 54 184 92V106H72V92Z" fill="#1F2328"/>
+  <path d="M98 132C116 138 140 138 158 132" stroke="#8B4C39" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="108" cy="102" r="5" fill="#271812"/>
+  <circle cx="148" cy="102" r="5" fill="#271812"/>
+  <text x="128" y="230" text-anchor="middle" font-size="28" font-family="Arial, sans-serif" font-weight="700" fill="#FFFFFF">RF</text>
+</svg>

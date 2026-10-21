@@ -27,3 +27,5 @@ export const theme = {
   fontWeight,
   borderRadius,
 };
+
+export { releaseInfo } from "./release";

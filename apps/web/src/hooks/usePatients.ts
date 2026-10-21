@@ -6,6 +6,7 @@ import {
   getPatientsWithFilters,
   searchGlobalPatients,
   assignPatient,
+  removePatient,
   getPatientDetails,
   GetPatientsFilters,
 } from "@/lib/dashboard-api";
@@ -66,6 +67,26 @@ export const useAssignPatient = () => {
     onSuccess: () => {
       // Invalidate patients queries to refetch
       queryClient.invalidateQueries({ queryKey: ["patients"] });
+    },
+  });
+};
+
+/**
+ * Hook to remove/unassign a patient from the doctor
+ */
+export const useRemovePatient = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (patientId: string) => {
+      const token = getToken();
+      if (!token) throw new Error("Not authenticated");
+      return removePatient(token, patientId);
+    },
+    onSuccess: () => {
+      // Invalidate patients queries to refetch
+      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      queryClient.invalidateQueries({ queryKey: ["patient"] });
     },
   });
 };

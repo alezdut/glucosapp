@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma/prisma.service";
 import * as crypto from "crypto";
@@ -10,6 +10,8 @@ import * as jwt from "jsonwebtoken";
  */
 @Injectable()
 export class TokenService {
+  private readonly logger = new Logger(TokenService.name);
+
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
@@ -100,7 +102,7 @@ export class TokenService {
         } catch (error) {
           // Token may have been deleted by another operation (e.g., concurrent refresh)
           // This is not a critical error - the goal is that the token doesn't exist
-          console.warn(`Refresh token ${storedToken.id} was already deleted or doesn't exist`);
+          this.logger.warn(`Refresh token ${storedToken.id} was already deleted or doesn't exist`);
         }
         return;
       }

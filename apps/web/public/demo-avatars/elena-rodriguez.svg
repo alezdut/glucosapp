@@ -1,0 +1,10 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="256" height="256" rx="48" fill="#FFF7E8"/>
+  <circle cx="128" cy="100" r="52" fill="#EFC4A2"/>
+  <path d="M64 228C64 188 92 164 128 164C164 164 192 188 192 228V256H64V228Z" fill="#F08C00"/>
+  <path d="M74 92C74 54 98 34 128 34C158 34 182 54 182 92V110H74V92Z" fill="#85644D"/>
+  <circle cx="108" cy="102" r="5" fill="#36251D"/>
+  <circle cx="148" cy="102" r="5" fill="#36251D"/>
+  <path d="M112 126C118 132 138 132 144 126" stroke="#B46D57" stroke-width="6" stroke-linecap="round"/>
+  <text x="128" y="230" text-anchor="middle" font-size="28" font-family="Arial, sans-serif" font-weight="700" fill="#FFFFFF">ER</text>
+</svg>

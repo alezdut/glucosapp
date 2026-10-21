@@ -3,14 +3,25 @@
  * Based on backend validation rules and medical best practices
  */
 
+import {
+  MIN_GLUCOSE_READING,
+  MAX_GLUCOSE_READING,
+  CRITICAL_MIN_GLUCOSE,
+  CRITICAL_MAX_GLUCOSE,
+  MIN_TARGET_GLUCOSE,
+  MAX_TARGET_GLUCOSE,
+  MIN_INSULIN_DOSE,
+  MAX_INSULIN_DOSE,
+} from "@glucosapp/types";
+
 // Glucose level validation
 export const GLUCOSE_LIMITS = {
-  MIN: 20, // mg/dL - absolute minimum
-  MAX: 600, // mg/dL - absolute maximum
-  CRITICAL_MIN: 40, // mg/dL - severe hypoglycemia
-  CRITICAL_MAX: 350, // mg/dL - severe hyperglycemia
-  TARGET_MIN: 70, // mg/dL - minimum for target glucose
-  TARGET_MAX: 200, // mg/dL - maximum for target glucose
+  MIN: MIN_GLUCOSE_READING, // mg/dL - absolute minimum
+  MAX: MAX_GLUCOSE_READING, // mg/dL - absolute maximum
+  CRITICAL_MIN: CRITICAL_MIN_GLUCOSE, // mg/dL - severe hypoglycemia
+  CRITICAL_MAX: CRITICAL_MAX_GLUCOSE, // mg/dL - severe hyperglycemia
+  TARGET_MIN: MIN_TARGET_GLUCOSE, // mg/dL - minimum for target glucose
+  TARGET_MAX: MAX_TARGET_GLUCOSE, // mg/dL - maximum for target glucose
 } as const;
 
 // Carbohydrates validation
@@ -23,8 +34,8 @@ export const CARB_LIMITS = {
 
 // Insulin units validation
 export const INSULIN_LIMITS = {
-  MIN: 0.5, // units - minimum dose
-  MAX: 100, // units - maximum dose
+  MIN: MIN_INSULIN_DOSE, // units - minimum dose
+  MAX: MAX_INSULIN_DOSE, // units - maximum dose
   PRECISION: 0.1, // units - decimal precision
 } as const;
 
@@ -227,11 +238,11 @@ export const validateGlucoseForDoseCalculation = (value: number | undefined): Va
     return { isValid: true }; // Don't block if no value
   }
 
-  // Backend algorithm requires minimum 40 mg/dL for dose calculation
-  if (value < 40) {
+  // Backend algorithm requires minimum CRITICAL_MIN_GLUCOSE for dose calculation
+  if (value < GLUCOSE_LIMITS.CRITICAL_MIN) {
     return {
       isValid: false,
-      message: "La glucosa debe ser al menos 40 mg/dL para calcular la dosis de insulina",
+      message: `La glucosa debe ser al menos ${GLUCOSE_LIMITS.CRITICAL_MIN} mg/dL para calcular la dosis de insulina`,
       severity: "error",
     };
   }

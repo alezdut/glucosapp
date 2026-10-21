@@ -14,6 +14,7 @@ import {
   PatientInsulinStatsDto,
   PatientInsulinStatsPointDto,
 } from "./dto/patient-insulin-stats.dto";
+import { AlertType } from "@prisma/client";
 
 @Injectable()
 export class DashboardService {
@@ -24,16 +25,25 @@ export class DashboardService {
   ) {}
 
   /**
+   * Get alert settings for a patient (used internally to filter alerts)
+   */
+  private async getAlertSettings(patientId: string) {
+    return this.prisma.alertSettings.findUnique({
+      where: { userId: patientId },
+    });
+  }
+
+  /**
    * Get dashboard summary (active patients, critical alerts, upcoming appointments)
    */
-  async getSummary(doctorId: string): Promise<DashboardSummaryDto> {
+  async getSummary(doctorId: string, days: number = 7): Promise<DashboardSummaryDto> {
     await this.doctorUtils.verifyDoctor(doctorId);
 
     const patientIds = await this.doctorUtils.getDoctorPatientIds(doctorId);
 
-    // Count active patients (patients with recent activity in last 30 days)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // Count active patients (patients with recent activity in specified period)
+    const activitySinceDate = new Date();
+    activitySinceDate.setDate(activitySinceDate.getDate() - days);
 
     const activePatientsCount = await this.prisma.user.count({
       where: {
@@ -42,21 +52,21 @@ export class DashboardService {
           {
             glucoseReadings: {
               some: {
-                recordedAt: { gte: thirtyDaysAgo },
+                recordedAt: { gte: activitySinceDate },
               },
             },
           },
           {
             insulinDoses: {
               some: {
-                recordedAt: { gte: thirtyDaysAgo },
+                recordedAt: { gte: activitySinceDate },
               },
             },
           },
           {
             meals: {
               some: {
-                createdAt: { gte: thirtyDaysAgo },
+                createdAt: { gte: activitySinceDate },
               },
             },
           },
@@ -64,18 +74,48 @@ export class DashboardService {
       },
     });
 
-    // Count critical alerts (not acknowledged, severity CRITICAL or HIGH)
-    const criticalAlertsCount = await this.prisma.alert.count({
-      where: {
-        userId: { in: patientIds },
-        acknowledged: false,
-        severity: { in: ["CRITICAL", "HIGH"] },
-      },
-    });
+    // Count critical alerts (not acknowledged, respecting user's enabled alert types, within period)
+    const alertsSinceDate = new Date();
+    alertsSinceDate.setDate(alertsSinceDate.getDate() - days);
+    alertsSinceDate.setHours(0, 0, 0, 0);
 
-    // Count upcoming appointments (in next 7 days)
-    const sevenDaysFromNow = new Date();
-    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+    // Get alert settings to determine which alert types are enabled
+    const firstPatientId = patientIds[0];
+    const settings = await this.getAlertSettings(firstPatientId);
+
+    // Build list of enabled alert types based on settings
+    const enabledAlertTypes: AlertType[] = [];
+    if (settings) {
+      if (settings.severeHypoglycemiaEnabled) {
+        enabledAlertTypes.push(AlertType.SEVERE_HYPOGLYCEMIA);
+      }
+      if (settings.hypoglycemiaEnabled) {
+        enabledAlertTypes.push(AlertType.HYPOGLYCEMIA);
+      }
+      if (settings.hyperglycemiaEnabled) {
+        enabledAlertTypes.push(AlertType.HYPERGLYCEMIA);
+      }
+      if (settings.persistentHyperglycemiaEnabled) {
+        enabledAlertTypes.push(AlertType.PERSISTENT_HYPERGLYCEMIA);
+      }
+    }
+
+    // Only count alerts if at least one type is enabled
+    const criticalAlertsCount =
+      enabledAlertTypes.length > 0
+        ? await this.prisma.alert.count({
+            where: {
+              userId: { in: patientIds },
+              acknowledged: false,
+              type: { in: enabledAlertTypes },
+              createdAt: { gte: alertsSinceDate },
+            },
+          })
+        : 0;
+
+    // Count upcoming appointments in the selected dashboard period
+    const appointmentsUntil = new Date();
+    appointmentsUntil.setDate(appointmentsUntil.getDate() + days);
     const now = new Date();
 
     const upcomingAppointmentsCount = await this.prisma.appointment.count({
@@ -83,7 +123,7 @@ export class DashboardService {
         doctorId,
         scheduledAt: {
           gte: now,
-          lte: sevenDaysFromNow,
+          lte: appointmentsUntil,
         },
         status: {
           in: ["SCHEDULED", "CONFIRMED"],
@@ -99,10 +139,10 @@ export class DashboardService {
   }
 
   /**
-   * Get glucose evolution data for the last 15 days (aggregated by day)
+   * Get glucose evolution data for the last N days (aggregated by day)
    * Shows daily average of all patients under treatment
    */
-  async getGlucoseEvolution(doctorId: string): Promise<GlucoseEvolutionDto> {
+  async getGlucoseEvolution(doctorId: string, days: number = 15): Promise<GlucoseEvolutionDto> {
     await this.doctorUtils.verifyDoctor(doctorId);
 
     const patientIds = await this.doctorUtils.getDoctorPatientIds(doctorId);
@@ -110,15 +150,15 @@ export class DashboardService {
       return { data: [] };
     }
 
-    const fifteenDaysAgo = new Date();
-    fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
-    fifteenDaysAgo.setHours(0, 0, 0, 0);
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0);
 
-    // Get all glucose entries from patients in the last 15 days
+    // Get all glucose entries from patients in the specified period
     const glucoseEntries = await this.prisma.glucoseEntry.findMany({
       where: {
         userId: { in: patientIds },
-        recordedAt: { gte: fifteenDaysAgo },
+        recordedAt: { gte: startDate },
       },
       select: {
         mgdlEncrypted: true,
@@ -129,11 +169,11 @@ export class DashboardService {
       },
     });
 
-    // Get all glucose readings (encrypted) from patients in the last 15 days
+    // Get all glucose readings (encrypted) from patients in the specified period
     const glucoseReadings = await this.prisma.glucoseReading.findMany({
       where: {
         userId: { in: patientIds },
-        recordedAt: { gte: fifteenDaysAgo },
+        recordedAt: { gte: startDate },
       },
       select: {
         glucoseEncrypted: true,
@@ -156,7 +196,6 @@ export class DashboardService {
               recordedAt: entry.recordedAt,
             };
           } catch (error) {
-            console.error("[Dashboard] Failed to decrypt glucose entry:", error);
             return null;
           }
         })
@@ -173,7 +212,6 @@ export class DashboardService {
               recordedAt: reading.recordedAt,
             };
           } catch (error) {
-            console.error("[Dashboard] Failed to decrypt glucose reading:", error);
             return null;
           }
         })
@@ -191,13 +229,13 @@ export class DashboardService {
       groupedByDate.get(dateKey)!.push(reading.value);
     });
 
-    // Generate data points for the last 15 days
+    // Generate data points for the specified number of days
     // Calculate daily average across all patients for each day
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const data: GlucoseEvolutionPointDto[] = [];
 
-    for (let i = 14; i >= 0; i--) {
+    for (let i = days - 1; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
       const dateKey = date.toISOString().split("T")[0];
@@ -254,6 +292,7 @@ export class DashboardService {
         recordedAt: { gte: startDate },
       },
       select: {
+        userId: true,
         units: true,
       },
     });
@@ -268,14 +307,15 @@ export class DashboardService {
     }
 
     const totalUnits = doses.reduce((sum, dose) => sum + dose.units, 0);
-    // Calculate average units per day
-    const averageDose = totalUnits / days;
+    const patientsWithDoses = new Set(doses.map((dose) => dose.userId)).size;
+    const averageDose = patientsWithDoses > 0 ? totalUnits / (days * patientsWithDoses) : 0;
+    const roundedAverageDose = Math.round(averageDose * 10) / 10;
 
     return {
-      averageDose: Math.round(averageDose * 10) / 10, // Round to 1 decimal
+      averageDose: roundedAverageDose,
       unit: "unidades/día",
       days,
-      description: `En los últimos ${days} días, sus pacientes promedian ${Math.round(averageDose * 10) / 10} unidades/día.`,
+      description: `En los últimos ${days} días, sus pacientes con registros promedian ${roundedAverageDose} unidades/día por paciente.`,
     };
   }
 
@@ -298,10 +338,15 @@ export class DashboardService {
     startDate.setDate(startDate.getDate() - days);
     startDate.setHours(0, 0, 0, 0);
 
-    const totalMeals = await this.prisma.meal.count({
+    // Count meals from LogEntry (real patient meals, not templates)
+    const totalMeals = await this.prisma.logEntry.count({
       where: {
         userId: { in: patientIds },
-        createdAt: { gte: startDate },
+        recordedAt: { gte: startDate },
+        OR: [
+          { mealTemplateId: { not: null } }, // Entries with meal templates
+          { carbohydrates: { not: null, gt: 0 } }, // Entries with carbohydrates recorded
+        ],
       },
     });
 
@@ -380,7 +425,6 @@ export class DashboardService {
               recordedAt: entry.recordedAt,
             };
           } catch (error) {
-            console.error("[Dashboard] Failed to decrypt glucose entry:", error);
             return null;
           }
         })
@@ -397,7 +441,6 @@ export class DashboardService {
               recordedAt: reading.recordedAt,
             };
           } catch (error) {
-            console.error("[Dashboard] Failed to decrypt glucose reading:", error);
             return null;
           }
         })
@@ -526,20 +569,20 @@ export class DashboardService {
       const monthData = groupedByMonth.get(monthKey) || { basal: [], bolus: [] };
 
       if (monthData.basal.length > 0 || monthData.bolus.length > 0) {
-        // Calculate averages for months with data
+        // Calculate number of days in the month
+        const year = date.getFullYear();
+        const month = date.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        // Calculate total units for the month and divide by days (not by number of doses)
+        const totalBasalUnits = monthData.basal.reduce((a, b) => a + b, 0);
+        const totalBolusUnits = monthData.bolus.reduce((a, b) => a + b, 0);
+
         const averageBasal =
-          monthData.basal.length > 0
-            ? Math.round(
-                (monthData.basal.reduce((a, b) => a + b, 0) / monthData.basal.length) * 10,
-              ) / 10
-            : 0;
+          monthData.basal.length > 0 ? Math.round((totalBasalUnits / daysInMonth) * 10) / 10 : 0;
 
         const averageBolus =
-          monthData.bolus.length > 0
-            ? Math.round(
-                (monthData.bolus.reduce((a, b) => a + b, 0) / monthData.bolus.length) * 10,
-              ) / 10
-            : 0;
+          monthData.bolus.length > 0 ? Math.round((totalBolusUnits / daysInMonth) * 10) / 10 : 0;
 
         data.push({
           month: monthKey,

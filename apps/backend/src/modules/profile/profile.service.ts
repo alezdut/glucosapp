@@ -20,6 +20,7 @@ export class ProfileService {
       select: {
         id: true,
         email: true,
+        role: true,
         firstName: true,
         lastName: true,
         avatarUrl: true,
@@ -74,6 +75,8 @@ export class ProfileService {
     const user = await this.prisma.user.update({
       where: { id: userId },
       data: {
+        firstName: data.firstName,
+        lastName: data.lastName,
         birthDate: data.birthDate ? new Date(data.birthDate) : undefined,
         weight: data.weight,
         diabetesType: data.diabetesType,
@@ -98,6 +101,7 @@ export class ProfileService {
       select: {
         id: true,
         email: true,
+        role: true,
         firstName: true,
         lastName: true,
         avatarUrl: true,
@@ -142,10 +146,10 @@ export class ProfileService {
   }
 
   /**
-   * Get assigned doctor for patient (if any)
+   * Get assigned doctor for patient (1:1 relationship)
    */
   async getAssignedDoctor(userId: string): Promise<AssignedDoctorResponseDto | null> {
-    const relation = await this.prisma.doctorPatient.findFirst({
+    const relation = await this.prisma.doctorPatient.findUnique({
       where: { patientId: userId },
       include: {
         doctor: {
@@ -157,9 +161,6 @@ export class ProfileService {
             avatarUrl: true,
           },
         },
-      },
-      orderBy: {
-        createdAt: "desc",
       },
     });
 

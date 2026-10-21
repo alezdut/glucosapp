@@ -8,6 +8,8 @@ export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<RootTabParamList> | undefined;
   Calculator: undefined;
   TreatmentParameters: undefined;
+  Communication: undefined;
+  Appointments: undefined;
 };
 
 // Define the parameter list for the bottom tab navigator

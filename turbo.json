@@ -7,7 +7,11 @@
       "outputs": ["dist/**", ".next/**", "build/**"]
     },
     "lint": { "outputs": [] },
-    "test": { "dependsOn": [], "outputs": ["coverage/**"] },
-    "typecheck": { "outputs": [] }
+    "test": { "dependsOn": [], "outputs": [] },
+    "test:integration": { "dependsOn": [], "outputs": [] },
+    "test:coverage": { "dependsOn": [], "outputs": ["coverage/**"] },
+    "typecheck": { "dependsOn": ["^typecheck"], "outputs": [] },
+    "@glucosapp/config#build": { "outputs": [] },
+    "mobile#build": { "outputs": [] }
   }
 }

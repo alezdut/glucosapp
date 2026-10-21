@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import * as WebBrowser from "expo-web-browser";
+import type { UserProfile } from "@glucosapp/types";
 import {
   createApiClient,
   storeTokens,
@@ -7,7 +7,9 @@ import {
   getRefreshToken,
   clearTokens,
 } from "../lib/api";
-import * as Linking from "expo-linking";
+import { getMobileApiBaseUrl } from "../lib/env";
+import { unregisterCurrentPushDevice } from "../lib/push-notifications";
+import { Linking, WebBrowser } from "../lib/expo-auth";
 
 // Enable web browser to properly dismiss after auth
 WebBrowser.maybeCompleteAuthSession();
@@ -19,6 +21,7 @@ interface User {
   firstName?: string;
   lastName?: string;
   emailVerified: boolean;
+  role: "DOCTOR" | "PATIENT";
   createdAt: string;
 }
 
@@ -28,6 +31,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   needsOnboarding: boolean;
   signInWithGoogle: () => Promise<void>;
+  signInWithPassword: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateUserProfile: (firstName: string, lastName: string) => Promise<void>;
   completeOnboarding: () => void;
@@ -36,7 +40,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:3000";
+const API_BASE_URL = getMobileApiBaseUrl();
 
 /**
  * AuthProvider component that manages authentication state
@@ -61,8 +65,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // If we got an error response, check if it's an auth error
       if (response.error) {
         // If it's a 401, tokens were already cleared by the API client
-        if (response.error.status === 401) {
-          console.log("Authentication failed, clearing user state");
+        if (
+          typeof response.error === "object" &&
+          response.error !== null &&
+          "status" in response.error &&
+          response.error.status === 401
+        ) {
           setUser(null);
         }
       }
@@ -137,7 +145,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             await storeTokens(accessToken, refreshToken);
 
             // Parse and set user
-            // TODO: Check if userData is already parsed
             const parsedUser = JSON.parse(userData);
             setUser(parsedUser);
 
@@ -170,6 +177,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const signInWithPassword = async (email: string, password: string) => {
+    setIsLoading(true);
+    try {
+      const response = await createApiClient().POST<{
+        accessToken: string;
+        refreshToken: string;
+        user: User;
+      }>("/auth/login", { body: { email: email.trim(), password } });
+      if (
+        response.error ||
+        !response.data?.accessToken ||
+        !response.data.refreshToken ||
+        !response.data.user
+      ) {
+        throw new Error("No se pudo iniciar sesión. Revisá tu email y contraseña.");
+      }
+      await storeTokens(response.data.accessToken, response.data.refreshToken);
+      setUser(response.data.user);
+      setNeedsOnboarding(!(response.data.user.firstName && response.data.user.lastName));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   /**
    * Sign in with Google
    */
@@ -179,14 +210,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Use custom scheme for better iOS compatibility
       const redirectUrl = "glucosapp://auth/callback";
-      console.log("Redirect URL:", redirectUrl);
-
-      // Pass redirect URL to backend so it knows where to redirect
       const authUrl = `${API_BASE_URL}/v1/auth/google/mobile?redirect_uri=${encodeURIComponent(redirectUrl)}`;
-      console.log("Auth URL:", authUrl);
 
       const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
-      console.log("Auth result:", result);
 
       if (result.type === "success" && result.url) {
         // Parse the callback URL for tokens
@@ -196,12 +222,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const accessToken = params.get("accessToken");
         const refreshToken = params.get("refreshToken");
         const userData = params.get("user");
-
-        console.log("Tokens received:", {
-          accessToken: !!accessToken,
-          refreshToken: !!refreshToken,
-          userData: !!userData,
-        });
 
         if (accessToken && refreshToken && userData) {
           // Store tokens
@@ -233,6 +253,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Get refresh token before clearing
       const refreshToken = await getRefreshToken();
+      await unregisterCurrentPushDevice();
 
       // Call logout endpoint with refresh token
       if (refreshToken) {
@@ -268,17 +289,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateUserProfile = async (firstName: string, lastName: string) => {
     try {
       setIsLoading(true);
+      const client = createApiClient();
+      const response = await client.PATCH<UserProfile>("/profile", {
+        firstName,
+        lastName,
+      });
 
-      // TODO: Implement update profile endpoint in backend
-      // For now, we'll just update locally
-
-      if (user) {
-        setUser({
-          ...user,
-          firstName,
-          lastName,
-        });
+      if (response.error || !response.data) {
+        throw response.error ?? new Error("Failed to update profile");
       }
+
+      setUser((currentUser) =>
+        currentUser
+          ? {
+              ...currentUser,
+              firstName: response.data?.firstName,
+              lastName: response.data?.lastName,
+            }
+          : currentUser,
+      );
+      setNeedsOnboarding(!(response.data.firstName && response.data.lastName));
     } catch (error) {
       console.error("Profile update failed:", error);
       throw error;
@@ -300,6 +330,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: !!user,
     needsOnboarding,
     signInWithGoogle,
+    signInWithPassword,
     signOut,
     updateUserProfile,
     completeOnboarding,

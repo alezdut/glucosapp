@@ -1,0 +1,10 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="256" height="256" rx="48" fill="#EAFBF5"/>
+  <circle cx="128" cy="100" r="52" fill="#E2B28B"/>
+  <path d="M60 228C60 186 90 162 128 162C166 162 196 186 196 228V256H60V228Z" fill="#0CA678"/>
+  <path d="M72 94C72 54 96 34 128 34C160 34 184 54 184 94V104H72V94Z" fill="#3C2E28"/>
+  <circle cx="108" cy="102" r="5" fill="#2D1D17"/>
+  <circle cx="148" cy="102" r="5" fill="#2D1D17"/>
+  <path d="M111 126C118 131 138 131 145 126" stroke="#9F624C" stroke-width="6" stroke-linecap="round"/>
+  <text x="128" y="230" text-anchor="middle" font-size="28" font-family="Arial, sans-serif" font-weight="700" fill="#FFFFFF">JS</text>
+</svg>

@@ -1,12 +1,21 @@
 import "reflect-metadata";
-import { ValidationPipe, VersioningType } from "@nestjs/common";
+import { ValidationPipe, VersioningType, Logger } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module";
+import { assertBackendRuntimeEnv, loadBackendRuntimeEnv } from "./config/runtime-env";
 
 async function bootstrap() {
+  const runtimeEnv = loadBackendRuntimeEnv();
+  assertBackendRuntimeEnv(runtimeEnv);
   const app = await NestFactory.create(AppModule);
-  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [];
+  const logger = new Logger("Bootstrap");
+  const allowedOrigins = runtimeEnv.ALLOWED_ORIGINS;
+
+  if (allowedOrigins.length === 0) {
+    throw new Error("ALLOWED_ORIGINS must contain at least one allowed origin.");
+  }
+
   app.enableCors({
     origin: allowedOrigins,
     credentials: true,
@@ -25,9 +34,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup("docs", app, document);
 
-  const port = process.env.PORT ? Number(process.env.PORT) : 3000;
-  await app.listen(port, "0.0.0.0");
-  // eslint-disable-next-line no-console
-  console.log(`API running on http://0.0.0.0:${port}/v1 (docs: /docs)`);
+  await app.listen(runtimeEnv.PORT, "0.0.0.0");
+  logger.log(`API running on http://0.0.0.0:${runtimeEnv.PORT}/v1 (docs: /docs)`);
 }
 bootstrap();

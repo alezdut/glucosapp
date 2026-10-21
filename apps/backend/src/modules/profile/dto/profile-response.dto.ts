@@ -10,6 +10,9 @@ export class ProfileResponseDto {
   @ApiProperty()
   email!: string;
 
+  @ApiProperty()
+  role!: string;
+
   @ApiProperty({ required: false })
   firstName?: string;
 

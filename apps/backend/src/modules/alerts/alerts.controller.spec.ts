@@ -3,6 +3,9 @@ import { AlertsController } from "./alerts.controller";
 import { AlertsService } from "./alerts.service";
 import { createMockUserResponse } from "../../common/test-helpers/fixtures";
 import { UpdateAlertSettingsDto } from "./dto/alert-settings.dto";
+import { GetAlertsQueryDto } from "./dto/get-alerts-query.dto";
+import { AlertResponseDto } from "./dto/alert-response.dto";
+import { AlertSeverity } from "@prisma/client";
 
 describe("AlertsController", () => {
   let controller: AlertsController;
@@ -12,9 +15,7 @@ describe("AlertsController", () => {
 
   beforeEach(async () => {
     const mockService = {
-      findAll: jest.fn(),
-      getCritical: jest.fn(),
-      getRecent: jest.fn(),
+      findAllWithFilters: jest.fn(),
       acknowledge: jest.fn(),
       getAlertSettings: jest.fn(),
       updateAlertSettings: jest.fn(),
@@ -38,64 +39,219 @@ describe("AlertsController", () => {
     expect(controller).toBeDefined();
   });
 
-  describe("findAll", () => {
-    it("should return all alerts with default limit", async () => {
-      const expectedResult: any[] = [];
+  describe("findAll (unified endpoint with filters)", () => {
+    it("should return all alerts with default filters", async () => {
+      const expectedResult: AlertResponseDto[] = [];
+      const query: GetAlertsQueryDto = {};
 
-      (service.findAll as jest.Mock).mockResolvedValue(expectedResult);
+      (service.findAllWithFilters as jest.Mock).mockResolvedValue(expectedResult);
 
-      const result = await controller.findAll(mockUser);
+      const result = await controller.findAll(mockUser, query);
 
       expect(result).toEqual(expectedResult);
-      expect(service.findAll).toHaveBeenCalledWith(mockUser.id, 50);
+      expect(service.findAllWithFilters).toHaveBeenCalledWith(mockUser.id, {
+        limit: undefined,
+        acknowledged: undefined,
+        severity: undefined,
+        sinceHours: undefined,
+        patientId: undefined,
+      });
     });
 
-    it("should return all alerts with custom limit", async () => {
-      const expectedResult: any[] = [];
+    it("should return alerts with limit filter", async () => {
+      const expectedResult: AlertResponseDto[] = [];
+      const query: GetAlertsQueryDto = { limit: 20 };
 
-      (service.findAll as jest.Mock).mockResolvedValue(expectedResult);
+      (service.findAllWithFilters as jest.Mock).mockResolvedValue(expectedResult);
 
-      const result = await controller.findAll(mockUser, "20");
-
-      expect(result).toEqual(expectedResult);
-      expect(service.findAll).toHaveBeenCalledWith(mockUser.id, 20);
-    });
-  });
-
-  describe("getCritical", () => {
-    it("should return critical alerts", async () => {
-      const expectedResult: any[] = [];
-
-      (service.getCritical as jest.Mock).mockResolvedValue(expectedResult);
-
-      const result = await controller.getCritical(mockUser);
+      const result = await controller.findAll(mockUser, query);
 
       expect(result).toEqual(expectedResult);
-      expect(service.getCritical).toHaveBeenCalledWith(mockUser.id);
-    });
-  });
-
-  describe("getRecent", () => {
-    it("should return recent alerts with default limit", async () => {
-      const expectedResult: any[] = [];
-
-      (service.getRecent as jest.Mock).mockResolvedValue(expectedResult);
-
-      const result = await controller.getRecent(mockUser);
-
-      expect(result).toEqual(expectedResult);
-      expect(service.getRecent).toHaveBeenCalledWith(mockUser.id, 10);
+      expect(service.findAllWithFilters).toHaveBeenCalledWith(mockUser.id, {
+        limit: 20,
+        acknowledged: undefined,
+        severity: undefined,
+        sinceHours: undefined,
+        patientId: undefined,
+      });
     });
 
-    it("should return recent alerts with custom limit", async () => {
-      const expectedResult: any[] = [];
+    it("should return unacknowledged alerts", async () => {
+      const expectedResult: AlertResponseDto[] = [];
+      const query: GetAlertsQueryDto = { acknowledged: false };
 
-      (service.getRecent as jest.Mock).mockResolvedValue(expectedResult);
+      (service.findAllWithFilters as jest.Mock).mockResolvedValue(expectedResult);
 
-      const result = await controller.getRecent(mockUser, "15");
+      const result = await controller.findAll(mockUser, query);
 
       expect(result).toEqual(expectedResult);
-      expect(service.getRecent).toHaveBeenCalledWith(mockUser.id, 15);
+      expect(service.findAllWithFilters).toHaveBeenCalledWith(mockUser.id, {
+        limit: undefined,
+        acknowledged: false,
+        severity: undefined,
+        sinceHours: undefined,
+        patientId: undefined,
+      });
+    });
+
+    it("should return acknowledged alerts", async () => {
+      const expectedResult: AlertResponseDto[] = [];
+      const query: GetAlertsQueryDto = { acknowledged: true };
+
+      (service.findAllWithFilters as jest.Mock).mockResolvedValue(expectedResult);
+
+      const result = await controller.findAll(mockUser, query);
+
+      expect(result).toEqual(expectedResult);
+      expect(service.findAllWithFilters).toHaveBeenCalledWith(mockUser.id, {
+        limit: undefined,
+        acknowledged: true,
+        severity: undefined,
+        sinceHours: undefined,
+        patientId: undefined,
+      });
+    });
+
+    it("should return alerts filtered by single severity", async () => {
+      const expectedResult: AlertResponseDto[] = [];
+      const query: GetAlertsQueryDto = { severity: [AlertSeverity.CRITICAL] };
+
+      (service.findAllWithFilters as jest.Mock).mockResolvedValue(expectedResult);
+
+      const result = await controller.findAll(mockUser, query);
+
+      expect(result).toEqual(expectedResult);
+      expect(service.findAllWithFilters).toHaveBeenCalledWith(mockUser.id, {
+        limit: undefined,
+        acknowledged: undefined,
+        severity: [AlertSeverity.CRITICAL],
+        sinceHours: undefined,
+        patientId: undefined,
+      });
+    });
+
+    it("should return alerts filtered by multiple severities", async () => {
+      const expectedResult: AlertResponseDto[] = [];
+      const query: GetAlertsQueryDto = {
+        severity: [AlertSeverity.CRITICAL, AlertSeverity.HIGH],
+      };
+
+      (service.findAllWithFilters as jest.Mock).mockResolvedValue(expectedResult);
+
+      const result = await controller.findAll(mockUser, query);
+
+      expect(result).toEqual(expectedResult);
+      expect(service.findAllWithFilters).toHaveBeenCalledWith(mockUser.id, {
+        limit: undefined,
+        acknowledged: undefined,
+        severity: [AlertSeverity.CRITICAL, AlertSeverity.HIGH],
+        sinceHours: undefined,
+        patientId: undefined,
+      });
+    });
+
+    it("should return alerts from last N hours", async () => {
+      const expectedResult: AlertResponseDto[] = [];
+      const query: GetAlertsQueryDto = { sinceHours: 24 };
+
+      (service.findAllWithFilters as jest.Mock).mockResolvedValue(expectedResult);
+
+      const result = await controller.findAll(mockUser, query);
+
+      expect(result).toEqual(expectedResult);
+      expect(service.findAllWithFilters).toHaveBeenCalledWith(mockUser.id, {
+        limit: undefined,
+        acknowledged: undefined,
+        severity: undefined,
+        sinceHours: 24,
+        patientId: undefined,
+      });
+    });
+
+    it("should return alerts for specific patient", async () => {
+      const expectedResult: AlertResponseDto[] = [];
+      const patientId = "patient-123";
+      const query: GetAlertsQueryDto = { patientId };
+
+      (service.findAllWithFilters as jest.Mock).mockResolvedValue(expectedResult);
+
+      const result = await controller.findAll(mockUser, query);
+
+      expect(result).toEqual(expectedResult);
+      expect(service.findAllWithFilters).toHaveBeenCalledWith(mockUser.id, {
+        limit: undefined,
+        acknowledged: undefined,
+        severity: undefined,
+        sinceHours: undefined,
+        patientId,
+      });
+    });
+
+    it("should return alerts with combined filters (critical alerts use case)", async () => {
+      const expectedResult: AlertResponseDto[] = [];
+      const query: GetAlertsQueryDto = {
+        acknowledged: false,
+        severity: [AlertSeverity.CRITICAL, AlertSeverity.HIGH],
+      };
+
+      (service.findAllWithFilters as jest.Mock).mockResolvedValue(expectedResult);
+
+      const result = await controller.findAll(mockUser, query);
+
+      expect(result).toEqual(expectedResult);
+      expect(service.findAllWithFilters).toHaveBeenCalledWith(mockUser.id, {
+        limit: undefined,
+        acknowledged: false,
+        severity: [AlertSeverity.CRITICAL, AlertSeverity.HIGH],
+        sinceHours: undefined,
+        patientId: undefined,
+      });
+    });
+
+    it("should return alerts with combined filters (recent alerts use case)", async () => {
+      const expectedResult: AlertResponseDto[] = [];
+      const query: GetAlertsQueryDto = {
+        sinceHours: 24,
+        limit: 10,
+      };
+
+      (service.findAllWithFilters as jest.Mock).mockResolvedValue(expectedResult);
+
+      const result = await controller.findAll(mockUser, query);
+
+      expect(result).toEqual(expectedResult);
+      expect(service.findAllWithFilters).toHaveBeenCalledWith(mockUser.id, {
+        limit: 10,
+        acknowledged: undefined,
+        severity: undefined,
+        sinceHours: 24,
+        patientId: undefined,
+      });
+    });
+
+    it("should return alerts with all filters combined", async () => {
+      const expectedResult: AlertResponseDto[] = [];
+      const patientId = "patient-123";
+      const query: GetAlertsQueryDto = {
+        limit: 50,
+        acknowledged: false,
+        severity: [AlertSeverity.CRITICAL],
+        sinceHours: 12,
+        patientId,
+      };
+
+      (service.findAllWithFilters as jest.Mock).mockResolvedValue(expectedResult);
+
+      const result = await controller.findAll(mockUser, query);
+
+      expect(result).toEqual(expectedResult);
+      expect(service.findAllWithFilters).toHaveBeenCalledWith(mockUser.id, {
+        limit: 50,
+        acknowledged: false,
+        severity: [AlertSeverity.CRITICAL],
+        sinceHours: 12,
+        patientId,
+      });
     });
   });
 

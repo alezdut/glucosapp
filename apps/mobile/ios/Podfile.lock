@@ -11,6 +11,8 @@ PODS:
   - EXJSONUtils (0.15.0)
   - EXManifests (1.0.8):
     - ExpoModulesCore
+  - EXNotifications (0.32.16):
+    - ExpoModulesCore
   - Expo (54.0.12):
     - boost
     - DoubleConversion
@@ -268,6 +270,8 @@ PODS:
   - ExpoImagePicker (17.0.8):
     - ExpoModulesCore
   - ExpoKeepAwake (15.0.7):
+    - ExpoModulesCore
+  - ExpoLinearGradient (15.0.7):
     - ExpoModulesCore
   - ExpoLinking (8.0.8):
     - ExpoModulesCore
@@ -2070,8 +2074,6 @@ PODS:
     - React-RCTFBReactNativeSpec
     - ReactCommon/turbomodule/core
     - SocketRocket
-  - react-native-nfc-manager (3.17.1):
-    - React-Core
   - react-native-safe-area-context (5.6.1):
     - React-Core
   - React-NativeModulesApple (0.81.4):
@@ -2609,7 +2611,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
-  - RNReanimated (3.15.5):
+  - RNReanimated (3.19.5):
     - boost
     - DoubleConversion
     - fast_float
@@ -2625,6 +2627,7 @@ PODS:
     - React-Fabric
     - React-featureflags
     - React-graphics
+    - React-hermes
     - React-ImageManager
     - React-jsi
     - React-NativeModulesApple
@@ -2635,11 +2638,11 @@ PODS:
     - ReactCodegen
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
-    - RNReanimated/reanimated (= 3.15.5)
-    - RNReanimated/worklets (= 3.15.5)
+    - RNReanimated/reanimated (= 3.19.5)
+    - RNReanimated/worklets (= 3.19.5)
     - SocketRocket
     - Yoga
-  - RNReanimated/reanimated (3.15.5):
+  - RNReanimated/reanimated (3.19.5):
     - boost
     - DoubleConversion
     - fast_float
@@ -2655,6 +2658,37 @@ PODS:
     - React-Fabric
     - React-featureflags
     - React-graphics
+    - React-hermes
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - RNReanimated/reanimated/apple (= 3.19.5)
+    - SocketRocket
+    - Yoga
+  - RNReanimated/reanimated/apple (3.19.5):
+    - boost
+    - DoubleConversion
+    - fast_float
+    - fmt
+    - glog
+    - hermes-engine
+    - RCT-Folly
+    - RCT-Folly/Fabric
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-hermes
     - React-ImageManager
     - React-jsi
     - React-NativeModulesApple
@@ -2667,7 +2701,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
-  - RNReanimated/worklets (3.15.5):
+  - RNReanimated/worklets (3.19.5):
     - boost
     - DoubleConversion
     - fast_float
@@ -2683,6 +2717,37 @@ PODS:
     - React-Fabric
     - React-featureflags
     - React-graphics
+    - React-hermes
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - RNReanimated/worklets/apple (= 3.19.5)
+    - SocketRocket
+    - Yoga
+  - RNReanimated/worklets/apple (3.19.5):
+    - boost
+    - DoubleConversion
+    - fast_float
+    - fmt
+    - glog
+    - hermes-engine
+    - RCT-Folly
+    - RCT-Folly/Fabric
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-hermes
     - React-ImageManager
     - React-jsi
     - React-NativeModulesApple
@@ -2774,6 +2839,7 @@ DEPENDENCIES:
   - "EXImageLoader (from `../../../node_modules/.pnpm/expo-image-loader@6.0.0_expo@54.0.12_@babel+core@7.28.4_graphql@15.8.0_react-native@0.81.4_@b_jmui75ahohskcduggd43puh2yu/node_modules/expo-image-loader/ios`)"
   - "EXJSONUtils (from `../../../node_modules/.pnpm/expo-json-utils@0.15.0/node_modules/expo-json-utils/ios`)"
   - "EXManifests (from `../../../node_modules/.pnpm/expo-manifests@1.0.8_expo@54.0.12_@babel+core@7.28.4_graphql@15.8.0_react-native@0.81.4_@babe_5ys3nku5wv2it4lf5ycjpfz6dm/node_modules/expo-manifests/ios`)"
+  - "EXNotifications (from `../../../node_modules/.pnpm/expo-notifications@0.32.16_expo@54.0.12_@babel+core@7.28.4_graphql@15.8.0_react-native@0.81.4_3wqxlp4kciai65heup6blo2i5i/node_modules/expo-notifications/ios`)"
   - "Expo (from `../../../node_modules/.pnpm/expo@54.0.12_@babel+core@7.28.4_graphql@15.8.0_react-native@0.81.4_@babel+core@7.28.4_@react-_swpcxs66dgama6wov2k4bwcpei/node_modules/expo`)"
   - "expo-dev-client (from `../../../node_modules/.pnpm/expo-dev-client@6.0.16_expo@54.0.12_@babel+core@7.28.4_graphql@15.8.0_react-native@0.81.4_@ba_dzanwepapbbvmkevlowcn2ry24/node_modules/expo-dev-client/ios`)"
   - "expo-dev-launcher (from `../../../node_modules/.pnpm/expo-dev-launcher@6.0.16_expo@54.0.12_@babel+core@7.28.4_graphql@15.8.0_react-native@0.81.4_@_gd7madzkgazrija4maz7zusuai/node_modules/expo-dev-launcher`)"
@@ -2787,6 +2853,7 @@ DEPENDENCIES:
   - "ExpoImageManipulator (from `../../../node_modules/.pnpm/expo-image-manipulator@14.0.7_expo@54.0.12_@babel+core@7.28.4_graphql@15.8.0_react-native@0.8_mtpjnnqne7mdjugcsq7mlb6hci/node_modules/expo-image-manipulator/ios`)"
   - "ExpoImagePicker (from `../../../node_modules/.pnpm/expo-image-picker@17.0.8_expo@54.0.12_@babel+core@7.28.4_graphql@15.8.0_react-native@0.81.4_@_tzojcd3yhprzxqzuecrbkann4u/node_modules/expo-image-picker/ios`)"
   - "ExpoKeepAwake (from `../../../node_modules/.pnpm/expo-keep-awake@15.0.7_expo@54.0.12_@babel+core@7.28.4_graphql@15.8.0_react-native@0.81.4_@ba_gecoxekd5ykmjasqrgntb7ihci/node_modules/expo-keep-awake/ios`)"
+  - "ExpoLinearGradient (from `../../../node_modules/.pnpm/expo-linear-gradient@15.0.7_expo@54.0.12_@babel+core@7.28.4_graphql@15.8.0_react-native@0.81._sarc5exqfexqbfwgrsxlh7zo5i/node_modules/expo-linear-gradient/ios`)"
   - "ExpoLinking (from `../../../node_modules/.pnpm/expo-linking@8.0.8_expo@54.0.12_@babel+core@7.28.4_graphql@15.8.0_react-native@0.81.4_@babel+_fqogj36jsw62ru7xwk42nfr4km/node_modules/expo-linking/ios`)"
   - "ExpoMediaLibrary (from `../../../node_modules/.pnpm/expo-media-library@18.2.0_expo@54.0.12_@babel+core@7.28.4_graphql@15.8.0_react-native@0.81.4__n43btv2fmqojwd4kbndspwqk7e/node_modules/expo-media-library/ios`)"
   - "ExpoModulesCore (from `../../../node_modules/.pnpm/expo-modules-core@3.0.20_react-native@0.81.4_@babel+core@7.28.4_@react-native-community+cli@1_hvhygztwvqphsxnbatdv7cfsii/node_modules/expo-modules-core`)"
@@ -2833,7 +2900,6 @@ DEPENDENCIES:
   - "React-logger (from `../../../node_modules/.pnpm/react-native@0.81.4_@babel+core@7.28.4_@react-native-community+cli@13.6.9_@types+react@19.1.17_react@19.1.0/node_modules/react-native/ReactCommon/logger`)"
   - "React-Mapbuffer (from `../../../node_modules/.pnpm/react-native@0.81.4_@babel+core@7.28.4_@react-native-community+cli@13.6.9_@types+react@19.1.17_react@19.1.0/node_modules/react-native/ReactCommon`)"
   - "React-microtasksnativemodule (from `../../../node_modules/.pnpm/react-native@0.81.4_@babel+core@7.28.4_@react-native-community+cli@13.6.9_@types+react@19.1.17_react@19.1.0/node_modules/react-native/ReactCommon/react/nativemodule/microtasks`)"
-  - "react-native-nfc-manager (from `../../../node_modules/.pnpm/react-native-nfc-manager@3.17.1_@expo+config-plugins@54.0.2/node_modules/react-native-nfc-manager`)"
   - "react-native-safe-area-context (from `../../../node_modules/.pnpm/react-native-safe-area-context@5.6.1_react-native@0.81.4_@babel+core@7.28.4_@react-native-com_vod2epvx5wzkoaomoablyedgeq/node_modules/react-native-safe-area-context`)"
   - "React-NativeModulesApple (from `../../../node_modules/.pnpm/react-native@0.81.4_@babel+core@7.28.4_@react-native-community+cli@13.6.9_@types+react@19.1.17_react@19.1.0/node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)"
   - "React-oscompat (from `../../../node_modules/.pnpm/react-native@0.81.4_@babel+core@7.28.4_@react-native-community+cli@13.6.9_@types+react@19.1.17_react@19.1.0/node_modules/react-native/ReactCommon/oscompat`)"
@@ -2867,7 +2933,7 @@ DEPENDENCIES:
   - "ReactCommon/turbomodule/core (from `../../../node_modules/.pnpm/react-native@0.81.4_@babel+core@7.28.4_@react-native-community+cli@13.6.9_@types+react@19.1.17_react@19.1.0/node_modules/react-native/ReactCommon`)"
   - "RNDateTimePicker (from `../../../node_modules/.pnpm/@react-native-community+datetimepicker@8.4.5_expo@54.0.12_@babel+core@7.28.4_graphql@15.8.0_r_m3hykworfpxmhsxhmmimt36goi/node_modules/@react-native-community/datetimepicker`)"
   - "RNGestureHandler (from `../../../node_modules/.pnpm/react-native-gesture-handler@2.28.0_react-native@0.81.4_@babel+core@7.28.4_@react-native-comm_6lcylih3l6ftf7z7qzf36bwwtu/node_modules/react-native-gesture-handler`)"
-  - "RNReanimated (from `../../../node_modules/.pnpm/react-native-reanimated@3.15.5_@babel+core@7.28.4_react-native@0.81.4_@babel+core@7.28.4_@rea_ziq56u47wqbnayqczarmvbr37e/node_modules/react-native-reanimated`)"
+  - "RNReanimated (from `../../../node_modules/.pnpm/react-native-reanimated@3.19.5_@babel+core@7.28.4_react-native@0.81.4_@babel+core@7.28.4_@rea_2bkuic4ileleygi7gwmggvn74i/node_modules/react-native-reanimated`)"
   - "RNScreens (from `../../../node_modules/.pnpm/react-native-screens@4.16.0_react-native@0.81.4_@babel+core@7.28.4_@react-native-community+cl_fzzqm5xdynrp5hsyjhd6jcvnoe/node_modules/react-native-screens`)"
   - "RNShare (from `../../../node_modules/.pnpm/react-native-share@11.1.0/node_modules/react-native-share`)"
   - "RNSVG (from `../../../node_modules/.pnpm/react-native-svg@15.13.0_react-native@0.81.4_@babel+core@7.28.4_@react-native-community+cli@1_7tyqggmya7domstukum7lbatii/node_modules/react-native-svg`)"
@@ -2897,6 +2963,8 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/.pnpm/expo-json-utils@0.15.0/node_modules/expo-json-utils/ios"
   EXManifests:
     :path: "../../../node_modules/.pnpm/expo-manifests@1.0.8_expo@54.0.12_@babel+core@7.28.4_graphql@15.8.0_react-native@0.81.4_@babe_5ys3nku5wv2it4lf5ycjpfz6dm/node_modules/expo-manifests/ios"
+  EXNotifications:
+    :path: "../../../node_modules/.pnpm/expo-notifications@0.32.16_expo@54.0.12_@babel+core@7.28.4_graphql@15.8.0_react-native@0.81.4_3wqxlp4kciai65heup6blo2i5i/node_modules/expo-notifications/ios"
   Expo:
     :path: "../../../node_modules/.pnpm/expo@54.0.12_@babel+core@7.28.4_graphql@15.8.0_react-native@0.81.4_@babel+core@7.28.4_@react-_swpcxs66dgama6wov2k4bwcpei/node_modules/expo"
   expo-dev-client:
@@ -2923,6 +2991,8 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/.pnpm/expo-image-picker@17.0.8_expo@54.0.12_@babel+core@7.28.4_graphql@15.8.0_react-native@0.81.4_@_tzojcd3yhprzxqzuecrbkann4u/node_modules/expo-image-picker/ios"
   ExpoKeepAwake:
     :path: "../../../node_modules/.pnpm/expo-keep-awake@15.0.7_expo@54.0.12_@babel+core@7.28.4_graphql@15.8.0_react-native@0.81.4_@ba_gecoxekd5ykmjasqrgntb7ihci/node_modules/expo-keep-awake/ios"
+  ExpoLinearGradient:
+    :path: "../../../node_modules/.pnpm/expo-linear-gradient@15.0.7_expo@54.0.12_@babel+core@7.28.4_graphql@15.8.0_react-native@0.81._sarc5exqfexqbfwgrsxlh7zo5i/node_modules/expo-linear-gradient/ios"
   ExpoLinking:
     :path: "../../../node_modules/.pnpm/expo-linking@8.0.8_expo@54.0.12_@babel+core@7.28.4_graphql@15.8.0_react-native@0.81.4_@babel+_fqogj36jsw62ru7xwk42nfr4km/node_modules/expo-linking/ios"
   ExpoMediaLibrary:
@@ -3014,8 +3084,6 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/.pnpm/react-native@0.81.4_@babel+core@7.28.4_@react-native-community+cli@13.6.9_@types+react@19.1.17_react@19.1.0/node_modules/react-native/ReactCommon"
   React-microtasksnativemodule:
     :path: "../../../node_modules/.pnpm/react-native@0.81.4_@babel+core@7.28.4_@react-native-community+cli@13.6.9_@types+react@19.1.17_react@19.1.0/node_modules/react-native/ReactCommon/react/nativemodule/microtasks"
-  react-native-nfc-manager:
-    :path: "../../../node_modules/.pnpm/react-native-nfc-manager@3.17.1_@expo+config-plugins@54.0.2/node_modules/react-native-nfc-manager"
   react-native-safe-area-context:
     :path: "../../../node_modules/.pnpm/react-native-safe-area-context@5.6.1_react-native@0.81.4_@babel+core@7.28.4_@react-native-com_vod2epvx5wzkoaomoablyedgeq/node_modules/react-native-safe-area-context"
   React-NativeModulesApple:
@@ -3083,7 +3151,7 @@ EXTERNAL SOURCES:
   RNGestureHandler:
     :path: "../../../node_modules/.pnpm/react-native-gesture-handler@2.28.0_react-native@0.81.4_@babel+core@7.28.4_@react-native-comm_6lcylih3l6ftf7z7qzf36bwwtu/node_modules/react-native-gesture-handler"
   RNReanimated:
-    :path: "../../../node_modules/.pnpm/react-native-reanimated@3.15.5_@babel+core@7.28.4_react-native@0.81.4_@babel+core@7.28.4_@rea_ziq56u47wqbnayqczarmvbr37e/node_modules/react-native-reanimated"
+    :path: "../../../node_modules/.pnpm/react-native-reanimated@3.19.5_@babel+core@7.28.4_react-native@0.81.4_@babel+core@7.28.4_@rea_2bkuic4ileleygi7gwmggvn74i/node_modules/react-native-reanimated"
   RNScreens:
     :path: "../../../node_modules/.pnpm/react-native-screens@4.16.0_react-native@0.81.4_@babel+core@7.28.4_@react-native-community+cl_fzzqm5xdynrp5hsyjhd6jcvnoe/node_modules/react-native-screens"
   RNShare:
@@ -3101,6 +3169,7 @@ SPEC CHECKSUMS:
   EXImageLoader: 189e3476581efe3ad4d1d3fb4735b7179eb26f05
   EXJSONUtils: 1d3e4590438c3ee593684186007028a14b3686cd
   EXManifests: 224345a575fca389073c416297b6348163f28d1a
+  EXNotifications: 9eec98712cc814ceff916d876cb53859003b0597
   Expo: e76ce83f1f59229f3328d893946b55ba97749f1c
   expo-dev-client: 974463bca58c100a32f099450e9413893bee3de8
   expo-dev-launcher: 31960c9440aea2dc13ba7f6fd616ae345a04b5de
@@ -3114,6 +3183,7 @@ SPEC CHECKSUMS:
   ExpoImageManipulator: ead6e7cca441603bfaecc898a69a093adef8b4ef
   ExpoImagePicker: d251aab45a1b1857e4156fed88511b278b4eee1c
   ExpoKeepAwake: 1a2e820692e933c94a565ec3fbbe38ac31658ffe
+  ExpoLinearGradient: a464898cb95153125e3b81894fd479bcb1c7dd27
   ExpoLinking: f051f28e50ea9269ff539317c166adec81d9342d
   ExpoMediaLibrary: 641a6952299b395159ccd459bd8f5f6764bf55fe
   ExpoModulesCore: ef80f7bc55cf08945ac9653426dfd142553ebd09
@@ -3160,7 +3230,6 @@ SPEC CHECKSUMS:
   React-logger: a3cb5b29c32b8e447b5a96919340e89334062b48
   React-Mapbuffer: 9d2434a42701d6144ca18f0ca1c4507808ca7696
   React-microtasksnativemodule: 75b6604b667d297292345302cc5bfb6b6aeccc1b
-  react-native-nfc-manager: e5e91b4e9af0551755cdb6eaec55a8ff820ccdc6
   react-native-safe-area-context: 2243039f43d10cb1ea30ec5ac57fc6d1448413f4
   React-NativeModulesApple: 879fbdc5dcff7136abceb7880fe8a2022a1bd7c3
   React-oscompat: 93b5535ea7f7dff46aaee4f78309a70979bdde9d
@@ -3194,7 +3263,7 @@ SPEC CHECKSUMS:
   ReactCommon: 394c6b92765cf6d211c2c3f7f6bc601dffb316a6
   RNDateTimePicker: 8c12d12e8660697c2e176d2f98775764431c141f
   RNGestureHandler: 12a436b5074378be95468a57b62c165a1e24cfc9
-  RNReanimated: 94e3b54073a7ff7f32271f2a9c536f29b71016a4
+  RNReanimated: 3979e65213348df246b9f6a6ad6897134632417b
   RNScreens: 35525ebfe219c8709da0d26aebbc9a5e02e1077b
   RNShare: fa1fdd2e111a94e7e4aac5797d5477eef1d25295
   RNSVG: e0293d50d2cc0c7b8259fc66faa292378a04ba9a

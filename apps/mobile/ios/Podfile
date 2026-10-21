@@ -2,6 +2,7 @@ require File.join(File.dirname(`node --print "require.resolve('expo/package.json
 require File.join(File.dirname(`node --print "require.resolve('react-native/package.json')"`), "scripts/react_native_pods")
 
 require 'json'
+require_relative './fmt_compat'
 podfile_properties = JSON.parse(File.read(File.join(__dir__, 'Podfile.properties.json'))) rescue {}
 
 def ccache_enabled?(podfile_properties)
@@ -50,6 +51,7 @@ target 'GlucosappMobile' do
   )
 
   post_install do |installer|
+    patch_fmt_consteval!(installer.sandbox.root.to_s)
     react_native_post_install(
       installer,
       config[:reactNativePath],

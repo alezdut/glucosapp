@@ -9,16 +9,20 @@ import { GlucoseChart } from "@/components/dashboard/GlucoseChart";
 import { InsulinStatsCard } from "@/components/dashboard/InsulinStatsCard";
 import { MealStatsCard } from "@/components/dashboard/MealStatsCard";
 import { RecentAlerts } from "@/components/dashboard/RecentAlerts";
+import { DashboardPeriodSelector } from "@/components/dashboard/DashboardPeriodSelector";
+import { AlertsSummaryCard } from "@/components/dashboard/AlertsSummaryCard";
 import {
   useDashboardSummary,
   useGlucoseEvolution,
   useInsulinStats,
   useMealStats,
   useRecentAlerts,
+  useAcknowledgeBatch,
 } from "@/hooks/useDashboard";
 import { useQueryClient } from "@tanstack/react-query";
-import { Users, AlertTriangle, Calendar } from "lucide-react";
+import { Users, Calendar } from "lucide-react";
 import { invalidateAlertQueries } from "@/lib/alert-utils";
+import { useState, useEffect } from "react";
 
 /**
  * Dashboard page showing doctor's overview
@@ -27,11 +31,43 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: summary, isLoading: summaryLoading } = useDashboardSummary();
-  const { data: glucoseEvolution, isLoading: glucoseLoading } = useGlucoseEvolution();
-  const { data: insulinStats, isLoading: insulinLoading } = useInsulinStats(30);
-  const { data: mealStats, isLoading: mealLoading } = useMealStats(30);
+  // Estado del período global con persistencia en localStorage
+  const [dashboardDays, setDashboardDays] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("dashboardPeriodDays");
+      return saved ? parseInt(saved, 10) : 7; // Default 7 días
+    }
+    return 7;
+  });
+
+  // Persistir cambios en localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("dashboardPeriodDays", dashboardDays.toString());
+    }
+  }, [dashboardDays]);
+
+  const { data: summary, isLoading: summaryLoading } = useDashboardSummary(dashboardDays);
+  const { data: glucoseEvolution, isLoading: glucoseLoading } = useGlucoseEvolution(dashboardDays);
+  const { data: insulinStats, isLoading: insulinLoading } = useInsulinStats(dashboardDays);
+  const { data: mealStats, isLoading: mealLoading } = useMealStats(dashboardDays);
   const { data: recentAlerts, isLoading: alertsLoading } = useRecentAlerts(3);
+
+  const acknowledgeBatchMutation = useAcknowledgeBatch();
+
+  const handleAcknowledgeAllCritical = async () => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
+
+    try {
+      await acknowledgeBatchMutation.mutateAsync({
+        token,
+        acknowledgeAll: true,
+      });
+    } catch (error) {
+      console.error("Failed to acknowledge alerts:", error);
+    }
+  };
 
   const handleAlertUpdate = () => {
     // Use shared utility to invalidate all alert-related queries
@@ -49,13 +85,18 @@ export default function DashboardPage() {
         <Header />
 
         <main className="ml-64 mt-16 p-6">
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Bienvenido de nuevo, {doctorName}
-            </h1>
-            <p className="text-gray-600">
-              Aquí tienes un resumen rápido de la actividad de tus pacientes.
-            </p>
+          {/* Header with Period Selector */}
+          <div className="mb-6 flex items-start justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                Bienvenido de nuevo, {doctorName}
+              </h1>
+              <p className="text-gray-600">
+                Aquí tienes un resumen rápido de la actividad de tus pacientes.
+              </p>
+            </div>
+            {/* Period Selector moved to the right */}
+            <DashboardPeriodSelector selectedDays={dashboardDays} onChange={setDashboardDays} />
           </div>
 
           {/* Summary Cards */}
@@ -63,23 +104,23 @@ export default function DashboardPage() {
             <SummaryCard
               title="Pacientes Activos"
               value={summaryLoading ? "..." : summary?.activePatients || 0}
-              description="Actualmente bajo control"
+              description={`Últimos ${dashboardDays} días`}
               icon={Users}
               iconColor="text-gray-500"
             />
-            <SummaryCard
-              title="Alertas Críticas"
-              value={summaryLoading ? "..." : summary?.criticalAlerts || 0}
-              description="Requiere atención inmediata"
-              icon={AlertTriangle}
-              iconColor="text-gray-500"
+            <AlertsSummaryCard
+              criticalAlerts={summaryLoading ? 0 : summary?.criticalAlerts || 0}
+              days={dashboardDays}
+              onAcknowledgeAll={handleAcknowledgeAllCritical}
+              loading={acknowledgeBatchMutation.isPending}
             />
             <SummaryCard
               title="Próximas Citas"
               value={summaryLoading ? "..." : summary?.upcomingAppointments || 0}
-              description="En los próximos 7 días"
+              description={`En los próximos ${dashboardDays} días`}
               icon={Calendar}
               iconColor="text-gray-500"
+              href="/dashboard/appointments"
             />
           </div>
 
@@ -93,7 +134,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ) : (
-                <GlucoseChart data={glucoseEvolution?.data || []} />
+                <GlucoseChart data={glucoseEvolution?.data || []} days={dashboardDays} />
               )}
             </div>
             <div className="flex">

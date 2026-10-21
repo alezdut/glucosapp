@@ -17,6 +17,9 @@ export const createMockConfigService = (
     SMTP_PORT: "587",
     SMTP_USER: "test@test.com",
     SMTP_PASS: "test-password",
+    RESEND_API_KEY: "re_test_123",
+    RESEND_FROM_EMAIL: "Glucosapp <noreply@example.com>",
+    RESEND_REPLY_TO: "support@example.com",
     ...config,
   };
 

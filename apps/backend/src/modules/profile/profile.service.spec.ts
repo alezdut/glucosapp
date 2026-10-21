@@ -105,6 +105,8 @@ describe("ProfileService", () => {
       const updatedUser = createMockUser({
         id: userId,
         ...updateDto,
+        firstName: "Ana",
+        lastName: "Paz",
         createdAt: new Date("2024-01-01"),
       });
 
@@ -119,9 +121,38 @@ describe("ProfileService", () => {
       });
       expect(result).toMatchObject({
         id: userId,
+        firstName: "Ana",
+        lastName: "Paz",
         weight: updateDto.weight,
         targetGlucose: updateDto.targetGlucose,
       });
+    });
+
+    it("should persist first and last name updates", async () => {
+      const updatedUser = createMockUser({
+        id: userId,
+        firstName: "Ana",
+        lastName: "Paz",
+        createdAt: new Date("2024-01-01"),
+      });
+
+      (prismaService.user.update as jest.Mock).mockResolvedValue(updatedUser);
+
+      const result = await service.updateProfile(userId, {
+        firstName: "Ana",
+        lastName: "Paz",
+      });
+
+      expect(prismaService.user.update).toHaveBeenCalledWith({
+        where: { id: userId },
+        data: expect.objectContaining({
+          firstName: "Ana",
+          lastName: "Paz",
+        }),
+        select: expect.any(Object),
+      });
+      expect(result.firstName).toBe("Ana");
+      expect(result.lastName).toBe("Paz");
     });
 
     it("should handle birthDate conversion", async () => {
@@ -189,7 +220,7 @@ describe("ProfileService", () => {
         doctor,
       };
 
-      (prismaService.doctorPatient.findFirst as jest.Mock).mockResolvedValue(relation);
+      (prismaService.doctorPatient.findUnique as jest.Mock).mockResolvedValue(relation);
 
       const result = await service.getAssignedDoctor(userId);
 
@@ -209,7 +240,7 @@ describe("ProfileService", () => {
     });
 
     it("should return null if no doctor assigned", async () => {
-      (prismaService.doctorPatient.findFirst as jest.Mock).mockResolvedValue(null);
+      (prismaService.doctorPatient.findUnique as jest.Mock).mockResolvedValue(null);
 
       const result = await service.getAssignedDoctor(userId);
 

@@ -1,5 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsNotEmpty, IsString, IsDateString, IsOptional } from "class-validator";
+import { AppointmentModality } from "@prisma/client";
+import { IsNotEmpty, IsString, IsDateString, IsOptional, IsEnum, IsUrl } from "class-validator";
 
 export class CreateAppointmentDto {
   @ApiProperty({ example: "patient-id-123" })
@@ -16,4 +17,23 @@ export class CreateAppointmentDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiProperty({
+    enum: AppointmentModality,
+    required: false,
+    default: AppointmentModality.IN_PERSON,
+  })
+  @IsOptional()
+  @IsEnum(AppointmentModality)
+  modality?: AppointmentModality;
+
+  @ApiProperty({ example: "Consultorio 4, Clínica Central", required: false })
+  @IsOptional()
+  @IsString()
+  location?: string;
+
+  @ApiProperty({ example: "https://meet.example.com/appointment-123", required: false })
+  @IsOptional()
+  @IsUrl({}, { message: "meetingUrl must be a valid URL" })
+  meetingUrl?: string;
 }

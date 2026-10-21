@@ -1,4 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
+import { UserRole } from "@prisma/client";
 
 /**
  * User data returned in auth responses
@@ -21,6 +22,9 @@ export class UserResponseDto {
 
   @ApiProperty()
   emailVerified!: boolean;
+
+  @ApiProperty({ enum: UserRole })
+  role!: UserRole;
 
   @ApiProperty()
   createdAt!: string;

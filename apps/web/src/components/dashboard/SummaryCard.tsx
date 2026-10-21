@@ -1,11 +1,14 @@
 "use client";
 
+import Link from "next/link";
+
 interface SummaryCardProps {
   title: string;
   value: number | string;
   description: string;
   icon: React.ComponentType<{ className?: string }>;
   iconColor?: string;
+  href?: string;
 }
 
 export const SummaryCard = ({
@@ -14,8 +17,9 @@ export const SummaryCard = ({
   description,
   icon: Icon,
   iconColor = "text-blue-500",
+  href,
 }: SummaryCardProps) => {
-  return (
+  const content = (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <div className="flex items-start justify-between">
         <div className="flex-1">
@@ -27,4 +31,14 @@ export const SummaryCard = ({
       </div>
     </div>
   );
+
+  if (href) {
+    return (
+      <Link href={href} className="block transition-transform hover:scale-[1.01]">
+        {content}
+      </Link>
+    );
+  }
+
+  return content;
 };

@@ -1,0 +1,65 @@
+import type { Statistics, UserProfile, DoseResult } from "@glucosapp/types";
+
+export const mobileFixtures = {
+  patientUser: {
+    id: "patient-1",
+    email: "patient@example.com",
+    firstName: "Ana",
+    lastName: "Paz",
+    emailVerified: true,
+    role: "PATIENT" as const,
+    createdAt: "2026-01-01T00:00:00.000Z",
+  },
+  onboardingUser: {
+    id: "patient-2",
+    email: "onboarding@example.com",
+    firstName: "",
+    lastName: "",
+    emailVerified: true,
+    role: "PATIENT" as const,
+    createdAt: "2026-01-01T00:00:00.000Z",
+  },
+  statistics: {
+    averageGlucose: 128,
+    dailyInsulinDose: 21,
+    mealsRegistered: 14,
+  } satisfies Statistics,
+  userProfile: {
+    targetGlucose: 110,
+    icRatioBreakfast: 10,
+    icRatioLunch: 12,
+    icRatioDinner: 14,
+    mealTimeBreakfastStart: 300,
+    mealTimeBreakfastEnd: 660,
+    mealTimeLunchStart: 660,
+    mealTimeLunchEnd: 1020,
+    mealTimeDinnerStart: 1020,
+    mealTimeDinnerEnd: 1320,
+  } as UserProfile,
+  mealDose: {
+    dose: 4.5,
+    breakdown: {
+      prandial: 3,
+      correction: 1.5,
+      insulinOnBoard: 0,
+      safetyReduction: 0,
+      glucose: 180,
+      targetGlucose: 110,
+      carbohydrates: 36,
+    },
+    warnings: [],
+  } as DoseResult,
+  correctionDose: {
+    dose: 2,
+    breakdown: {
+      prandial: 0,
+      correction: 2,
+      insulinOnBoard: 0,
+      safetyReduction: 0,
+      glucose: 180,
+      targetGlucose: 110,
+      carbohydrates: 0,
+    },
+    warnings: [],
+  } as DoseResult,
+};

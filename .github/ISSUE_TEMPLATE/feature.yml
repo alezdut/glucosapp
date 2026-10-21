@@ -1,0 +1,16 @@
+name: Propuesta
+description: Proponer una mejora.
+body:
+  - type: markdown
+    attributes:
+      value: "Usá ejemplos ficticios. No compartas datos de pacientes ni secretos."
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema y comportamiento propuesto
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Cómo comprobar que resuelve el problema

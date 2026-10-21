@@ -1,6 +1,6 @@
 import { Controller, Post, Body, UseGuards, Res, HttpCode, HttpStatus } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
-import { Response } from "express";
+import type { Response } from "express";
 import { ReportsService } from "./reports.service";
 import {
   GenerateIndividualReportDto,
@@ -9,7 +9,7 @@ import {
 } from "./dto/generate-report.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { AuthUser } from "../auth/decorators/auth-user.decorator";
-import { UserResponseDto } from "../auth/dto/auth-response.dto";
+import type { UserResponseDto } from "../auth/dto/auth-response.dto";
 
 /**
  * Controller for reports endpoints

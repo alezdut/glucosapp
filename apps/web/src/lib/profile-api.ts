@@ -1,10 +1,13 @@
 import { makeApiClient } from "@glucosapp/api-client";
 import type { DiabetesType, GlucoseUnit, Language, Theme, UserProfile } from "@glucosapp/types";
+import { getWebApiBaseUrl } from "./env";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
+const apiBaseUrl = getWebApiBaseUrl();
 const { client } = makeApiClient(`${apiBaseUrl}/v1`);
 
 export type UpdateProfilePayload = {
+  firstName?: string;
+  lastName?: string;
   birthDate?: string; // ISO date string
   weight?: number;
   diabetesType?: DiabetesType;
@@ -46,4 +49,35 @@ export async function updateProfile(
   }
 
   return response.data;
+}
+
+export interface AssignedDoctor {
+  id: string;
+  doctorId: string;
+  patientId: string;
+  createdAt: string;
+  doctor: {
+    id: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    avatarUrl?: string;
+  };
+}
+
+/**
+ * Get doctor assigned to the current patient
+ */
+export async function getAssignedDoctor(accessToken: string): Promise<AssignedDoctor | null> {
+  const response = await client.GET<AssignedDoctor | null>("/profile/doctor", {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (response.error) {
+    throw new Error(response.error.message || "Failed to fetch assigned doctor");
+  }
+
+  return response.data ?? null;
 }

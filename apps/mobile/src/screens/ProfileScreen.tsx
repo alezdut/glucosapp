@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -29,6 +30,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { theme } from "../theme";
+import { releaseInfo } from "@glucosapp/theme";
 import { createApiClient } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { type UserProfile, DiabetesType, GlucoseUnit, Theme, Language } from "@glucosapp/types";
@@ -501,6 +503,29 @@ export default function ProfileScreen() {
           </View>
           <ChevronRight size={20} color={theme.colors.textTertiary} />
         </TouchableOpacity>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Glucosapp {releaseInfo.version}</Text>
+        <Text style={styles.fieldValue}>
+          Software experimental, sin garantía. No validado clínicamente.
+        </Text>
+        {[
+          ["Código fuente", releaseInfo.source],
+          ["Licencia AGPL-3.0", releaseInfo.licenseUrl],
+          ["Atribuciones", releaseInfo.noticesUrl],
+        ].map(([label, url]) => (
+          <TouchableOpacity
+            key={label}
+            accessibilityRole="link"
+            style={styles.fieldRow}
+            onPress={() =>
+              Linking.openURL(url).catch(() => Alert.alert("No se pudo abrir el enlace", url))
+            }
+          >
+            <Text style={styles.fieldLabel}>{label}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       {/* Logout Button */}

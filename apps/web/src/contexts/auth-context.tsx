@@ -1,6 +1,14 @@
 "use client";
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { User } from "@glucosapp/types";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
+import { type User } from "@glucosapp/types";
+import { isTokenExpiringSoon } from "@glucosapp/auth-utils";
 import * as authApi from "@/lib/auth-api";
 
 interface AuthContextValue {
@@ -23,6 +31,7 @@ export function useAuth() {
   if (!context) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
+
   return context;
 }
 
@@ -40,76 +49,69 @@ export function AuthProvider({ children }: AuthProviderProps) {
   /**
    * Get tokens from localStorage
    */
-  const getTokens = () => {
+  const getTokens = useCallback(() => {
     if (typeof window === "undefined") return { accessToken: null, refreshToken: null };
     return {
       accessToken: localStorage.getItem("accessToken"),
       refreshToken: localStorage.getItem("refreshToken"),
     };
-  };
+  }, []);
 
   /**
    * Store tokens in localStorage
    */
-  const setTokens = (accessToken: string, refreshToken: string) => {
+  const setTokens = useCallback((accessToken: string, refreshToken: string) => {
+    if (typeof window === "undefined") return;
     localStorage.setItem("accessToken", accessToken);
     localStorage.setItem("refreshToken", refreshToken);
-  };
+  }, []);
 
   /**
    * Clear tokens from localStorage
    */
-  const clearTokens = () => {
+  const clearTokens = useCallback(() => {
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
-  };
-
-  /**
-   * Decode JWT to get expiration time
-   */
-  const getTokenExpiration = (token: string): number | null => {
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      return payload.exp ? payload.exp * 1000 : null;
-    } catch {
-      return null;
-    }
-  };
+  }, []);
 
   /**
    * Refresh access token if needed
    */
-  const refreshTokenIfNeeded = async () => {
+  const refreshTokenIfNeeded = useCallback(async () => {
     const { accessToken, refreshToken } = getTokens();
-    if (!accessToken || !refreshToken) return false;
 
-    const expiration = getTokenExpiration(accessToken);
-    if (!expiration) return false;
-
-    const now = Date.now();
-    const timeUntilExpiry = expiration - now;
-    const oneMinute = 60 * 1000;
+    if (!accessToken || !refreshToken) {
+      return false;
+    }
 
     // Refresh if token expires in less than 1 minute
-    if (timeUntilExpiry < oneMinute) {
+    if (isTokenExpiringSoon(accessToken)) {
       try {
         const tokens = await authApi.refreshAccessToken(refreshToken);
         setTokens(tokens.accessToken, tokens.refreshToken);
         return true;
       } catch (error) {
+        console.error("Token refresh failed:", error);
         clearTokens();
         setUser(null);
         return false;
       }
     }
+
     return true;
-  };
+  }, [clearTokens, getTokens, setTokens]);
 
   /**
    * Fetch current user from API
    */
-  const fetchCurrentUser = async () => {
+  const fetchCurrentUser = useCallback(async () => {
+    if (typeof window === "undefined") {
+      setIsLoading(false);
+      return;
+    }
+
     let { accessToken } = getTokens();
+
     if (!accessToken) {
       setIsLoading(false);
       return;
@@ -130,20 +132,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const currentUser = await authApi.getCurrentUser(accessToken);
       setUser(currentUser);
     } catch (error) {
+      console.error("Error fetching user:", error);
       clearTokens();
       setUser(null);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [clearTokens, getTokens, refreshTokenIfNeeded]);
 
   /**
    * Login user
    */
   const login = async (email: string, password: string) => {
-    const response = await authApi.login({ email, password });
-    setTokens(response.accessToken, response.refreshToken);
-    setUser(response.user);
+    try {
+      const response = await authApi.login({ email, password });
+      setTokens(response.accessToken, response.refreshToken);
+      setUser(response.user);
+      setIsLoading(false);
+    } catch (error) {
+      console.error("Login failed:", error);
+      setIsLoading(false);
+      throw error;
+    }
   };
 
   /**
@@ -176,21 +186,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
     await fetchCurrentUser();
   };
 
-  // Initialize auth state on mount
+  // Initialize auth state on mount (client-side only)
   useEffect(() => {
-    fetchCurrentUser();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (typeof window === "undefined") {
+      // Server-side render, skip
+      setIsLoading(false);
+      return;
+    }
+
+    void fetchCurrentUser();
+  }, [fetchCurrentUser]);
 
   // Set up token refresh interval
   useEffect(() => {
     const interval = setInterval(() => {
-      refreshTokenIfNeeded();
+      void refreshTokenIfNeeded();
     }, 30 * 1000); // Check every 30 seconds
 
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [refreshTokenIfNeeded]);
 
   const value: AuthContextValue = {
     user,

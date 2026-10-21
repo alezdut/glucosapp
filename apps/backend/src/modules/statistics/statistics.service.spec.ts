@@ -109,7 +109,50 @@ describe("StatisticsService", () => {
 
       const result = await service.getSummary(userId);
 
+      // Average should be: (120 + 130 + 125 + 135) / 4 = 127.5 rounded to 128
+      expect(result.averageGlucose).toBe(128);
+    });
+
+    it("should calculate correct average with NFC sensor readings", async () => {
+      // Simulate scenario: user has manual entries and NFC sensor readings
+      const manualEntries = [
+        { mgdlEncrypted: "encrypted-110" }, // Manual entry
+        { mgdlEncrypted: "encrypted-115" }, // Manual entry
+      ];
+      const nfcReadings = [
+        { glucoseEncrypted: "encrypted-120" }, // NFC reading
+        { glucoseEncrypted: "encrypted-125" }, // NFC reading
+        { glucoseEncrypted: "encrypted-130" }, // NFC reading
+      ];
+
+      (prismaService.glucoseEntry.findMany as jest.Mock).mockResolvedValue(manualEntries);
+      (prismaService.glucoseReading.findMany as jest.Mock).mockResolvedValue(nfcReadings);
+      (prismaService.insulinDose.findMany as jest.Mock).mockResolvedValue([]);
+      (prismaService.logEntry.count as jest.Mock).mockResolvedValue(0);
+
+      const result = await service.getSummary(userId);
+
+      // Average should be: (110 + 115 + 120 + 125 + 130) / 5 = 120
+      expect(result.averageGlucose).toBe(120);
       expect(result.averageGlucose).toBeGreaterThan(0);
+    });
+
+    it("should handle only NFC sensor readings without manual entries", async () => {
+      const nfcReadings = [
+        { glucoseEncrypted: "encrypted-100" },
+        { glucoseEncrypted: "encrypted-110" },
+        { glucoseEncrypted: "encrypted-120" },
+      ];
+
+      (prismaService.glucoseEntry.findMany as jest.Mock).mockResolvedValue([]);
+      (prismaService.glucoseReading.findMany as jest.Mock).mockResolvedValue(nfcReadings);
+      (prismaService.insulinDose.findMany as jest.Mock).mockResolvedValue([]);
+      (prismaService.logEntry.count as jest.Mock).mockResolvedValue(0);
+
+      const result = await service.getSummary(userId);
+
+      // Average should be: (100 + 110 + 120) / 3 = 110
+      expect(result.averageGlucose).toBe(110);
     });
   });
 
@@ -156,7 +199,8 @@ describe("StatisticsService", () => {
 
       const result = await service.getWeeklyGlucoseAverage(userId);
 
-      expect(result.averageGlucose).toBeGreaterThan(0);
+      // Average should be: (120 + 130 + 140) / 3 = 130
+      expect(result.averageGlucose).toBe(130);
     });
   });
 

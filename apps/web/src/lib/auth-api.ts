@@ -1,7 +1,9 @@
 import { makeApiClient } from "@glucosapp/api-client";
 import { AuthResponse, User } from "@glucosapp/types";
+import { throwApiError } from "@glucosapp/utils";
+import { getWebApiBaseUrl } from "./env";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
+const apiBaseUrl = getWebApiBaseUrl();
 const { client } = makeApiClient(`${apiBaseUrl}/v1`);
 
 export interface RegisterData {
@@ -26,7 +28,7 @@ export async function register(data: RegisterData): Promise<{ message: string }>
     role: "DOCTOR", // Web app users are doctors by default
   });
   if (response.error) {
-    throw new Error(response.error.message || "Registration failed");
+    throwApiError(response.error, "Registration failed");
   }
   return response.data!;
 }
@@ -37,7 +39,7 @@ export async function register(data: RegisterData): Promise<{ message: string }>
 export async function login(data: LoginData): Promise<AuthResponse> {
   const response = await client.POST<AuthResponse>("/auth/login", data);
   if (response.error) {
-    throw new Error(response.error.message || "Login failed");
+    throwApiError(response.error, "Login failed");
   }
   return response.data!;
 }
@@ -52,7 +54,7 @@ export async function getCurrentUser(accessToken: string): Promise<User> {
     },
   });
   if (response.error) {
-    throw new Error(response.error.message || "Failed to fetch user");
+    throwApiError(response.error, "Failed to fetch user");
   }
   return response.data!;
 }
@@ -68,7 +70,7 @@ export async function refreshAccessToken(
     { refreshToken },
   );
   if (response.error) {
-    throw new Error(response.error.message || "Failed to refresh token");
+    throwApiError(response.error, "Failed to refresh token");
   }
   return response.data!;
 }
@@ -94,7 +96,7 @@ export async function logout(accessToken: string, refreshToken: string): Promise
 export async function verifyEmail(token: string): Promise<{ message: string }> {
   const response = await client.POST<{ message: string }>("/auth/verify-email", { token });
   if (response.error) {
-    throw new Error(response.error.message || "Email verification failed");
+    throwApiError(response.error, "Email verification failed");
   }
   return response.data!;
 }
@@ -107,7 +109,7 @@ export async function resendVerification(email: string): Promise<{ message: stri
     email,
   });
   if (response.error) {
-    throw new Error(response.error.message || "Failed to resend verification");
+    throwApiError(response.error, "Failed to resend verification");
   }
   return response.data!;
 }
@@ -118,7 +120,7 @@ export async function resendVerification(email: string): Promise<{ message: stri
 export async function forgotPassword(email: string): Promise<{ message: string }> {
   const response = await client.POST<{ message: string }>("/auth/forgot-password", { email });
   if (response.error) {
-    throw new Error(response.error.message || "Failed to send password reset email");
+    throwApiError(response.error, "Failed to send password reset email");
   }
   return response.data!;
 }
@@ -135,7 +137,7 @@ export async function resetPassword(
     newPassword,
   });
   if (response.error) {
-    throw new Error(response.error.message || "Password reset failed");
+    throwApiError(response.error, "Password reset failed");
   }
   return response.data!;
 }

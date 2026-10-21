@@ -74,6 +74,11 @@ enum AppointmentStatus {
   CANCELLED
 }
 
+enum AppointmentModality {
+  IN_PERSON
+  VIRTUAL
+}
+
 model User {
   id                       String           @id @default(cuid())
   email                    String           @unique
@@ -127,6 +132,10 @@ model User {
   // Alerts
   alerts                   Alert[]
   alertSettings            AlertSettings?
+  pushDevices              PushDevice[]
+  // Messages
+  sentMessages             Message[]  @relation("SentMessages")
+  receivedMessages         Message[]  @relation("ReceivedMessages")
 }
 
 model Account {
@@ -255,7 +264,7 @@ model GlucoseReading {
 model DoctorPatient {
   id        String   @id @default(cuid())
   doctorId  String
-  patientId String
+  patientId String   @unique
   createdAt DateTime @default(now())
   doctor    User     @relation("Doctor", fields: [doctorId], references: [id], onDelete: Cascade)
   patient   User     @relation("Patient", fields: [patientId], references: [id], onDelete: Cascade)
@@ -266,16 +275,20 @@ model DoctorPatient {
 }
 
 model Appointment {
-  id          String            @id @default(cuid())
-  doctorId    String
-  patientId   String
-  scheduledAt DateTime
-  notes       String?
-  status      AppointmentStatus @default(SCHEDULED)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  doctor      User              @relation("Doctor", fields: [doctorId], references: [id], onDelete: Cascade)
-  patient     User              @relation("Patient", fields: [patientId], references: [id], onDelete: Cascade)
+  id             String                @id @default(cuid())
+  doctorId       String
+  patientId      String
+  scheduledAt    DateTime
+  notes          String?
+  status         AppointmentStatus     @default(SCHEDULED)
+  modality       AppointmentModality   @default(IN_PERSON)
+  location       String?
+  meetingUrl     String?
+  reminderSentAt DateTime?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  doctor         User                  @relation("Doctor", fields: [doctorId], references: [id], onDelete: Cascade)
+  patient        User                  @relation("Patient", fields: [patientId], references: [id], onDelete: Cascade)
 
   @@index([doctorId])
   @@index([patientId])
@@ -329,4 +342,36 @@ model AlertSettings {
   user                               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  senderId   String
+  receiverId String
+  content    String
+  read       Boolean  @default(false)
+  readAt     DateTime?
+  createdAt  DateTime @default(now())
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([senderId, receiverId])
+  @@index([receiverId, read])
+  @@index([createdAt])
+}
+
+model PushDevice {
+  id            String   @id @default(cuid())
+  userId        String
+  expoPushToken String   @unique
+  platform      String
+  deviceId      String?
+  isActive      Boolean  @default(true)
+  lastSeenAt    DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
+  @@index([lastSeenAt])
 }

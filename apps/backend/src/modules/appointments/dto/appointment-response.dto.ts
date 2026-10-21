@@ -1,7 +1,21 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { AppointmentStatus } from "@prisma/client";
+import { AppointmentStatus, AppointmentModality } from "@prisma/client";
 
 export class AppointmentPatientDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  email!: string;
+
+  @ApiProperty({ required: false })
+  firstName?: string;
+
+  @ApiProperty({ required: false })
+  lastName?: string;
+}
+
+export class AppointmentDoctorDto {
   @ApiProperty()
   id!: string;
 
@@ -34,6 +48,15 @@ export class AppointmentResponseDto {
   @ApiProperty({ enum: AppointmentStatus })
   status!: AppointmentStatus;
 
+  @ApiProperty({ enum: AppointmentModality })
+  modality!: AppointmentModality;
+
+  @ApiProperty({ required: false })
+  location?: string;
+
+  @ApiProperty({ required: false })
+  meetingUrl?: string;
+
   @ApiProperty()
   createdAt!: string;
 
@@ -42,4 +65,7 @@ export class AppointmentResponseDto {
 
   @ApiProperty({ type: AppointmentPatientDto, required: false })
   patient?: AppointmentPatientDto;
+
+  @ApiProperty({ type: AppointmentDoctorDto, required: false })
+  doctor?: AppointmentDoctorDto;
 }
