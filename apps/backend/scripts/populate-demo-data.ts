@@ -83,6 +83,9 @@ class DemoDataPopulator {
     console.log("Demo Data Population Script");
     console.log("=================================================\n");
 
+    const { assertDemoTarget } = await import("../../../scripts/demo-config.mjs");
+    assertDemoTarget(process.env);
+
     // Bootstrap NestJS application
     const app = await NestFactory.createApplicationContext(AppModule, {
       logger: ["error", "warn"],
@@ -105,7 +108,14 @@ class DemoDataPopulator {
   async resetDemoData() {
     console.log("⚠️  Reset mode: Deleting all existing demo data...\n");
 
-    // Delete all demo patients and their related data (cascade will handle relations)
+    // GlucoseEntry has no user cascade; remove linked records in dependency order.
+    const patients = await this.prisma.user.findMany({
+      where: { email: { endsWith: "@glucosapp.demo" }, role: "PATIENT" },
+      select: { id: true },
+    });
+    const userId = { in: patients.map((patient) => patient.id) };
+    await this.prisma.logEntry.deleteMany({ where: { userId } });
+    await this.prisma.glucoseEntry.deleteMany({ where: { userId } });
     const deleted = await this.prisma.user.deleteMany({
       where: {
         email: {
@@ -157,6 +167,18 @@ class DemoDataPopulator {
   }
 
   async populateAllPatients() {
+    const doctor = await this.prisma.user.upsert({
+      where: { email: "demo-doctor@glucosapp.demo" },
+      create: {
+        email: "demo-doctor@glucosapp.demo",
+        firstName: "Profesional",
+        lastName: "Demo",
+        role: "DOCTOR",
+        emailVerified: true,
+        password: await bcrypt.hash("Demo123!", 10),
+      },
+      update: {},
+    });
     const existingPatients = await this.detectExistingPatients();
 
     console.log(`Generating data for ${DEMO_PATIENTS.length} patients...\n`);
@@ -180,6 +202,17 @@ class DemoDataPopulator {
       totalAlerts += stats.alertsCreated;
     }
 
+    const patients = await this.prisma.user.findMany({
+      where: { email: { in: DEMO_PATIENTS.map((profile) => profile.email) } },
+      select: { id: true },
+    });
+    for (const patient of patients) {
+      await this.prisma.doctorPatient.upsert({
+        where: { patientId: patient.id },
+        create: { doctorId: doctor.id, patientId: patient.id },
+        update: { doctorId: doctor.id },
+      });
+    }
     this.printSummary(totalLogEntries, totalSensorReadings, totalAlerts);
   }
 
@@ -212,6 +245,12 @@ class DemoDataPopulator {
       // Special case for inactive patient
       startDate = addDays(today, -(profile.dataStartDaysAgo || 180));
       endDate = addDays(today, -(profile.dataEndDaysAgo || 90));
+      if (existing?.lastDataDate) {
+        if (existing.lastDataDate >= endDate) {
+          return { logEntriesCreated: 0, sensorReadingsCreated: 0, alertsCreated: 0 };
+        }
+        startDate = addDays(existing.lastDataDate, 1);
+      }
     } else if (existing && existing.lastDataDate) {
       // Incremental update: add data from last date to today
       startDate = addDays(existing.lastDataDate, 1);
@@ -554,7 +593,7 @@ async function main() {
   } catch (error) {
     console.error("\n❌ Error during demo data population:");
     console.error(error);
-    process.exit(1);
+    process.exitCode = 1;
   } finally {
     if (app) {
       await populator.close(app);

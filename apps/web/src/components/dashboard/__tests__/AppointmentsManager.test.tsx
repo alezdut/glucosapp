@@ -118,6 +118,8 @@ const appointments = [
 
 describe("AppointmentsManager", () => {
   beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(Date.parse("2026-04-10T12:00:00.000Z"));
     jest.clearAllMocks();
     mockUsePatients.mockReturnValue({ data: patients } as never);
     mockUseCreateDoctorAppointment.mockReturnValue({
@@ -144,6 +146,7 @@ describe("AppointmentsManager", () => {
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     jest.restoreAllMocks();
   });
 

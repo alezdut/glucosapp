@@ -1,47 +1,14 @@
-# Guion de demo para defensa
+# Demo de Glucosapp v0.1.0
 
-## Objetivo
+Todos los nombres, perfiles, lecturas y credenciales son sintéticos. No use la demo para decisiones clínicas ni ingrese datos reales.
 
-Mostrar que Glucosapp cubre un circuito clínico-tecnológico coherente, desde autenticación hasta seguimiento y apoyo a la toma de decisiones.
+1. Ejecute la instalación de [SETUP](SETUP.md), `pnpm dev` y `pnpm dev:mobile`.
+2. En web ingrese como `demo-doctor@glucosapp.demo`, contraseña `Demo123!`. Compruebe los diez pacientes, gráficos y alertas.
+3. En móvil ingrese como `demo-patient-1@glucosapp.demo`, misma contraseña. Revise historial y profesional asignado.
+4. Registre un valor ficticio de glucosa y compruebe que aparece en el historial y en la vista del paciente del profesional.
+5. Con ambos clientes conectados, envíe un mensaje entre paciente y profesional. Cree o consulte una cita de prueba.
+6. Genere un reporte PDF o CSV con datos de los últimos siete días y **sin resumen IA**.
+7. En web abra el enlace a licencia y código fuente del pie de navegación; en móvil, los enlaces de la sección Glucosapp del perfil.
+8. Explique que el algoritmo MDI es experimental y no está validado clínicamente. No cambie parámetros ni muestre dosis como recomendaciones para una persona real.
 
-## Preparación
-
-- Confirmar que `backend` y `web` estén corriendo.
-- Confirmar que `mobile` esté conectado al mismo backend.
-- Tener al menos un usuario profesional y un usuario paciente de prueba.
-- Tener datos demo cargados o un flujo preparado para registrar información en vivo.
-
-## Recorrido sugerido
-
-### 1. Autenticación
-
-- Ingresar en web con usuario profesional.
-- Mostrar protección de rutas y acceso al dashboard.
-- Ingresar o restaurar sesión en mobile con usuario paciente.
-
-### 2. Visualización clínica
-
-- Mostrar dashboard web con resumen de pacientes, alertas y métricas.
-- Mostrar en mobile la pantalla principal o historial del paciente.
-
-### 3. Flujo funcional de alto valor en web
-
-- Navegar a pacientes, alertas, citas o comunicación.
-- Ejecutar una acción concreta: revisar alertas, ver evolución o abrir conversación.
-
-### 4. Flujo funcional de alto valor en mobile
-
-- Registrar glucosa o navegar al flujo de cálculo.
-- Mostrar cómo la app soporta seguimiento diario del paciente.
-
-### 5. Soporte a la decisión y trazabilidad
-
-- Señalar el cálculo de insulina y el módulo algorítmico compartido.
-- Mostrar reportes, estadísticas o historial como evidencia de seguimiento longitudinal.
-
-## Mensajes clave para el jurado
-
-- Monorepo con lógica compartida y contratos tipados.
-- Backend con módulos de dominio y tests unitarios amplios.
-- Frontends con validación automatizada en flujos críticos.
-- Configuración reproducible mediante `.env.example`, README y guía de setup.
+Las capturas de documentación se obtienen de estas cuentas. No necesita sensores, credenciales Google, correo ni servicios pagos para este recorrido. Consulte las dependencias opcionales y limitaciones en SETUP.

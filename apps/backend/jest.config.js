@@ -9,6 +9,7 @@ module.exports = {
   collectCoverageFrom: [
     "**/*.(t|j)s",
     "!**/*.spec.ts",
+    "!**/*.integration-test.ts",
     "!**/*.interface.ts",
     "!**/*.dto.ts",
     "!**/*.module.ts",

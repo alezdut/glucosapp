@@ -27,5 +27,6 @@
     "eslint-plugin-react-hooks": "^4.6.0",
     "tsup": "^8.0.1",
     "typescript": "^5.9.2"
-  }
+  },
+  "license": "AGPL-3.0-only"
 }

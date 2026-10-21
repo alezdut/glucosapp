@@ -59,6 +59,11 @@ export const Sidebar = () => {
           })}
         </ul>
       </nav>
+      <div className="p-4 border-t text-sm text-gray-600">
+        <Link href="/about" className="hover:underline">
+          Código fuente, licencia y atribuciones
+        </Link>
+      </div>
     </div>
   );
 };
