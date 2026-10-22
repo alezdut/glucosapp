@@ -3,7 +3,7 @@ import type { DiabetesType, GlucoseUnit, Language, Theme, UserProfile } from "@g
 import { getWebApiBaseUrl } from "./env";
 
 const apiBaseUrl = getWebApiBaseUrl();
-const { client } = makeApiClient(`${apiBaseUrl}/v1`);
+const { client } = makeApiClient(apiBaseUrl);
 
 export type UpdateProfilePayload = {
   firstName?: string;

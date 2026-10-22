@@ -12,6 +12,37 @@ import { CreateMessageDto } from "./dto/create-message.dto";
 import { MessageResponseDto } from "./dto/message-response.dto";
 import { ConversationResponseDto } from "./dto/conversation-response.dto";
 
+type MessageRecord = {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  clientMessageId: string;
+  content: string;
+  read: boolean;
+  readAt: Date | null;
+  createdAt: Date;
+  createdAtClient: Date | null;
+  sender: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    avatarUrl: string | null;
+  };
+  receiver: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    avatarUrl: string | null;
+  };
+};
+
+export interface SendMessageResult {
+  message: MessageResponseDto;
+  created: boolean;
+}
+
 @Injectable()
 export class MessagesService {
   private readonly logger = new Logger(MessagesService.name);
@@ -59,8 +90,8 @@ export class MessagesService {
   /**
    * Send a message
    */
-  async sendMessage(senderId: string, createDto: CreateMessageDto): Promise<MessageResponseDto> {
-    const { receiverId, content } = createDto;
+  async sendMessage(senderId: string, createDto: CreateMessageDto): Promise<SendMessageResult> {
+    const { receiverId, content, clientMessageId, createdAtClient } = createDto;
 
     // Verify receiver exists
     const receiver = await this.prisma.user.findUnique({
@@ -95,36 +126,38 @@ export class MessagesService {
       throw new ForbiddenException("Doctors can only send messages to their assigned patients");
     }
 
-    // Create message
+    const existingMessage = await this.prisma.message.findUnique({
+      where: {
+        senderId_clientMessageId: {
+          senderId,
+          clientMessageId: clientMessageId.trim(),
+        },
+      },
+      include: this.messageInclude,
+    });
+
+    if (existingMessage) {
+      return {
+        message: this.mapMessageToDto(existingMessage),
+        created: false,
+      };
+    }
+
     const message = await this.prisma.message.create({
       data: {
         senderId,
         receiverId,
+        clientMessageId: clientMessageId.trim(),
         content: content.trim(),
+        createdAtClient: createdAtClient ? new Date(createdAtClient) : null,
       },
-      include: {
-        sender: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            avatarUrl: true,
-          },
-        },
-        receiver: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            avatarUrl: true,
-          },
-        },
-      },
+      include: this.messageInclude,
     });
 
-    return this.mapMessageToDto(message);
+    return {
+      message: this.mapMessageToDto(message),
+      created: true,
+    };
   }
 
   /**
@@ -177,26 +210,7 @@ export class MessagesService {
           },
         ],
       },
-      include: {
-        sender: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            avatarUrl: true,
-          },
-        },
-        receiver: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            avatarUrl: true,
-          },
-        },
-      },
+      include: this.messageInclude,
       orderBy: {
         createdAt: "asc",
       },
@@ -271,26 +285,7 @@ export class MessagesService {
           { senderId: { in: patientIds }, receiverId: userId },
         ],
       },
-      include: {
-        sender: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            avatarUrl: true,
-          },
-        },
-        receiver: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            avatarUrl: true,
-          },
-        },
-      },
+      include: this.messageInclude,
       orderBy: {
         createdAt: "desc", // Most recent first for easier latest message extraction
       },
@@ -357,26 +352,7 @@ export class MessagesService {
   async markAsRead(userId: string, messageId: string): Promise<MessageResponseDto> {
     const message = await this.prisma.message.findUnique({
       where: { id: messageId },
-      include: {
-        sender: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            avatarUrl: true,
-          },
-        },
-        receiver: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            avatarUrl: true,
-          },
-        },
-      },
+      include: this.messageInclude,
     });
 
     if (!message) {
@@ -481,37 +457,38 @@ export class MessagesService {
   /**
    * Map Prisma message to DTO
    */
-  private mapMessageToDto(message: {
-    id: string;
-    senderId: string;
-    receiverId: string;
-    content: string;
-    read: boolean;
-    readAt: Date | null;
-    createdAt: Date;
+  private readonly messageInclude = {
     sender: {
-      id: string;
-      email: string;
-      firstName: string | null;
-      lastName: string | null;
-      avatarUrl: string | null;
-    };
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        avatarUrl: true,
+      },
+    },
     receiver: {
-      id: string;
-      email: string;
-      firstName: string | null;
-      lastName: string | null;
-      avatarUrl: string | null;
-    };
-  }): MessageResponseDto {
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        avatarUrl: true,
+      },
+    },
+  } as const;
+
+  private mapMessageToDto(message: MessageRecord): MessageResponseDto {
     return {
       id: message.id,
       senderId: message.senderId,
       receiverId: message.receiverId,
+      clientMessageId: message.clientMessageId,
       content: message.content,
       read: message.read,
       readAt: message.readAt ? message.readAt.toISOString() : undefined,
       createdAt: message.createdAt.toISOString(),
+      createdAtClient: message.createdAtClient ? message.createdAtClient.toISOString() : undefined,
       sender: {
         id: message.sender.id,
         email: message.sender.email,

@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, MaxLength } from "class-validator";
+import { IsDateString, IsNotEmpty, IsOptional, IsString, MaxLength } from "class-validator";
 
 /**
  * DTO for sending a message via WebSocket
@@ -12,6 +12,14 @@ export class SendMessageDto {
   @IsNotEmpty()
   @MaxLength(5000, { message: "Message content cannot exceed 5000 characters" })
   content!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  clientMessageId!: string;
+
+  @IsDateString()
+  @IsNotEmpty()
+  createdAtClient!: string;
 }
 
 /**

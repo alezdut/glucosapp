@@ -13,6 +13,7 @@ const REFRESH_TOKEN_KEY = "refreshToken";
 // Flag to prevent multiple simultaneous refresh attempts
 let isRefreshing = false;
 let refreshPromise: Promise<{ accessToken: string; refreshToken: string } | null> | null = null;
+const isDevLoggingEnabled = typeof __DEV__ !== "undefined" && __DEV__;
 
 /**
  * Store authentication tokens securely
@@ -66,7 +67,7 @@ export async function refreshAccessToken(): Promise<{
         return null;
       }
 
-      const { client } = makeApiClient(`${API_BASE_URL}/v1`);
+      const { client } = makeApiClient(API_BASE_URL);
       const response = await client.POST<{ accessToken: string; refreshToken: string }>(
         "/auth/refresh",
         {
@@ -82,20 +83,22 @@ export async function refreshAccessToken(): Promise<{
 
       // If refresh fails, clear tokens only for certain errors
       if (response.error) {
-        console.error("Token refresh failed:", response.error);
         // Only clear tokens for 401/403 errors (invalid token), not for network/server errors
         const status = (response.error as { status?: number })?.status;
         if (status === 401 || status === 403) {
           await clearTokens();
+        } else if (status !== 404 && isDevLoggingEnabled) {
+          console.warn("Token refresh returned an unexpected response", response.error);
         }
       }
 
       return null;
     } catch (error) {
-      console.error("Failed to refresh token:", error);
       // Don't clear tokens on network/server errors, only on auth errors
       if (error instanceof Error && error.message.includes("401")) {
         await clearTokens();
+      } else if (isDevLoggingEnabled) {
+        console.warn("Token refresh request failed", error);
       }
       return null;
     } finally {
@@ -149,7 +152,7 @@ const getRequestHeaders = (
  * Create API client with automatic token injection and refresh handling
  */
 export function createApiClient() {
-  const { client } = makeApiClient(`${API_BASE_URL}/v1`);
+  const { client } = makeApiClient(API_BASE_URL);
 
   /**
    * Execute a request with automatic token refresh on 401 errors

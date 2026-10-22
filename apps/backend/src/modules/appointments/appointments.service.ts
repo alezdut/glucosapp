@@ -282,7 +282,9 @@ export class AppointmentsService implements OnModuleInit, OnModuleDestroy {
     });
 
     if (overlappingAppointment) {
-      throw new ConflictException("Doctor already has an overlapping appointment");
+      throw new ConflictException(
+        "Usted ya cuenta con una cita programada en ese horario. Por favor elija otro horario para evitar conflictos.",
+      );
     }
   }
 

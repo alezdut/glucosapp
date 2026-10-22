@@ -12,6 +12,26 @@ export interface GeneratedReading {
   source: "MANUAL" | "LIBRE_NFC" | "DEXCOM";
 }
 
+type ReadingState = "SEVERE_HYPO" | "HYPO" | "IN_RANGE" | "HYPER";
+
+export interface ReadingValidationResult {
+  passed: boolean;
+  actual: ReturnType<typeof verifyReadingStatistics>;
+  deltas: {
+    inRangePercentage: number;
+    hypoPercentage: number;
+    severeHypoPercentage: number;
+    hyperPercentage: number;
+  };
+}
+
+export interface ReadingValidationTolerances {
+  inRangePercentage: number;
+  hypoPercentage: number;
+  severeHypoPercentage: number;
+  hyperPercentage: number;
+}
+
 /**
  * Apply diurnal variation (dawn phenomenon and circadian rhythm)
  * Returns a multiplier to apply to base glucose value
@@ -53,8 +73,8 @@ function getMealSpikeEffect(timestamp: Date, meals: GeneratedMeal[]): number {
 
     // Spike starts 15 min after meal, peaks at 60-90 min, returns to baseline by 3 hours
     if (timeDiff >= 0 && timeDiff <= 180) {
-      // Spike magnitude based on carbs
-      const peakSpike = meal.carbs * 1.5; // ~1.5 mg/dL per gram of carb at peak
+      // Use a modest postprandial effect so meals shape the curve without dominating the profile.
+      const peakSpike = meal.carbs * 0.35;
 
       // Time-based spike curve (rises quickly, falls slowly)
       let spikeMultiplier = 0;
@@ -74,6 +94,79 @@ function getMealSpikeEffect(timestamp: Date, meals: GeneratedMeal[]): number {
   return maxSpike;
 }
 
+function getStateProbabilities(
+  profile: PatientProfile,
+): Array<{ state: ReadingState; weight: number }> {
+  const severeHypo = Math.max(0, profile.severeHypoglycemiaPercentage);
+  const totalHypo = Math.max(severeHypo, profile.hypoglycemiaPercentage);
+  const regularHypo = Math.max(0, totalHypo - severeHypo);
+  const inRange = Math.max(0, profile.targetInRangePercentage);
+  const hyper = Math.max(0, profile.hyperglycemiaPercentage);
+
+  return [
+    { state: "SEVERE_HYPO", weight: severeHypo },
+    { state: "HYPO", weight: regularHypo },
+    { state: "IN_RANGE", weight: inRange },
+    { state: "HYPER", weight: hyper },
+  ];
+}
+
+function pickReadingState(profile: PatientProfile): ReadingState {
+  const probabilities = getStateProbabilities(profile);
+  const totalWeight = probabilities.reduce((sum, item) => sum + item.weight, 0);
+  const normalizedTotal = totalWeight > 0 ? totalWeight : 1;
+
+  let threshold = Math.random() * normalizedTotal;
+  for (const item of probabilities) {
+    threshold -= item.weight;
+    if (threshold <= 0) {
+      return item.state;
+    }
+  }
+
+  return "IN_RANGE";
+}
+
+function generateStateBoundedValue(
+  state: ReadingState,
+  baseline: number,
+  mealSpike: number,
+  profile: PatientProfile,
+): number {
+  const inRangeMidpoint = (profile.minTarget + profile.maxTarget) / 2;
+  const mealBias = mealSpike * (state === "HYPER" ? 0.9 : state === "IN_RANGE" ? 0.35 : 0.1);
+
+  switch (state) {
+    case "SEVERE_HYPO": {
+      const target = gaussianRandom(49, 4);
+      return clamp(baseline * 0.15 + target * 0.85 - mealBias * 0.2, 40, 53);
+    }
+    case "HYPO": {
+      const target = gaussianRandom(62, 5);
+      return clamp(baseline * 0.2 + target * 0.8 - mealBias * 0.1, 54, 69);
+    }
+    case "IN_RANGE": {
+      const lowerTarget = profile.minTarget;
+      const upperTarget = profile.maxTarget;
+      const target = gaussianRandom(
+        inRangeMidpoint + mealBias * 0.25,
+        Math.max(6, profile.stdDev * 0.18),
+      );
+      return clamp(baseline * 0.4 + target * 0.6, lowerTarget, upperTarget);
+    }
+    case "HYPER": {
+      const upperLimit = profile.hyperglycemiaPercentage >= 50 ? 330 : 260;
+      const target = gaussianRandom(
+        Math.max(195, profile.meanGlucose + mealBias * 0.35),
+        Math.max(12, profile.stdDev * 0.22),
+      );
+      return clamp(baseline * 0.25 + target * 0.75 + mealBias * 0.5, 181, upperLimit);
+    }
+    default:
+      return baseline;
+  }
+}
+
 /**
  * Generate a single glucose reading based on patient profile
  */
@@ -85,7 +178,7 @@ export function generateGlucoseReading(
   const hour = getHourOfDay(timestamp);
 
   // 1. Generate base value from Gaussian distribution
-  let glucose = gaussianRandom(profile.meanGlucose, profile.stdDev);
+  let glucose = gaussianRandom(profile.meanGlucose, Math.max(8, profile.stdDev * 0.35));
 
   // 2. Apply diurnal variation
   const diurnalMultiplier = getDiurnalMultiplier(hour);
@@ -93,29 +186,11 @@ export function generateGlucoseReading(
 
   // 3. Apply meal spike effect
   const mealSpike = getMealSpikeEffect(timestamp, meals);
-  glucose += mealSpike;
+  glucose += mealSpike * 0.25;
 
-  // 4. Inject events based on profile percentages
-  // This ensures we hit the target percentages for hypos and hypers
-  const rand = Math.random() * 100;
-
-  // Severe hypoglycemia (<54 mg/dL)
-  if (rand < profile.severeHypoglycemiaPercentage) {
-    glucose = randomFloat(40, 54);
-  }
-  // Regular hypoglycemia (<70 mg/dL) - excluding severe
-  else if (rand < profile.severeHypoglycemiaPercentage + profile.hypoglycemiaPercentage) {
-    glucose = randomFloat(54, 70);
-  }
-  // Hyperglycemia (>180 mg/dL)
-  else if (rand > 100 - profile.hyperglycemiaPercentage) {
-    // For high hyperglycemia percentage, ensure some very high values
-    if (profile.hyperglycemiaPercentage > 50) {
-      glucose = randomFloat(180, 350);
-    } else {
-      glucose = randomFloat(180, 280);
-    }
-  }
+  // 4. Choose the metabolic state first, then shape the value within that band.
+  const state = pickReadingState(profile);
+  glucose = generateStateBoundedValue(state, glucose, mealSpike, profile);
 
   // 5. Clamp to valid physiological range
   glucose = clamp(glucose, 20, 600);
@@ -237,5 +312,38 @@ export function verifyReadingStatistics(
     hypoPercentage: Math.round((hypo / n) * 100 * 10) / 10,
     severeHypoPercentage: Math.round((severeHypo / n) * 100 * 10) / 10,
     hyperPercentage: Math.round((hyper / n) * 100 * 10) / 10,
+  };
+}
+
+export function validateGeneratedReadings(
+  readings: GeneratedReading[],
+  profile: PatientProfile,
+  tolerances: Partial<ReadingValidationTolerances> = {},
+): ReadingValidationResult {
+  const actual = verifyReadingStatistics(readings, profile);
+  const mergedTolerances: ReadingValidationTolerances = {
+    inRangePercentage: tolerances.inRangePercentage ?? 8,
+    hypoPercentage: tolerances.hypoPercentage ?? 4,
+    severeHypoPercentage: tolerances.severeHypoPercentage ?? 2,
+    hyperPercentage: tolerances.hyperPercentage ?? 8,
+  };
+
+  const deltas = {
+    inRangePercentage: Math.abs(actual.inRangePercentage - profile.targetInRangePercentage),
+    hypoPercentage: Math.abs(actual.hypoPercentage - profile.hypoglycemiaPercentage),
+    severeHypoPercentage: Math.abs(
+      actual.severeHypoPercentage - profile.severeHypoglycemiaPercentage,
+    ),
+    hyperPercentage: Math.abs(actual.hyperPercentage - profile.hyperglycemiaPercentage),
+  };
+
+  return {
+    passed:
+      deltas.inRangePercentage <= mergedTolerances.inRangePercentage &&
+      deltas.hypoPercentage <= mergedTolerances.hypoPercentage &&
+      deltas.severeHypoPercentage <= mergedTolerances.severeHypoPercentage &&
+      deltas.hyperPercentage <= mergedTolerances.hyperPercentage,
+    actual,
+    deltas,
   };
 }

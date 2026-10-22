@@ -4,6 +4,7 @@ import { JwtModule } from "@nestjs/jwt";
 import { MessagesGateway } from "./messages.gateway";
 import { MessagesController } from "./messages.controller";
 import { MessagesService } from "./messages.service";
+import { MessagesRealtimeService } from "./messages-realtime.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { DoctorUtilsService } from "../../common/services/doctor-utils.service";
 import { AuthModule } from "../auth/auth.module";
@@ -28,7 +29,13 @@ import { NotificationsModule } from "../notifications/notifications.module";
     }),
   ],
   controllers: [MessagesController],
-  providers: [MessagesGateway, MessagesService, PrismaService, DoctorUtilsService],
+  providers: [
+    MessagesGateway,
+    MessagesService,
+    MessagesRealtimeService,
+    PrismaService,
+    DoctorUtilsService,
+  ],
   exports: [MessagesService, MessagesGateway],
 })
 export class MessagesModule {}

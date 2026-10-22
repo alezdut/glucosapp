@@ -196,7 +196,6 @@ describe("useSocket", () => {
       token === "token-new" ? (socketNew as never) : (socketOld as never),
     );
 
-    const consoleSpy = jest.spyOn(console, "error").mockImplementation(() => {});
     const { result } = renderHook(() => useSocket());
 
     localStorage.setItem("accessToken", "token-new");
@@ -207,8 +206,5 @@ describe("useSocket", () => {
 
     await waitFor(() => expect(result.current.socket).toBe(socketNew));
     expect(result.current.error?.message).toContain("jwt expired");
-    expect(consoleSpy).toHaveBeenCalledWith("Socket connection error:", "jwt expired");
-
-    consoleSpy.mockRestore();
   });
 });

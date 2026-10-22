@@ -45,6 +45,9 @@ export class MessageResponseDto {
   receiverId!: string;
 
   @ApiProperty()
+  clientMessageId!: string;
+
+  @ApiProperty()
   content!: string;
 
   @ApiProperty()
@@ -55,6 +58,9 @@ export class MessageResponseDto {
 
   @ApiProperty()
   createdAt!: string;
+
+  @ApiProperty({ required: false })
+  createdAtClient?: string;
 
   @ApiProperty({ type: MessageSenderDto })
   sender!: MessageSenderDto;

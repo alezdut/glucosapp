@@ -1,10 +1,13 @@
 import { io, Socket } from "socket.io-client";
-import { getWebApiBaseUrl } from "./env";
+import { isTemporaryMessageError } from "@glucosapp/utils";
+import { getWebApiOrigin } from "./env";
 
-const apiBaseUrl = getWebApiBaseUrl();
-const socketUrl = apiBaseUrl.replace(/\/v1$/, ""); // Remove /v1 if present
+const socketUrl = getWebApiOrigin();
 
 let socket: Socket | null = null;
+
+const isAuthError = (message: string): boolean =>
+  /expired|jwt|token|unauthorized|forbidden|invalid/i.test(message);
 
 /**
  * Get or create Socket.io connection
@@ -54,15 +57,19 @@ export const getSocket = (token: string | null): Socket | null => {
     });
 
     socket.on("connect_error", (error) => {
-      console.error("Socket connection error:", error.message);
+      if (isAuthError(error.message)) {
+        console.error("Socket authentication error:", error.message);
+      } else if (isTemporaryMessageError(error)) {
+        if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") {
+          console.warn("Socket connection degraded:", error.message);
+        }
+      } else {
+        console.error("Socket connection error:", error.message);
+      }
+
       // If token expired, disable auto-reconnection and disconnect
       // The useSocket hook will handle reconnection with new token
-      if (
-        socket &&
-        (error.message.includes("expired") ||
-          error.message.includes("jwt") ||
-          error.message.includes("Invalid token"))
-      ) {
+      if (socket && isAuthError(error.message)) {
         socket.io.opts.reconnection = false; // Disable auto-reconnection
         socket.disconnect();
       }

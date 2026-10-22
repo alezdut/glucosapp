@@ -2581,6 +2581,8 @@ PODS:
     - React-perflogger (= 0.81.4)
     - React-utils (= 0.81.4)
     - SocketRocket
+  - RNCAsyncStorage (2.2.0):
+    - React-Core
   - RNDateTimePicker (8.4.5):
     - React-Core
   - RNGestureHandler (2.28.0):
@@ -2931,6 +2933,7 @@ DEPENDENCIES:
   - ReactAppDependencyProvider (from `build/generated/ios`)
   - ReactCodegen (from `build/generated/ios`)
   - "ReactCommon/turbomodule/core (from `../../../node_modules/.pnpm/react-native@0.81.4_@babel+core@7.28.4_@react-native-community+cli@13.6.9_@types+react@19.1.17_react@19.1.0/node_modules/react-native/ReactCommon`)"
+  - "RNCAsyncStorage (from `../../../node_modules/.pnpm/@react-native-async-storage+async-storage@2.2.0_react-native@0.81.4_@babel+core@7.28.4_@react_rughmn7orchl5koh2sshtnacum/node_modules/@react-native-async-storage/async-storage`)"
   - "RNDateTimePicker (from `../../../node_modules/.pnpm/@react-native-community+datetimepicker@8.4.5_expo@54.0.12_@babel+core@7.28.4_graphql@15.8.0_r_m3hykworfpxmhsxhmmimt36goi/node_modules/@react-native-community/datetimepicker`)"
   - "RNGestureHandler (from `../../../node_modules/.pnpm/react-native-gesture-handler@2.28.0_react-native@0.81.4_@babel+core@7.28.4_@react-native-comm_6lcylih3l6ftf7z7qzf36bwwtu/node_modules/react-native-gesture-handler`)"
   - "RNReanimated (from `../../../node_modules/.pnpm/react-native-reanimated@3.19.5_@babel+core@7.28.4_react-native@0.81.4_@babel+core@7.28.4_@rea_2bkuic4ileleygi7gwmggvn74i/node_modules/react-native-reanimated`)"
@@ -3146,6 +3149,8 @@ EXTERNAL SOURCES:
     :path: build/generated/ios
   ReactCommon:
     :path: "../../../node_modules/.pnpm/react-native@0.81.4_@babel+core@7.28.4_@react-native-community+cli@13.6.9_@types+react@19.1.17_react@19.1.0/node_modules/react-native/ReactCommon"
+  RNCAsyncStorage:
+    :path: "../../../node_modules/.pnpm/@react-native-async-storage+async-storage@2.2.0_react-native@0.81.4_@babel+core@7.28.4_@react_rughmn7orchl5koh2sshtnacum/node_modules/@react-native-async-storage/async-storage"
   RNDateTimePicker:
     :path: "../../../node_modules/.pnpm/@react-native-community+datetimepicker@8.4.5_expo@54.0.12_@babel+core@7.28.4_graphql@15.8.0_r_m3hykworfpxmhsxhmmimt36goi/node_modules/@react-native-community/datetimepicker"
   RNGestureHandler:
@@ -3261,6 +3266,7 @@ SPEC CHECKSUMS:
   ReactAppDependencyProvider: 433ddfb4536948630aadd5bd925aff8a632d2fe3
   ReactCodegen: 9288149f43054edd681e4376d7d3db33fb29981f
   ReactCommon: 394c6b92765cf6d211c2c3f7f6bc601dffb316a6
+  RNCAsyncStorage: b44e8a4e798c3e1f56bffccd0f591f674fb9198f
   RNDateTimePicker: 8c12d12e8660697c2e176d2f98775764431c141f
   RNGestureHandler: 12a436b5074378be95468a57b62c165a1e24cfc9
   RNReanimated: 3979e65213348df246b9f6a6ad6897134632417b

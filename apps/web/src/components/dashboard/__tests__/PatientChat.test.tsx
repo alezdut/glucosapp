@@ -5,6 +5,7 @@ import { act } from "@testing-library/react";
 import { useAuth } from "@/contexts/auth-context";
 import { usePatientDetails } from "@/hooks/usePatients";
 import { useConversation, useMarkAsRead, useSendMessage } from "@/hooks/useMessages";
+import { useSocket } from "@/hooks/useSocket";
 import { PatientChat } from "../PatientChat";
 
 jest.mock("@/contexts/auth-context", () => ({
@@ -21,11 +22,16 @@ jest.mock("@/hooks/useMessages", () => ({
   useMarkAsRead: jest.fn(),
 }));
 
+jest.mock("@/hooks/useSocket", () => ({
+  useSocket: jest.fn(),
+}));
+
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockUsePatientDetails = usePatientDetails as jest.MockedFunction<typeof usePatientDetails>;
 const mockUseConversation = useConversation as jest.MockedFunction<typeof useConversation>;
 const mockUseSendMessage = useSendMessage as jest.MockedFunction<typeof useSendMessage>;
 const mockUseMarkAsRead = useMarkAsRead as jest.MockedFunction<typeof useMarkAsRead>;
+const mockUseSocket = useSocket as jest.MockedFunction<typeof useSocket>;
 
 describe("PatientChat", () => {
   beforeEach(() => {
@@ -57,6 +63,9 @@ describe("PatientChat", () => {
     mockUseMarkAsRead.mockReturnValue({
       mutate: jest.fn(),
     } as never);
+    mockUseSocket.mockReturnValue({
+      connectionState: "connected",
+    } as never);
   });
 
   afterEach(() => {
@@ -78,7 +87,7 @@ describe("PatientChat", () => {
     } as never);
 
     const { rerender } = render(<PatientChat patientId="patient-1" />);
-    expect(screen.getByText(/mensajes/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /mensajes/i })).toBeInTheDocument();
 
     mockUseConversation.mockReturnValueOnce({
       data: [],

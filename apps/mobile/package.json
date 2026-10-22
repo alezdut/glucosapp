@@ -24,6 +24,7 @@
     "@glucosapp/theme": "workspace:*",
     "@glucosapp/types": "workspace:*",
     "@glucosapp/utils": "workspace:*",
+    "@react-native-async-storage/async-storage": "^2.1.2",
     "@react-native-community/datetimepicker": "^8.4.4",
     "@react-navigation/bottom-tabs": "^6.5.11",
     "@react-navigation/native": "^6.1.9",

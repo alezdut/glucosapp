@@ -11,7 +11,6 @@ describe("DashboardService", () => {
   let service: DashboardService;
   let prismaService: PrismaService;
   let doctorUtilsService: DoctorUtilsService;
-  let encryptionService: EncryptionService;
 
   const doctorId = "doctor-123";
   const patientId = "patient-123";
@@ -56,7 +55,6 @@ describe("DashboardService", () => {
     service = module.get<DashboardService>(DashboardService);
     prismaService = module.get<PrismaService>(PrismaService);
     doctorUtilsService = module.get<DoctorUtilsService>(DoctorUtilsService);
-    encryptionService = module.get<EncryptionService>(EncryptionService);
   });
 
   it("should be defined", () => {
@@ -125,6 +123,7 @@ describe("DashboardService", () => {
         criticalAlerts: 0,
         upcomingAppointments: 0,
       });
+      expect(prismaService.alertSettings.findUnique).not.toHaveBeenCalled();
     });
   });
 

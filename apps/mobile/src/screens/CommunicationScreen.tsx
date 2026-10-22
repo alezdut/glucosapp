@@ -24,6 +24,8 @@ import {
   useMarkAsReadBatch,
   useAssignedDoctor,
 } from "../hooks/useMessages";
+import { useMessageOutbox } from "../hooks/useMessageOutbox";
+import { useSocket } from "../hooks/useSocket";
 import { formatTimeAgo } from "@glucosapp/utils";
 import type { RootStackParamList } from "../navigation/types";
 import type { Message } from "../lib/messages-api";
@@ -37,49 +39,71 @@ interface MessageItemProps {
   message: Message;
   user: { id: string } | null;
   getMessageSenderName: (message: Message) => string;
+  onRetry?: (clientMessageId: string) => void;
 }
 
-const MessageItem = React.memo(({ message, user, getMessageSenderName }: MessageItemProps) => {
-  const isOwnMessage = message.senderId === user?.id;
-  const senderName = getMessageSenderName(message);
+const MessageItem = React.memo(
+  ({ message, user, getMessageSenderName, onRetry }: MessageItemProps) => {
+    const isOwnMessage = message.senderId === user?.id;
+    const senderName = getMessageSenderName(message);
+    const deliveryLabel =
+      message.deliveryStatus === "failed"
+        ? "No se pudo enviar"
+        : message.deliveryStatus === "queued"
+          ? "Se enviará automáticamente"
+          : message.deliveryStatus === "sending"
+            ? "Enviando..."
+            : null;
 
-  return (
-    <View
-      style={[
-        styles.messageContainer,
-        isOwnMessage ? styles.messageContainerOwn : styles.messageContainerOther,
-      ]}
-    >
-      {!isOwnMessage && <Text style={styles.senderName}>{senderName}</Text>}
+    return (
       <View
         style={[
-          styles.messageBubble,
-          isOwnMessage ? styles.messageBubbleOwn : styles.messageBubbleOther,
+          styles.messageContainer,
+          isOwnMessage ? styles.messageContainerOwn : styles.messageContainerOther,
         ]}
       >
-        <Text
+        {!isOwnMessage && <Text style={styles.senderName}>{senderName}</Text>}
+        <View
           style={[
-            styles.messageText,
-            isOwnMessage ? styles.messageTextOwn : styles.messageTextOther,
+            styles.messageBubble,
+            isOwnMessage ? styles.messageBubbleOwn : styles.messageBubbleOther,
           ]}
         >
-          {message.content}
-        </Text>
-        <View style={styles.messageFooter}>
           <Text
             style={[
-              styles.messageTime,
-              isOwnMessage ? styles.messageTimeOwn : styles.messageTimeOther,
+              styles.messageText,
+              isOwnMessage ? styles.messageTextOwn : styles.messageTextOther,
             ]}
           >
-            {formatTimeAgo(message.createdAt)}
+            {message.content}
           </Text>
-          {isOwnMessage && message.read && <Text style={styles.readIndicator}>✓ Leído</Text>}
+          <View style={styles.messageFooter}>
+            <Text
+              style={[
+                styles.messageTime,
+                isOwnMessage ? styles.messageTimeOwn : styles.messageTimeOther,
+              ]}
+            >
+              {formatTimeAgo(message.createdAt)}
+            </Text>
+            {isOwnMessage && deliveryLabel ? (
+              <Text style={styles.deliveryIndicator}>{deliveryLabel}</Text>
+            ) : null}
+            {isOwnMessage && message.read && <Text style={styles.readIndicator}>✓ Leído</Text>}
+          </View>
+          {isOwnMessage && message.deliveryStatus === "failed" && message.clientMessageId ? (
+            <TouchableOpacity
+              onPress={() => onRetry?.(message.clientMessageId!)}
+              style={styles.retryButton}
+            >
+              <Text style={styles.retryText}>Reintentar</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       </View>
-    </View>
-  );
-});
+    );
+  },
+);
 
 MessageItem.displayName = "MessageItem";
 
@@ -91,9 +115,16 @@ export default function CommunicationScreen() {
   const flatListRef = useRef<FlatList>(null);
   const hasScrolledToEndRef = useRef(false);
 
-  const { data: messages = [], isLoading } = useConversationWithDoctor();
   const { data: assignedDoctor } = useAssignedDoctor();
+  const doctorId = assignedDoctor?.doctor?.id;
+  const {
+    data: messages = [],
+    isLoading,
+    isConnectionUncertain,
+  } = useConversationWithDoctor(doctorId);
   const sendMessageMutation = useSendMessage();
+  const { retryMessage } = useMessageOutbox(doctorId);
+  const { connectionState } = useSocket();
   const markAsReadBatchMutation = useMarkAsReadBatch();
   const markAsReadBatchMutationRef = useRef(markAsReadBatchMutation);
   const queryClient = useQueryClient();
@@ -193,7 +224,12 @@ export default function CommunicationScreen() {
   const renderMessage = ({ item: message }: { item: Message }) => {
     if (!user) return null;
     return (
-      <MessageItem message={message} user={user} getMessageSenderName={getMessageSenderName} />
+      <MessageItem
+        message={message}
+        user={user}
+        getMessageSenderName={getMessageSenderName}
+        onRetry={retryMessage}
+      />
     );
   };
 
@@ -231,17 +267,32 @@ export default function CommunicationScreen() {
         onBack={handleBack}
       />
       <View style={[styles.messagesContainer, { paddingBottom: insets.bottom + theme.spacing.md }]}>
+        {connectionState !== "connected" ? (
+          <View style={styles.connectionBanner}>
+            <Text style={styles.connectionBannerText}>
+              {connectionState === "auth_error"
+                ? "Tu sesión necesita reautenticación para sincronizar mensajes."
+                : "Sin conexión estable. Tus mensajes se enviarán automáticamente."}
+            </Text>
+          </View>
+        ) : null}
         {messages.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No hay mensajes aún</Text>
-            <Text style={styles.emptySubtext}>Comienza una conversación enviando un mensaje</Text>
+            <Text style={styles.emptyText}>
+              {isConnectionUncertain ? "No pudimos confirmar tus mensajes" : "No hay mensajes aún"}
+            </Text>
+            <Text style={styles.emptySubtext}>
+              {isConnectionUncertain
+                ? "Reintentando en segundo plano. Verifica tu conexión o vuelve a intentar en unos segundos."
+                : "Comienza una conversación enviando un mensaje"}
+            </Text>
           </View>
         ) : (
           <FlatList
             ref={flatListRef}
             data={messages}
             renderItem={renderMessage}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => item.clientMessageId ?? item.id}
             contentContainerStyle={styles.messagesList}
             onContentSizeChange={() => {
               // Scroll to end when content size changes (messages loaded/changed)
@@ -368,6 +419,18 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.xs,
     color: theme.colors.white + "CC",
   },
+  deliveryIndicator: {
+    fontSize: theme.fontSize.xs,
+    color: theme.colors.white + "CC",
+  },
+  retryButton: {
+    marginTop: theme.spacing.xs,
+  },
+  retryText: {
+    color: theme.colors.white,
+    fontSize: theme.fontSize.xs,
+    textDecorationLine: "underline",
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: "center",
@@ -391,6 +454,16 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
     gap: theme.spacing.sm,
+  },
+  connectionBanner: {
+    backgroundColor: theme.colors.warning + "22",
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.sm,
+    marginTop: theme.spacing.sm,
+  },
+  connectionBannerText: {
+    color: theme.colors.text,
+    fontSize: theme.fontSize.sm,
   },
   input: {
     flex: 1,

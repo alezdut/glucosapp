@@ -6,4 +6,8 @@ export const getWebEnv = () =>
     NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
   });
 
-export const getWebApiBaseUrl = () => getWebEnv().NEXT_PUBLIC_API_BASE_URL;
+const normalizeApiOrigin = (baseUrl: string) => baseUrl.replace(/\/+$/, "").replace(/\/v1$/, "");
+
+export const getWebApiOrigin = () => normalizeApiOrigin(getWebEnv().NEXT_PUBLIC_API_BASE_URL);
+
+export const getWebApiBaseUrl = () => `${getWebApiOrigin()}/v1`;

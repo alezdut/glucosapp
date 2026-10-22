@@ -29,6 +29,23 @@ export class ReportsService {
     private readonly configService: ConfigService,
   ) {}
 
+  private mapMealLogEntry(entry: any) {
+    const mealType = entry.mealType ?? (entry.mealTemplate as any)?.mealType ?? null;
+    const carbohydrates = entry.carbohydrates ?? entry.mealTemplate?.carbohydrates ?? 0;
+
+    return {
+      date: entry.recordedAt.toISOString(),
+      mealType,
+      carbohydrates,
+      name: entry.mealTemplate?.name ?? (mealType ? `Registro ${mealType}` : "Registro manual"),
+      foodItems: entry.mealTemplate?.foodItems.map((item: any) => ({
+        name: item.name,
+        quantity: item.quantity,
+        carbs: item.carbs,
+      })),
+    };
+  }
+
   /**
    * Generate individual patient report
    */
@@ -655,7 +672,7 @@ export class ReportsService {
       where: {
         userId: { in: patientIds },
         recordedAt: { gte: startDate, lte: endDate },
-        mealTemplateId: { not: null },
+        OR: [{ mealTemplateId: { not: null } }, { carbohydrates: { gt: 0 } }],
       },
       include: {
         mealTemplate: {
@@ -667,17 +684,7 @@ export class ReportsService {
       orderBy: { recordedAt: "asc" },
     });
 
-    return logEntries.map((entry) => ({
-      date: entry.recordedAt.toISOString(),
-      mealType: (entry.mealTemplate as any)?.mealType,
-      carbohydrates: entry.mealTemplate?.carbohydrates,
-      name: entry.mealTemplate?.name,
-      foodItems: entry.mealTemplate?.foodItems.map((item) => ({
-        name: item.name,
-        quantity: item.quantity,
-        carbs: item.carbs,
-      })),
-    }));
+    return logEntries.map((entry) => this.mapMealLogEntry(entry));
   }
 
   /**
@@ -688,7 +695,7 @@ export class ReportsService {
       where: {
         userId: patientId,
         recordedAt: { gte: startDate, lte: endDate },
-        mealTemplateId: { not: null },
+        OR: [{ mealTemplateId: { not: null } }, { carbohydrates: { gt: 0 } }],
       },
       include: {
         mealTemplate: {
@@ -700,17 +707,7 @@ export class ReportsService {
       orderBy: { recordedAt: "asc" },
     });
 
-    return logEntries.map((entry) => ({
-      date: entry.recordedAt.toISOString(),
-      mealType: (entry.mealTemplate as any)?.mealType,
-      carbohydrates: entry.mealTemplate?.carbohydrates,
-      name: entry.mealTemplate?.name,
-      foodItems: entry.mealTemplate?.foodItems.map((item) => ({
-        name: item.name,
-        quantity: item.quantity,
-        carbs: item.carbs,
-      })),
-    }));
+    return logEntries.map((entry) => this.mapMealLogEntry(entry));
   }
 
   /**
@@ -1777,7 +1774,7 @@ export class ReportsService {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite-001" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     // Sanitize data to remove personal information
     const sanitizedData = this.sanitizePatientData(data);
@@ -1892,7 +1889,7 @@ Asegúrate de que el resumen sea coherente, profesional, y fácil de interpretar
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite-001" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     // Sanitize data to remove personal information
     const sanitizedData = this.sanitizeGroupData(data);

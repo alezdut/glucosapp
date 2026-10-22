@@ -8,6 +8,17 @@ import { mobileFixtures } from "../../../test/fixtures";
 import * as api from "../../lib/api";
 import * as hooks from "../../hooks";
 
+let mockFocusCleanup: (() => void) | undefined;
+let mockTriggerFocusEffect: (() => void) | undefined;
+
+const mockTriggerBlur = () => {
+  mockFocusCleanup?.();
+};
+
+const mockTriggerFocus = () => {
+  mockTriggerFocusEffect?.();
+};
+
 jest.mock("../../lib/api", () => ({
   createApiClient: jest.fn(),
 }));
@@ -15,7 +26,16 @@ jest.mock("../../lib/api", () => ({
 jest.mock("@react-navigation/native", () => ({
   useFocusEffect: (callback: () => void) => {
     mockReact.useEffect(() => {
-      callback();
+      mockTriggerFocusEffect = () => {
+        const cleanup = callback();
+        mockFocusCleanup = typeof cleanup === "function" ? cleanup : undefined;
+      };
+
+      mockTriggerFocusEffect();
+
+      return () => {
+        mockFocusCleanup?.();
+      };
     }, [callback]);
   },
 }));
@@ -70,6 +90,7 @@ const mockUseDebouncedValidation = hooks.useDebouncedValidation as jest.MockedFu
 
 describe("RegistrarScreen", () => {
   const mockGet = jest.fn();
+  const mockPost = jest.fn();
   const navigation = {
     navigate: jest.fn(),
     setParams: jest.fn(),
@@ -80,9 +101,10 @@ describe("RegistrarScreen", () => {
     jest.clearAllMocks();
     jest.useFakeTimers();
     consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    mockPost.mockResolvedValue({ data: {} });
     mockCreateApiClient.mockReturnValue({
       GET: mockGet,
-      POST: jest.fn().mockResolvedValue({ data: {} }),
+      POST: mockPost,
     } as never);
     mockUseDebouncedValidation.mockReturnValue({
       validation: { isValid: true, message: undefined, severity: "warning" },
@@ -111,6 +133,8 @@ describe("RegistrarScreen", () => {
   afterEach(() => {
     jest.useRealTimers();
     consoleErrorSpy.mockRestore();
+    mockFocusCleanup = undefined;
+    mockTriggerFocusEffect = undefined;
   });
 
   it("shows a loading state while the patient profile is being fetched", () => {
@@ -261,5 +285,142 @@ describe("RegistrarScreen", () => {
 
     expect(screen.queryByText("Contexto Adicional")).toBeNull();
     expect(screen.queryByText("Cálculo de Unidades")).toBeNull();
+  });
+
+  it("sends fasting entries without correction as regular records", async () => {
+    mockGet.mockResolvedValue({ data: mobileFixtures.userProfile });
+
+    renderMobile(
+      <RegistrarScreen
+        navigation={navigation as never}
+        route={{ key: "Registrar", name: "Registrar", params: undefined } as never}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("Ej: 60")).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText("Nivel de Glucosa actual"), {
+      target: { value: "140" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /ayuno/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^registrar$/i }));
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalled();
+    });
+
+    expect(mockPost).toHaveBeenCalledWith(
+      "/log-entries",
+      expect.objectContaining({
+        mealType: undefined,
+        insulinUnits: 0,
+      }),
+    );
+  });
+
+  it("resets fasting correction values when leaving and re-entering without saving", async () => {
+    mockGet.mockResolvedValue({ data: mobileFixtures.userProfile });
+    mockUseRealTimeDoseCalculation.mockReturnValue({
+      doseResult: null,
+      error: null,
+      isLoading: false,
+      isCalculating: false,
+      lastCalculationTime: 0,
+      hasValidData: false,
+      refetch: jest.fn(),
+    });
+
+    renderMobile(
+      <RegistrarScreen
+        navigation={navigation as never}
+        route={{ key: "Registrar", name: "Registrar", params: undefined } as never}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("Ej: 60")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /ayuno/i }));
+    fireEvent.change(screen.getByLabelText("Corregir glucosa (opcional)"), {
+      target: { value: "95" },
+    });
+
+    expect(screen.getByText("Cálculo de Unidades")).toBeTruthy();
+    expect(screen.getByText(/Corrección:/i)).toBeTruthy();
+
+    act(() => {
+      mockTriggerBlur();
+      mockTriggerFocus();
+    });
+
+    expect(screen.getByPlaceholderText("Ej: 60")).toBeTruthy();
+    expect(screen.queryByLabelText("Corregir glucosa (opcional)")).toBeNull();
+    expect(screen.queryByText(/IOB restado:/i)).toBeNull();
+    expect(screen.queryByText(/Corrección:/i)).toBeNull();
+  });
+
+  it("shows 0.0 U after returning to registrar without saving a 250 to 100 correction", async () => {
+    mockGet.mockResolvedValue({ data: mobileFixtures.userProfile });
+    mockUseRealTimeDoseCalculation.mockReturnValue({
+      doseResult: null,
+      error: null,
+      isLoading: false,
+      isCalculating: false,
+      lastCalculationTime: 0,
+      hasValidData: false,
+      refetch: jest.fn(),
+    });
+    mockUseRealTimeCorrectionCalculation.mockReturnValue({
+      doseResult: mobileFixtures.correctionDose,
+      error: null,
+      isLoading: false,
+      isCalculating: false,
+      lastCalculationTime: 0,
+      hasValidData: true,
+      refetch: jest.fn(),
+    });
+
+    renderMobile(
+      <RegistrarScreen
+        navigation={navigation as never}
+        route={{ key: "Registrar", name: "Registrar", params: undefined } as never}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("Ej: 60")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /ayuno/i }));
+    fireEvent.change(screen.getByLabelText("Nivel de Glucosa actual"), {
+      target: { value: "250" },
+    });
+    fireEvent.change(screen.getByLabelText("Corregir glucosa (opcional)"), {
+      target: { value: "100" },
+    });
+
+    expect(screen.getByText("Cálculo de Unidades")).toBeTruthy();
+    expect(screen.getByText(/Corrección:/i)).toBeTruthy();
+
+    mockUseRealTimeCorrectionCalculation.mockReturnValue({
+      doseResult: null,
+      error: null,
+      isLoading: false,
+      isCalculating: false,
+      lastCalculationTime: 0,
+      hasValidData: false,
+      refetch: jest.fn(),
+    });
+
+    act(() => {
+      mockTriggerBlur();
+      mockTriggerFocus();
+    });
+
+    expect(screen.getByPlaceholderText("Ej: 60")).toBeTruthy();
+    expect(screen.getByText("0.0 U")).toBeTruthy();
   });
 });
